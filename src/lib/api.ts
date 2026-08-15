@@ -30,8 +30,10 @@ import type {
   AchievementAction,
   OfficialReport,
   OfficialReportQuery,
+  ArchiveYearsIndex,
+  ArchiveYearDetail,
 } from '../types';
-import { getPreviewAssessmentDetails, getPreviewEventDetails, getPreviewMeetingDetails, getPreviewOfficialReport, getPreviewPlanDetails, getPreviewSupervisionVisit, getPreviewTeacherProfile, previewBootstrap } from './preview';
+import { getPreviewArchiveYear, getPreviewArchiveYears, getPreviewAssessmentDetails, getPreviewEventDetails, getPreviewMeetingDetails, getPreviewOfficialReport, getPreviewPlanDetails, getPreviewSupervisionVisit, getPreviewTeacherProfile, previewBootstrap } from './preview';
 
 const PREVIEW_MODE = import.meta.env.VITE_PREVIEW_MODE === 'true';
 const PREVIEW_MESSAGE = 'هذه معاينة GitHub Pages فقط. الحفظ والرفع الفعليان يعملان عند تشغيل خادم مرصد الإنجازات.';
@@ -63,6 +65,18 @@ export async function getOfficialReport(input: OfficialReportQuery): Promise<Off
   const params = new URLSearchParams({ reportType: input.reportType, academicYear: input.academicYear, term: input.term });
   if (input.teacherId) params.set('teacherId', String(input.teacherId));
   return parseResponse(await fetch(`/api/reports/official?${params.toString()}`));
+}
+
+
+export async function getArchiveYears(): Promise<ArchiveYearsIndex> {
+  if (PREVIEW_MODE) return getPreviewArchiveYears();
+  return parseResponse(await fetch('/api/archive/years'));
+}
+
+export async function getArchiveYear(academicYear: string): Promise<ArchiveYearDetail> {
+  if (PREVIEW_MODE) return getPreviewArchiveYear(academicYear);
+  const params = new URLSearchParams({ academicYear });
+  return parseResponse(await fetch(`/api/archive/year?${params.toString()}`));
 }
 
 export async function createUploadRequest(input: CreateRequestInput): Promise<{ id: number; uploadUrl: string; expiresAt: string }> {

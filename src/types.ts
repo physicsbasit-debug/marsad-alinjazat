@@ -644,3 +644,54 @@ export type OfficialReportQuery = {
   term: string;
   teacherId?: number | null;
 };
+
+
+export type ArchiveSourceCounts = {
+  teachers: number;
+  plans: number;
+  assessments: number;
+  visits: number;
+  meetings: number;
+  decisions: number;
+  events: number;
+  documents: number;
+  requests: number;
+};
+
+export type ArchiveCoverageItem = {
+  id: string;
+  label: string;
+  count: number;
+  detail: string;
+};
+
+export type ArchiveTeacherRecord = {
+  id: number;
+  name: string;
+  subject: string;
+  linkedRecords: number;
+};
+
+export type ArchiveYearSummary = {
+  academicYear: string;
+  isCurrent: boolean;
+  totalRecords: number;
+  teacherCount: number;
+  documentCount: number;
+  decisionCount: number;
+  latestRecordAt?: string | null;
+  sourceCounts: ArchiveSourceCounts;
+};
+
+export type ArchiveYearsIndex = {
+  currentAcademicYear: string;
+  generatedAt: string;
+  years: ArchiveYearSummary[];
+};
+
+export type ArchiveYearDetail = ArchiveYearSummary & {
+  generatedAt: string;
+  coverage: ArchiveCoverageItem[];
+  teachers: ArchiveTeacherRecord[];
+  sections: OfficialReportSection[];
+};

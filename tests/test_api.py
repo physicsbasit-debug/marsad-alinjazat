@@ -32,7 +32,7 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         self.assertIn("supervisionAttention", boot.json())
         self.assertIn("assessments", boot.json())
         self.assertIn("achievementAttention", boot.json())
-        self.assertEqual(health.json()["version"], "0.9.0")
+        self.assertEqual(health.json()["version"], "0.10.0")
 
     def test_create_teacher_and_event(self):
         teacher = self.client.post("/api/teachers", json={
@@ -889,3 +889,49 @@ def _marsad_v09_report_contract_test(self):
 
 
 MarsadAlInjazatApiTests.test_official_report_center_contract_and_filters = _marsad_v09_report_contract_test
+
+
+def _marsad_v010_archive_contract_test(self):
+    historical_event = self.client.post("/api/events", json={
+        "title": "فعالية أرشيفية للاختبار",
+        "eventType": "مبادرة",
+        "eventDate": "2025-09-10",
+        "location": "المدرسة",
+        "audience": "طلبة المدرسة",
+        "participantCount": 12,
+        "goals": "اختبار اكتشاف العام الدراسي تاريخيًا",
+        "summary": "سجل تاريخي تجريبي",
+        "outcomes": "مخرج موثق",
+        "recommendations": "لا توجد",
+        "teacherIds": [1],
+    })
+    self.assertEqual(historical_event.status_code, 201)
+
+    index = self.client.get("/api/archive/years")
+    self.assertEqual(index.status_code, 200)
+    body = index.json()
+    self.assertEqual(body["currentAcademicYear"], "2026/2027")
+    years = {item["academicYear"]: item for item in body["years"]}
+    self.assertIn("2026/2027", years)
+    self.assertIn("2025/2026", years)
+    self.assertTrue(years["2026/2027"]["isCurrent"])
+    self.assertFalse(years["2025/2026"]["isCurrent"])
+
+    detail = self.client.get("/api/archive/year", params={"academicYear": "2025/2026"})
+    self.assertEqual(detail.status_code, 200)
+    archive = detail.json()
+    self.assertEqual(archive["academicYear"], "2025/2026")
+    self.assertGreaterEqual(archive["sourceCounts"]["events"], 1)
+    self.assertGreaterEqual(archive["teacherCount"], 1)
+    self.assertTrue(any(section["id"] == "events" and section["rows"] for section in archive["sections"]))
+    self.assertTrue(any(item["id"] == 1 for item in archive["teachers"]))
+
+    invalid = self.client.get("/api/archive/year", params={"academicYear": "2026-2027"})
+    self.assertEqual(invalid.status_code, 422)
+    missing = self.client.get("/api/archive/year", params={"academicYear": "2034/2035"})
+    self.assertEqual(missing.status_code, 404)
+    read_only = self.client.post("/api/archive/year", params={"academicYear": "2025/2026"})
+    self.assertEqual(read_only.status_code, 405)
+
+
+MarsadAlInjazatApiTests.test_historical_archive_contract_and_year_discovery = _marsad_v010_archive_contract_test

@@ -33,7 +33,7 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 EVENT_UPLOADS_DIR = Path(os.getenv("APP_EVENT_UPLOADS_DIR", BASE_DIR / "uploads" / "events"))
 EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="مرصد الإنجازات API", version="0.9.0")
+app = FastAPI(title="مرصد الإنجازات API", version="0.10.0")
 
 
 class CreateRequestPayload(BaseModel):
@@ -1276,6 +1276,232 @@ def _official_report(report_type: str, academic_year: str, term: str, teacher_id
         }); return base
 
 
+ARCHIVE_EXPLICIT_YEAR_SOURCES = (
+    ("documents", "academic_year"),
+    ("meetings", "academic_year"),
+    ("curriculum_plans", "academic_year"),
+    ("supervision_visits", "academic_year"),
+    ("achievement_assessments", "academic_year"),
+)
+
+
+def _academic_year_from_date(date_value: str | None) -> str | None:
+    if not date_value:
+        return None
+    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})", str(date_value))
+    if not match:
+        return None
+    year, month = int(match.group(1)), int(match.group(2))
+    if month < 1 or month > 12:
+        return None
+    first = year if month >= 8 else year - 1
+    return f"{first:04d}/{first + 1:04d}"
+
+
+def _archive_available_years(conn) -> list[str]:
+    years: set[str] = {ACADEMIC_YEAR}
+    for table, column in ARCHIVE_EXPLICIT_YEAR_SOURCES:
+        for row in conn.execute(f"SELECT DISTINCT {column} AS academic_year FROM {table} WHERE {column} IS NOT NULL AND TRIM({column}) <> ''").fetchall():
+            value = str(row["academic_year"] or "").strip()
+            if _academic_year_bounds(value)[0]:
+                years.add(value)
+    for row in conn.execute("SELECT event_date FROM events").fetchall():
+        value = _academic_year_from_date(row["event_date"])
+        if value:
+            years.add(value)
+    for row in conn.execute("SELECT created_at FROM upload_requests").fetchall():
+        value = _academic_year_from_date(row["created_at"])
+        if value:
+            years.add(value)
+    return sorted(years, key=lambda value: int(value[:4]), reverse=True)
+
+
+def _archive_linked_teachers(conn, *, requests: list[dict], documents: list[dict], plans: list[dict], visits: list[dict], assessments: list[dict], events: list[dict], meetings: list[dict]) -> list[dict]:
+    counts: dict[int, int] = {}
+
+    def add(teacher_id) -> None:
+        if teacher_id is None:
+            return
+        try:
+            value = int(teacher_id)
+        except (TypeError, ValueError):
+            return
+        counts[value] = counts.get(value, 0) + 1
+
+    for item in requests:
+        add(item.get("teacherId"))
+    for item in documents:
+        add(item.get("teacherId"))
+    for item in plans:
+        add(item.get("ownerTeacherId"))
+    for item in visits:
+        add(item.get("teacherId"))
+    for item in assessments:
+        add(item.get("teacherId"))
+
+    event_ids = [int(item["id"]) for item in events]
+    if event_ids:
+        placeholders = ",".join("?" for _ in event_ids)
+        for row in conn.execute(f"SELECT teacher_id FROM event_teacher_links WHERE event_id IN ({placeholders})", event_ids).fetchall():
+            add(row["teacher_id"])
+
+    meeting_ids = [int(item["id"]) for item in meetings]
+    if meeting_ids:
+        placeholders = ",".join("?" for _ in meeting_ids)
+        for row in conn.execute(f"SELECT teacher_id FROM meeting_attendees WHERE meeting_id IN ({placeholders})", meeting_ids).fetchall():
+            add(row["teacher_id"])
+        for row in conn.execute(f"SELECT responsible_teacher_id FROM meeting_decisions WHERE meeting_id IN ({placeholders}) AND responsible_teacher_id IS NOT NULL", meeting_ids).fetchall():
+            add(row["responsible_teacher_id"])
+
+    plan_ids = [int(item["id"]) for item in plans]
+    if plan_ids:
+        placeholders = ",".join("?" for _ in plan_ids)
+        for row in conn.execute(f"SELECT responsible_teacher_id FROM curriculum_units WHERE plan_id IN ({placeholders}) AND responsible_teacher_id IS NOT NULL", plan_ids).fetchall():
+            add(row["responsible_teacher_id"])
+
+    visit_ids = [int(item["id"]) for item in visits]
+    if visit_ids:
+        placeholders = ",".join("?" for _ in visit_ids)
+        for row in conn.execute(f"SELECT responsible_teacher_id FROM supervision_actions WHERE visit_id IN ({placeholders}) AND responsible_teacher_id IS NOT NULL", visit_ids).fetchall():
+            add(row["responsible_teacher_id"])
+
+    assessment_ids = [int(item["id"]) for item in assessments]
+    if assessment_ids:
+        placeholders = ",".join("?" for _ in assessment_ids)
+        for row in conn.execute(f"SELECT responsible_teacher_id FROM achievement_actions WHERE assessment_id IN ({placeholders}) AND responsible_teacher_id IS NOT NULL", assessment_ids).fetchall():
+            add(row["responsible_teacher_id"])
+
+    if not counts:
+        return []
+    ids = sorted(counts)
+    placeholders = ",".join("?" for _ in ids)
+    rows = conn.execute(f"SELECT id, name, subject FROM teachers WHERE id IN ({placeholders})", ids).fetchall()
+    teachers = [
+        {"id": row["id"], "name": row["name"], "subject": row["subject"], "linkedRecords": counts.get(row["id"], 0)}
+        for row in rows
+    ]
+    teachers.sort(key=lambda item: (-item["linkedRecords"], item["name"]))
+    return teachers
+
+
+def _archive_scope(conn, academic_year: str) -> dict:
+    requests = [_request_dict(row) for row in conn.execute(
+        """SELECT r.*, t.name AS teacher_name FROM upload_requests r JOIN teachers t ON t.id = r.teacher_id ORDER BY r.created_at DESC"""
+    ).fetchall()]
+    documents = [_document_dict(row) for row in conn.execute("SELECT * FROM documents ORDER BY uploaded_at DESC").fetchall()]
+    events = [_event_dict(row) for row in conn.execute(
+        """SELECT e.*, COUNT(m.id) AS media_count FROM events e LEFT JOIN event_media m ON m.event_id = e.id GROUP BY e.id ORDER BY e.event_date DESC"""
+    ).fetchall()]
+    meetings = [_meeting_dict(row) for row in _meeting_summary_rows(conn)]
+    plans = [_plan_dict(row) for row in _plan_summary_rows(conn)]
+    visits = [_supervision_visit_dict(row) for row in _supervision_summary_rows(conn)]
+    assessments = [_achievement_assessment_dict(row) for row in _achievement_summary_rows(conn)]
+
+    requests_scope = [item for item in requests if _within_year(item.get("createdAt"), academic_year)]
+    documents_scope = [item for item in documents if item.get("academicYear") == academic_year or (not item.get("academicYear") and _within_year(item.get("uploadedAt"), academic_year))]
+    events_scope = [item for item in events if _within_year(item.get("eventDate"), academic_year)]
+    meetings_scope = [item for item in meetings if item.get("academicYear") == academic_year]
+    plans_scope = [item for item in plans if item.get("academicYear") == academic_year]
+    visits_scope = [item for item in visits if item.get("academicYear") == academic_year]
+    assessments_scope = [item for item in assessments if item.get("academicYear") == academic_year]
+
+    teachers = _archive_linked_teachers(
+        conn,
+        requests=requests_scope,
+        documents=documents_scope,
+        plans=plans_scope,
+        visits=visits_scope,
+        assessments=assessments_scope,
+        events=events_scope,
+        meetings=meetings_scope,
+    )
+    decisions = sum(int(item.get("decisionCount") or 0) for item in meetings_scope)
+    source_counts = {
+        "teachers": len(teachers),
+        "plans": len(plans_scope),
+        "assessments": len(assessments_scope),
+        "visits": len(visits_scope),
+        "meetings": len(meetings_scope),
+        "decisions": decisions,
+        "events": len(events_scope),
+        "documents": len(documents_scope),
+        "requests": len(requests_scope),
+    }
+    total_records = sum(source_counts[key] for key in ("plans", "assessments", "visits", "meetings", "events", "documents", "requests"))
+
+    date_values = [
+        *(item.get("updatedAt") for item in plans_scope),
+        *(item.get("updatedAt") for item in assessments_scope),
+        *(item.get("updatedAt") for item in visits_scope),
+        *(item.get("updatedAt") for item in meetings_scope),
+        *(item.get("updatedAt") for item in events_scope),
+        *(item.get("uploadedAt") for item in documents_scope),
+        *(item.get("updatedAt") for item in requests_scope),
+    ]
+    latest_record_at = max((str(value) for value in date_values if value), default=None)
+
+    coverage = [
+        {"id": "planning", "label": "التخطيط والمنهج", "count": len(plans_scope), "detail": f"{sum(int(item.get('unitCount') or 0) for item in plans_scope)} وحدة منهج"},
+        {"id": "achievement", "label": "التحصيل والنتائج", "count": len(assessments_scope), "detail": f"{sum(int(item.get('openActionCount') or 0) for item in assessments_scope)} تدخلات مفتوحة"},
+        {"id": "supervision", "label": "الإشراف والمتابعة", "count": len(visits_scope), "detail": f"{sum(int(item.get('openActionCount') or 0) for item in visits_scope)} متابعات مفتوحة"},
+        {"id": "meetings", "label": "الاجتماعات والقرارات", "count": len(meetings_scope), "detail": f"{decisions} قرارًا"},
+        {"id": "events", "label": "الفعاليات والتوثيق", "count": len(events_scope), "detail": f"{sum(int(item.get('mediaCount') or 0) for item in events_scope)} أدلة"},
+        {"id": "documents", "label": "الوثائق والطلبات", "count": len(documents_scope) + len(requests_scope), "detail": f"{len(documents_scope)} وثيقة • {len(requests_scope)} طلبات"},
+    ]
+
+    sections = [
+        _report_section("planning", "التخطيط والمنهج", [("title","الخطة"),("scope","النطاق"),("term","الفصل"),("owner","المسؤول"),("progress","الإنجاز"),("status","الحالة")], [
+            {"title": item["title"], "scope": f"{item['subject']} • {item['grade']}", "term": item["term"], "owner": item.get("ownerName") or "—", "progress": f"{item['progressPercent']}%", "status": _report_status_label(item.get("status"))} for item in plans_scope
+        ]),
+        _report_section("achievement", "التحصيل والنتائج", [("title","التقويم"),("scope","النطاق"),("term","الفصل"),("teacher","المعلم"),("mastery","الإتقان"),("actions","تدخلات مفتوحة")], [
+            {"title": item["title"], "scope": f"{item['subject']} • {item['grade']}", "term": item["term"], "teacher": item.get("teacherName") or "—", "mastery": f"{item['masteryPercent']}%", "actions": item.get("openActionCount", 0)} for item in assessments_scope
+        ]),
+        _report_section("supervision", "الإشراف والمتابعة", [("teacher","المعلم"),("date","التاريخ"),("type","النوع"),("lesson","الدرس"),("status","الحالة"),("followup","متابعة")], [
+            {"teacher": item.get("teacherName") or "—", "date": item["visitDate"], "type": item["visitType"], "lesson": item.get("lessonTitle") or "—", "status": _report_status_label(item.get("effectiveStatus")), "followup": item.get("openActionCount", 0)} for item in visits_scope
+        ]),
+        _report_section("meetings", "الاجتماعات والقرارات", [("title","الاجتماع"),("date","التاريخ"),("type","النوع"),("decisions","القرارات"),("open","مفتوحة")], [
+            {"title": item["title"], "date": item["meetingDate"], "type": item["meetingType"], "decisions": item.get("decisionCount", 0), "open": item.get("openDecisionCount", 0)} for item in meetings_scope
+        ]),
+        _report_section("events", "الفعاليات والتوثيق", [("title","الفعالية"),("date","التاريخ"),("type","النوع"),("participants","المشاركون"),("evidence","الأدلة")], [
+            {"title": item["title"], "date": item["eventDate"], "type": item["eventType"], "participants": item.get("participantCount", 0), "evidence": item.get("mediaCount", 0)} for item in events_scope
+        ]),
+        _report_section("documents", "الوثائق والمراجع", [("title","الوثيقة"),("category","النوع"),("scope","النطاق"),("status","الحالة"),("uploaded","تاريخ الرفع")], [
+            {"title": item["title"], "category": item["category"], "scope": " • ".join([value for value in [item.get("subject"), item.get("grade")] if value]) or "—", "status": _report_status_label(item.get("status")), "uploaded": str(item.get("uploadedAt") or "")[:10]} for item in documents_scope
+        ]),
+        _report_section("requests", "طلبات الملفات", [("title","الطلب"),("teacher","المعلم"),("type","النوع"),("scope","النطاق"),("status","الحالة")], [
+            {"title": item["title"], "teacher": item["teacherName"], "type": item["requestType"], "scope": f"{item['subject']} • {item['grade']}", "status": _report_status_label(item.get("status"))} for item in requests_scope
+        ]),
+    ]
+
+    return {
+        "academicYear": academic_year,
+        "isCurrent": academic_year == ACADEMIC_YEAR,
+        "generatedAt": utc_now(),
+        "totalRecords": total_records,
+        "teacherCount": len(teachers),
+        "documentCount": len(documents_scope),
+        "decisionCount": decisions,
+        "latestRecordAt": latest_record_at,
+        "sourceCounts": source_counts,
+        "coverage": coverage,
+        "teachers": teachers,
+        "sections": sections,
+    }
+
+
+def _archive_summary(detail: dict) -> dict:
+    return {
+        "academicYear": detail["academicYear"],
+        "isCurrent": detail["isCurrent"],
+        "totalRecords": detail["totalRecords"],
+        "teacherCount": detail["teacherCount"],
+        "documentCount": detail["documentCount"],
+        "decisionCount": detail["decisionCount"],
+        "latestRecordAt": detail["latestRecordAt"],
+        "sourceCounts": detail["sourceCounts"],
+    }
+
+
 def _safe_filename(name: str) -> str:
     name = Path(name).name
     name = re.sub(r"[^\w.()\-\u0600-\u06FF ]+", "_", name, flags=re.UNICODE)
@@ -1295,7 +1521,7 @@ def _resolve_event_local_path(storage_path: str) -> Path:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "0.9.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
+    return {"ok": True, "version": "0.10.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
 
 
 @app.get("/api/bootstrap")
@@ -1363,6 +1589,26 @@ def bootstrap():
 @app.get("/api/reports/official")
 def official_report(reportType: str = "department", academicYear: str = ACADEMIC_YEAR, term: str = "الفصل الأول", teacherId: int | None = None):
     return _official_report(reportType, academicYear, term, teacherId)
+
+
+
+@app.get("/api/archive/years")
+def archive_years():
+    with connect() as conn:
+        years = _archive_available_years(conn)
+        summaries = [_archive_summary(_archive_scope(conn, academic_year)) for academic_year in years]
+    return {"currentAcademicYear": ACADEMIC_YEAR, "generatedAt": utc_now(), "years": summaries}
+
+
+@app.get("/api/archive/year")
+def archive_year(academicYear: str = ACADEMIC_YEAR):
+    if not _academic_year_bounds(academicYear)[0]:
+        raise HTTPException(status_code=422, detail="صيغة العام الدراسي غير صحيحة. استخدم مثال 2026/2027.")
+    with connect() as conn:
+        years = _archive_available_years(conn)
+        if academicYear not in years:
+            raise HTTPException(status_code=404, detail="العام الدراسي غير موجود في الأرشيف.")
+        return _archive_scope(conn, academicYear)
 
 
 @app.post("/api/teachers", status_code=201)

@@ -1,4 +1,4 @@
-import type { AchievementAssessmentDetails, BootstrapData, CurriculumPlanDetails, EventDetails, EventMediaRecord, MeetingDetails, OfficialReport, OfficialReportQuery, OfficialReportSection, SupervisionVisitDetails, TeacherCvItem, TeacherProfileDetails } from '../types';
+import type { AchievementAssessmentDetails, ArchiveYearDetail, ArchiveYearsIndex, BootstrapData, CurriculumPlanDetails, EventDetails, EventMediaRecord, MeetingDetails, OfficialReport, OfficialReportQuery, OfficialReportSection, SupervisionVisitDetails, TeacherCvItem, TeacherProfileDetails } from '../types';
 
 function eventVisual(title: string, accent: string, secondary: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${accent}"/><stop offset="1" stop-color="${secondary}"/></linearGradient><radialGradient id="r"><stop stop-color="#fff" stop-opacity=".34"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="1400" height="800" fill="url(#g)"/><circle cx="1100" cy="170" r="270" fill="url(#r)"/><circle cx="240" cy="650" r="330" fill="url(#r)"/><g fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="10"><circle cx="700" cy="400" r="150"/><path d="M430 400h540M700 130v540M520 220l360 360M880 220L520 580"/></g><text x="700" y="410" text-anchor="middle" direction="rtl" fill="#fff" font-size="72" font-family="Arial" font-weight="700">${title}</text><text x="700" y="475" text-anchor="middle" direction="rtl" fill="#fff" fill-opacity=".78" font-size="30" font-family="Arial">مرصد الإنجازات • التوثيق المهني</text></svg>`;
@@ -410,4 +410,122 @@ export function getPreviewOfficialReport(input: OfficialReportQuery): OfficialRe
 
   const activePlans=plans.filter((x)=>x.status==='active'); const students=assessments.filter(x=>x.status!=='draft').reduce((s,x)=>s+x.studentCount,0); const mastered=assessments.filter(x=>x.status!=='draft').reduce((s,x)=>s+x.masteredCount,0); const decisions=meetings.reduce((s,x)=>s+x.decisionCount,0); const done=meetings.reduce((s,x)=>s+x.completedDecisionCount,0);
   return { ...base, title:'التقرير الشامل لأعمال القسم', subtitle:`ملخص مؤسسي لأعمال القسم خلال ${term} من العام الدراسي ${academicYear}`, summary:'يجمع هذا التقرير مؤشرات المعلمين والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في وثيقة واحدة مرتبطة بسجلاتها الأصلية.', metrics:[{label:'المعلمون',value:previewBootstrap.teachers.length},{label:'تقدم الخطط',value:`${activePlans.length?Math.round(activePlans.reduce((s,x)=>s+x.progressPercent,0)/activePlans.length):0}%`},{label:'الإتقان المجمع',value:`${previewPct(mastered,students)}%`},{label:'إغلاق الزيارات',value:`${previewPct(visits.filter(x=>x.status==='closed').length,visits.length)}%`},{label:'تنفيذ القرارات',value:`${previewPct(done,decisions)}%`}], sections:[previewReportSection('teachers','المعلمون',[['name','المعلم'],['subject','المادة'],['workload','النصاب'],['cv','اكتمال الملف']],previewBootstrap.teachers.map(x=>({name:x.name,subject:x.subject,workload:x.workload,cv:`${x.cvCompletion}%`}))),previewReportSection('planning','التخطيط والمنهج',[['title','الخطة'],['scope','النطاق'],['progress','الإنجاز']],plans.map(x=>({title:x.title,scope:`${x.subject} • ${x.grade}`,progress:`${x.progressPercent}%`}))),previewReportSection('achievement','التحصيل',[['title','التقويم'],['mastery','الإتقان'],['average','المتوسط']],assessments.filter(x=>x.status!=='draft').map(x=>({title:x.title,mastery:`${x.masteryPercent}%`,average:`${x.averagePercent}%`}))),previewReportSection('events','الفعاليات',[['title','الفعالية'],['date','التاريخ'],['participants','المشاركون']],events.map(x=>({title:x.title,date:x.eventDate,participants:x.participantCount})))], sourceCounts:{teachers:previewBootstrap.teachers.length,plans:plans.length,assessments:assessments.length,visits:visits.length,meetings:meetings.length,events:events.length} };
+}
+
+
+function previewAcademicYearFromDate(value?: string | null): string | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}/.test(value)) return null;
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(5, 7));
+  if (!Number.isFinite(year) || month < 1 || month > 12) return null;
+  const first = month >= 8 ? year : year - 1;
+  return `${first}/${first + 1}`;
+}
+
+function previewArchiveScope(academicYear: string): ArchiveYearDetail {
+  const plans = previewBootstrap.plans.filter((item) => item.academicYear === academicYear);
+  const assessments = previewBootstrap.assessments.filter((item) => item.academicYear === academicYear);
+  const visits = previewBootstrap.visits.filter((item) => item.academicYear === academicYear);
+  const meetings = previewBootstrap.meetings.filter((item) => item.academicYear === academicYear);
+  const events = previewBootstrap.events.filter((item) => previewAcademicYearFromDate(item.eventDate) === academicYear);
+  const documents = previewBootstrap.documents.filter((item) => (item.academicYear || previewAcademicYearFromDate(item.uploadedAt)) === academicYear);
+  const requests = previewBootstrap.requests.filter((item) => previewAcademicYearFromDate(item.createdAt) === academicYear);
+
+  const linked = new Map<number, number>();
+  const addTeacher = (id?: number | null) => { if (id) linked.set(id, (linked.get(id) || 0) + 1); };
+  requests.forEach((item) => addTeacher(item.teacherId));
+  documents.forEach((item) => addTeacher(item.teacherId));
+  plans.forEach((item) => addTeacher(item.ownerTeacherId));
+  visits.forEach((item) => addTeacher(item.teacherId));
+  assessments.forEach((item) => addTeacher(item.teacherId));
+  events.forEach((event) => getPreviewEventDetails(event.id).teachers.forEach((teacher) => addTeacher(teacher.id)));
+  meetings.forEach((meeting) => {
+    previewMeetingDetails[meeting.id]?.attendees.forEach((teacher) => addTeacher(teacher.id));
+    previewMeetingDetails[meeting.id]?.decisions.forEach((decision) => addTeacher(decision.responsibleTeacherId));
+  });
+
+  const teachers = previewBootstrap.teachers
+    .filter((teacher) => linked.has(teacher.id))
+    .map((teacher) => ({ id: teacher.id, name: teacher.name, subject: teacher.subject, linkedRecords: linked.get(teacher.id) || 0 }))
+    .sort((a, b) => b.linkedRecords - a.linkedRecords || a.name.localeCompare(b.name, 'ar'));
+
+  const decisions = meetings.reduce((sum, item) => sum + item.decisionCount, 0);
+  const sourceCounts = {
+    teachers: teachers.length,
+    plans: plans.length,
+    assessments: assessments.length,
+    visits: visits.length,
+    meetings: meetings.length,
+    decisions,
+    events: events.length,
+    documents: documents.length,
+    requests: requests.length,
+  };
+  const totalRecords = plans.length + assessments.length + visits.length + meetings.length + events.length + documents.length + requests.length;
+  const dates = [
+    ...plans.map((item) => item.updatedAt),
+    ...assessments.map((item) => item.updatedAt),
+    ...visits.map((item) => item.updatedAt),
+    ...meetings.map((item) => item.updatedAt),
+    ...events.map((item) => item.updatedAt),
+    ...documents.map((item) => item.uploadedAt),
+    ...requests.map((item) => item.updatedAt),
+  ].filter(Boolean).sort();
+
+  return {
+    academicYear,
+    isCurrent: academicYear === previewBootstrap.academicYear,
+    generatedAt: new Date().toISOString(),
+    totalRecords,
+    teacherCount: teachers.length,
+    documentCount: documents.length,
+    decisionCount: decisions,
+    latestRecordAt: dates.at(-1) || null,
+    sourceCounts,
+    coverage: [
+      { id: 'planning', label: 'التخطيط والمنهج', count: plans.length, detail: `${plans.reduce((sum, item) => sum + item.unitCount, 0)} وحدة منهج` },
+      { id: 'achievement', label: 'التحصيل والنتائج', count: assessments.length, detail: `${assessments.reduce((sum, item) => sum + item.openActionCount, 0)} تدخلات مفتوحة` },
+      { id: 'supervision', label: 'الإشراف والمتابعة', count: visits.length, detail: `${visits.reduce((sum, item) => sum + item.openActionCount, 0)} متابعات مفتوحة` },
+      { id: 'meetings', label: 'الاجتماعات والقرارات', count: meetings.length, detail: `${decisions} قرارًا` },
+      { id: 'events', label: 'الفعاليات والتوثيق', count: events.length, detail: `${events.reduce((sum, item) => sum + (item.mediaCount || 0), 0)} أدلة` },
+      { id: 'documents', label: 'الوثائق والطلبات', count: documents.length + requests.length, detail: `${documents.length} وثيقة • ${requests.length} طلبات` },
+    ],
+    teachers,
+    sections: [
+      previewReportSection('planning', 'التخطيط والمنهج', [['title','الخطة'],['scope','النطاق'],['term','الفصل'],['owner','المسؤول'],['progress','الإنجاز'],['status','الحالة']], plans.map((item) => ({ title: item.title, scope: `${item.subject} • ${item.grade}`, term: item.term, owner: item.ownerName || '—', progress: `${item.progressPercent}%`, status: previewStatusLabel(item.status) }))),
+      previewReportSection('achievement', 'التحصيل والنتائج', [['title','التقويم'],['scope','النطاق'],['term','الفصل'],['teacher','المعلم'],['mastery','الإتقان'],['actions','تدخلات مفتوحة']], assessments.map((item) => ({ title: item.title, scope: `${item.subject} • ${item.grade}`, term: item.term, teacher: item.teacherName || '—', mastery: `${item.masteryPercent}%`, actions: item.openActionCount }))),
+      previewReportSection('supervision', 'الإشراف والمتابعة', [['teacher','المعلم'],['date','التاريخ'],['type','النوع'],['lesson','الدرس'],['status','الحالة'],['followup','متابعة']], visits.map((item) => ({ teacher: item.teacherName, date: item.visitDate, type: item.visitType, lesson: item.lessonTitle || '—', status: previewStatusLabel(item.effectiveStatus), followup: item.openActionCount }))),
+      previewReportSection('meetings', 'الاجتماعات والقرارات', [['title','الاجتماع'],['date','التاريخ'],['type','النوع'],['decisions','القرارات'],['open','مفتوحة']], meetings.map((item) => ({ title: item.title, date: item.meetingDate, type: item.meetingType, decisions: item.decisionCount, open: item.openDecisionCount }))),
+      previewReportSection('events', 'الفعاليات والتوثيق', [['title','الفعالية'],['date','التاريخ'],['type','النوع'],['participants','المشاركون'],['evidence','الأدلة']], events.map((item) => ({ title: item.title, date: item.eventDate, type: item.eventType, participants: item.participantCount, evidence: item.mediaCount || 0 }))),
+      previewReportSection('documents', 'الوثائق والمراجع', [['title','الوثيقة'],['category','النوع'],['scope','النطاق'],['status','الحالة'],['uploaded','تاريخ الرفع']], documents.map((item) => ({ title: item.title, category: item.category, scope: [item.subject, item.grade].filter(Boolean).join(' • ') || '—', status: previewStatusLabel(item.status), uploaded: item.uploadedAt.slice(0, 10) }))),
+      previewReportSection('requests', 'طلبات الملفات', [['title','الطلب'],['teacher','المعلم'],['type','النوع'],['scope','النطاق'],['status','الحالة']], requests.map((item) => ({ title: item.title, teacher: item.teacherName, type: item.requestType, scope: `${item.subject} • ${item.grade}`, status: previewStatusLabel(item.status) }))),
+    ],
+  };
+}
+
+export function getPreviewArchiveYears(): ArchiveYearsIndex {
+  const years = new Set<string>([previewBootstrap.academicYear]);
+  previewBootstrap.plans.forEach((item) => years.add(item.academicYear));
+  previewBootstrap.assessments.forEach((item) => years.add(item.academicYear));
+  previewBootstrap.visits.forEach((item) => years.add(item.academicYear));
+  previewBootstrap.meetings.forEach((item) => years.add(item.academicYear));
+  previewBootstrap.documents.forEach((item) => { const year = item.academicYear || previewAcademicYearFromDate(item.uploadedAt); if (year) years.add(year); });
+  previewBootstrap.events.forEach((item) => { const year = previewAcademicYearFromDate(item.eventDate); if (year) years.add(year); });
+  previewBootstrap.requests.forEach((item) => { const year = previewAcademicYearFromDate(item.createdAt); if (year) years.add(year); });
+  const ordered = [...years].sort((a, b) => Number(b.slice(0, 4)) - Number(a.slice(0, 4)));
+  return {
+    currentAcademicYear: previewBootstrap.academicYear,
+    generatedAt: new Date().toISOString(),
+    years: ordered.map((year) => {
+      const detail = previewArchiveScope(year);
+      const { generatedAt: _generatedAt, coverage: _coverage, teachers: _teachers, sections: _sections, ...summary } = detail;
+      return summary;
+    }),
+  };
+}
+
+export function getPreviewArchiveYear(academicYear: string): ArchiveYearDetail {
+  const index = getPreviewArchiveYears();
+  if (!index.years.some((item) => item.academicYear === academicYear)) throw new Error('العام الدراسي غير موجود في الأرشيف.');
+  return previewArchiveScope(academicYear);
 }
