@@ -349,6 +349,106 @@ export type SupervisionActionInput = {
   notes: string;
 };
 
+export type AchievementAssessmentStatus = 'draft' | 'recorded' | 'reviewed';
+export type AchievementActionType = 'remedial' | 'enrichment' | 'followup';
+export type AchievementActionBaseStatus = 'new' | 'in_progress' | 'completed' | 'cancelled';
+export type AchievementActionStatus = AchievementActionBaseStatus | 'overdue';
+
+export type AchievementAssessmentRecord = {
+  id: number;
+  title: string;
+  assessmentType: string;
+  subject: string;
+  grade: string;
+  assessmentDate: string;
+  term: string;
+  academicYear: string;
+  teacherId?: number | null;
+  teacherName?: string | null;
+  maxScore: number;
+  studentCount: number;
+  averageScore?: number | null;
+  highestScore?: number | null;
+  lowestScore?: number | null;
+  masteryThresholdPct: number;
+  masteredCount: number;
+  nearMasteryCount: number;
+  interventionCount: number;
+  notes: string;
+  status: AchievementAssessmentStatus;
+  masteryPercent: number;
+  averagePercent: number;
+  actionCount: number;
+  openActionCount: number;
+  overdueActionCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AchievementAction = {
+  id: number;
+  assessmentId: number;
+  actionType: AchievementActionType;
+  title: string;
+  targetGroup: string;
+  responsibleTeacherId?: number | null;
+  responsibleName?: string | null;
+  startDate?: string | null;
+  dueDate?: string | null;
+  status: AchievementActionStatus;
+  baseStatus: AchievementActionBaseStatus;
+  baselineIndicator: string;
+  targetIndicator: string;
+  outcomeIndicator: string;
+  notes: string;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AchievementAssessmentDetails = AchievementAssessmentRecord & {
+  actions: AchievementAction[];
+  timeline: Activity[];
+  analysisReady: boolean;
+};
+
+export type AchievementAssessmentInput = {
+  title: string;
+  assessmentType: string;
+  subject: string;
+  grade: string;
+  assessmentDate: string;
+  term: string;
+  academicYear: string;
+  teacherId?: number | null;
+  maxScore: number;
+  studentCount: number;
+  averageScore?: number | null;
+  highestScore?: number | null;
+  lowestScore?: number | null;
+  masteryThresholdPct: number;
+  masteredCount: number;
+  nearMasteryCount: number;
+  interventionCount: number;
+  notes: string;
+  status: AchievementAssessmentStatus;
+};
+
+export type AchievementActionInput = {
+  actionType: AchievementActionType;
+  title: string;
+  targetGroup: string;
+  responsibleTeacherId?: number | null;
+  startDate?: string | null;
+  dueDate?: string | null;
+  status: AchievementActionBaseStatus;
+  baselineIndicator: string;
+  targetIndicator: string;
+  outcomeIndicator: string;
+  notes: string;
+};
+
+
 export type Activity = {
   id: number;
   activity_type: string;
@@ -367,6 +467,8 @@ export type DashboardStats = {
   planProgress: number;
   visitProgress: number;
   requestCompletion: number;
+  achievementMastery: number;
+  openAchievementActions: number;
 };
 
 export type BootstrapData = {
@@ -382,6 +484,8 @@ export type BootstrapData = {
   planningAttention: CurriculumUnit[];
   visits: SupervisionVisitRecord[];
   supervisionAttention: SupervisionVisitRecord[];
+  assessments: AchievementAssessmentRecord[];
+  achievementAttention: AchievementAssessmentRecord[];
   documents: DocumentRecord[];
   activities: Activity[];
   drive: DriveStatus;

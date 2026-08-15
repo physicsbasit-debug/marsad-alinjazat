@@ -1,4 +1,4 @@
-import type { BootstrapData, CurriculumPlanDetails, EventDetails, EventMediaRecord, MeetingDetails, SupervisionVisitDetails, TeacherCvItem, TeacherProfileDetails } from '../types';
+import type { AchievementAssessmentDetails, BootstrapData, CurriculumPlanDetails, EventDetails, EventMediaRecord, MeetingDetails, SupervisionVisitDetails, TeacherCvItem, TeacherProfileDetails } from '../types';
 
 function eventVisual(title: string, accent: string, secondary: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${accent}"/><stop offset="1" stop-color="${secondary}"/></linearGradient><radialGradient id="r"><stop stop-color="#fff" stop-opacity=".34"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="1400" height="800" fill="url(#g)"/><circle cx="1100" cy="170" r="270" fill="url(#r)"/><circle cx="240" cy="650" r="330" fill="url(#r)"/><g fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="10"><circle cx="700" cy="400" r="150"/><path d="M430 400h540M700 130v540M520 220l360 360M880 220L520 580"/></g><text x="700" y="410" text-anchor="middle" direction="rtl" fill="#fff" font-size="72" font-family="Arial" font-weight="700">${title}</text><text x="700" y="475" text-anchor="middle" direction="rtl" fill="#fff" fill-opacity=".78" font-size="30" font-family="Arial">مرصد الإنجازات • التوثيق المهني</text></svg>`;
@@ -25,6 +25,8 @@ export const previewBootstrap: BootstrapData = {
     planProgress: 69,
     visitProgress: 80,
     requestCompletion: 91,
+    achievementMastery: 60,
+    openAchievementActions: 2,
   },
   teachers: [
     { id: 1, name: 'أحمد السالمي', subject: 'الفيزياء', specialization: 'فيزياء', qualification: 'بكالوريوس تربية', experienceYears: 12, workload: 18, cvCompletion: 100, email: 'ahmed@example.edu' },
@@ -76,6 +78,14 @@ export const previewBootstrap: BootstrapData = {
     { id: 4, teacherId: 5, teacherName: 'يوسف البلوشي', teacherSubject: 'العلوم', visitType: 'زيارة صفية', visitDate: '2026-08-13', periodLabel: 'الحصة الرابعة', grade: 'الثامن', lessonTitle: 'الموجات', objectives: 'متابعة وضوح التعليمات وإدارة زمن الأنشطة.', strengths: '', developmentAreas: '', recommendations: '', followupDate: null, followupNotes: '', academicYear: '2026/2027', status: 'planned', effectiveStatus: 'overdue', actionCount: 0, openActionCount: 0, completedActionCount: 0, overdueActionCount: 0, createdAt: '2026-08-11T08:00:00+00:00', updatedAt: '2026-08-11T08:00:00+00:00' },
     { id: 2, teacherId: 2, teacherName: 'خالد الهنائي', teacherSubject: 'الكيمياء', visitType: 'زيارة تطويرية', visitDate: '2026-08-10', periodLabel: 'الحصة الثانية', grade: 'العاشر', lessonTitle: 'الترابط الكيميائي', objectives: 'متابعة تنويع التمثيلات البصرية والتقويم أثناء التعلم.', strengths: 'تنظيم واضح للمحتوى، وأسئلة تربط المعرفة السابقة بالمفهوم الجديد.', developmentAreas: 'زيادة زمن تعلم الطلبة النشط وتقليل الشرح المباشر في منتصف الدرس.', recommendations: 'إدخال مهمة ثنائية قصيرة قبل التقويم الختامي، وتوثيق أثرها في الزيارة التالية.', followupDate: '2026-08-14', followupNotes: 'ينبغي مراجعة تطبيق المهمة الثنائية وأثرها على مشاركة الطلبة.', academicYear: '2026/2027', status: 'needs_followup', effectiveStatus: 'overdue', actionCount: 2, openActionCount: 1, completedActionCount: 1, overdueActionCount: 1, createdAt: '2026-08-10T09:00:00+00:00', updatedAt: '2026-08-14T09:00:00+00:00' },
   ],
+  assessments: [
+    { id: 1, title: 'الاختبار القصير الأول', assessmentType: 'اختبار قصير', subject: 'الفيزياء', grade: 'العاشر', assessmentDate: '2026-09-15', term: 'الفصل الأول', academicYear: '2026/2027', teacherId: 1, teacherName: 'أحمد السالمي', maxScore: 40, studentCount: 28, averageScore: 26.8, highestScore: 39, lowestScore: 12, masteryThresholdPct: 60, masteredCount: 17, nearMasteryCount: 7, interventionCount: 4, notes: 'النتيجة مستقرة إجمالًا مع حاجة مجموعة صغيرة إلى مراجعة مركزة قبل التقويم التالي.', status: 'reviewed', masteryPercent: 61, averagePercent: 67, actionCount: 2, openActionCount: 1, overdueActionCount: 0, createdAt: '2026-09-15T10:00:00+00:00', updatedAt: '2026-09-16T08:00:00+00:00' },
+    { id: 2, title: 'تقويم الروابط الكيميائية', assessmentType: 'اختبار قصير', subject: 'الكيمياء', grade: 'العاشر', assessmentDate: '2026-08-10', term: 'الفصل الأول', academicYear: '2026/2027', teacherId: 2, teacherName: 'خالد الهنائي', maxScore: 40, studentCount: 30, averageScore: 21, highestScore: 37, lowestScore: 8, masteryThresholdPct: 60, masteredCount: 14, nearMasteryCount: 8, interventionCount: 8, notes: 'انخفاض الإتقان يستلزم تدخلًا موجّهًا وإعادة قياس، دون افتراض مهارة محددة من الدرجة الكلية وحدها.', status: 'recorded', masteryPercent: 47, averagePercent: 53, actionCount: 2, openActionCount: 1, overdueActionCount: 1, createdAt: '2026-08-10T10:00:00+00:00', updatedAt: '2026-08-14T09:00:00+00:00' },
+    { id: 3, title: 'تقويم الوراثة والتنوع', assessmentType: 'مهمة أدائية', subject: 'العلوم', grade: 'التاسع', assessmentDate: '2026-08-12', term: 'الفصل الأول', academicYear: '2026/2027', teacherId: 3, teacherName: 'محمد المعمري', maxScore: 20, studentCount: 26, averageScore: 15.5, highestScore: 20, lowestScore: 8, masteryThresholdPct: 60, masteredCount: 19, nearMasteryCount: 5, interventionCount: 2, notes: 'مستوى إتقان جيد مع متابعة محدودة للطلبة دون الحد.', status: 'reviewed', masteryPercent: 73, averagePercent: 78, actionCount: 1, openActionCount: 0, overdueActionCount: 0, createdAt: '2026-08-12T10:00:00+00:00', updatedAt: '2026-08-13T08:00:00+00:00' },
+  ],
+  achievementAttention: [
+    { id: 2, title: 'تقويم الروابط الكيميائية', assessmentType: 'اختبار قصير', subject: 'الكيمياء', grade: 'العاشر', assessmentDate: '2026-08-10', term: 'الفصل الأول', academicYear: '2026/2027', teacherId: 2, teacherName: 'خالد الهنائي', maxScore: 40, studentCount: 30, averageScore: 21, highestScore: 37, lowestScore: 8, masteryThresholdPct: 60, masteredCount: 14, nearMasteryCount: 8, interventionCount: 8, notes: 'انخفاض الإتقان يستلزم تدخلًا موجّهًا وإعادة قياس، دون افتراض مهارة محددة من الدرجة الكلية وحدها.', status: 'recorded', masteryPercent: 47, averagePercent: 53, actionCount: 2, openActionCount: 1, overdueActionCount: 1, createdAt: '2026-08-10T10:00:00+00:00', updatedAt: '2026-08-14T09:00:00+00:00' },
+  ],
   documents: [
     { id: 1, requestId: 2, teacherId: 2, title: 'الخطة الفصلية', category: 'خطة فصلية', subject: 'الكيمياء', grade: 'العاشر', academicYear: '2026/2027', originalName: 'خطة_الكيمياء_الفصل_الأول.pdf', mimeType: 'application/pdf', sizeBytes: 735000, storageProvider: 'preview', status: 'inbox', uploadedAt: '2026-08-15T05:00:00+00:00' },
     { id: 2, requestId: 4, teacherId: 4, title: 'تحليل النتائج', category: 'تحليل نتائج', subject: 'الأحياء', grade: 'التاسع', academicYear: '2026/2027', originalName: 'تحليل_نتائج_الأحياء.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', sizeBytes: 184000, storageProvider: 'preview', status: 'approved', uploadedAt: '2026-08-14T05:00:00+00:00', approvedAt: '2026-08-15T05:00:00+00:00' },
@@ -87,6 +97,7 @@ export const previewBootstrap: BootstrapData = {
     { id: 4, activity_type: 'planning', title: 'تحديث وحدة الحركة والقوى', detail: 'الفيزياء • التقدم 65%', created_at: '2026-08-15T08:00:00+00:00' },
     { id: 5, activity_type: 'meeting', title: 'تحديث قرار: توزيع أعمال القسم', detail: 'قيد التنفيذ', created_at: '2026-08-14T04:30:00+00:00' },
     { id: 6, activity_type: 'supervision', title: 'تحديث متابعة: خالد الهنائي', detail: 'زيارة تطويرية • تحتاج متابعة', created_at: '2026-08-14T09:00:00+00:00' },
+    { id: 7, activity_type: 'achievement', title: 'تسجيل نتيجة: تقويم الروابط الكيميائية', detail: 'الكيمياء • إتقان 47%', created_at: '2026-08-14T09:10:00+00:00' },
   ],
   drive: {
     configured: false,
@@ -96,6 +107,35 @@ export const previewBootstrap: BootstrapData = {
     storageMode: 'local',
   },
 };
+
+
+const previewAssessmentDetails: Record<number, AchievementAssessmentDetails> = {
+  1: {
+    ...previewBootstrap.assessments[0],
+    actions: [
+      { id: 101, assessmentId: 1, actionType: 'remedial', title: 'مراجعة مركزة للطلبة دون حد الإتقان', targetGroup: '4 طلاب دون حد الإتقان', responsibleTeacherId: 1, responsibleName: 'أحمد السالمي', startDate: '2026-09-17', dueDate: '2026-09-24', status: 'in_progress', baseStatus: 'in_progress', baselineIndicator: 'إتقان 61% على مستوى الصف', targetIndicator: 'تحسن المجموعة المستهدفة في إعادة القياس', outcomeIndicator: '', notes: 'تستخدم أسئلة تشخيصية قصيرة قبل إعادة القياس.', createdAt: '2026-09-16T08:10:00+00:00', updatedAt: '2026-09-16T08:10:00+00:00' },
+      { id: 102, assessmentId: 1, actionType: 'enrichment', title: 'مسألة إثرائية للطلبة المتقنين', targetGroup: 'الطلبة المتقنون', responsibleTeacherId: 6, responsibleName: 'ناصر الحوسني', startDate: '2026-09-18', dueDate: '2026-09-22', status: 'completed', baseStatus: 'completed', baselineIndicator: '', targetIndicator: 'إنتاج حلول متعددة', outcomeIndicator: 'أنجزت المهمة', notes: '', completedAt: '2026-09-22T08:00:00+00:00', createdAt: '2026-09-16T08:12:00+00:00', updatedAt: '2026-09-22T08:00:00+00:00' },
+    ],
+    timeline: [{ id: 8101, activity_type: 'achievement', title: 'تسجيل نتيجة: الاختبار القصير الأول', detail: 'الفيزياء • العاشر', created_at: '2026-09-15T10:00:00+00:00' }],
+    analysisReady: true,
+  },
+  2: {
+    ...previewBootstrap.assessments[1],
+    actions: [
+      { id: 201, assessmentId: 2, actionType: 'remedial', title: 'جلسات مراجعة قصيرة قبل إعادة القياس', targetGroup: '8 طلاب يحتاجون تدخلًا', responsibleTeacherId: 2, responsibleName: 'خالد الهنائي', startDate: '2026-08-11', dueDate: '2026-08-14', status: 'overdue', baseStatus: 'in_progress', baselineIndicator: 'إتقان 47%', targetIndicator: 'إتقان لا يقل عن 60% في إعادة القياس', outcomeIndicator: '', notes: 'يتم تحديد سبب التعثر باختبار تشخيصي قصير قبل التنفيذ.', createdAt: '2026-08-10T10:10:00+00:00', updatedAt: '2026-08-14T09:00:00+00:00' },
+      { id: 202, assessmentId: 2, actionType: 'followup', title: 'إعادة قياس بعد التدخل', targetGroup: 'المجموعة المستهدفة', responsibleTeacherId: 2, responsibleName: 'خالد الهنائي', startDate: '2026-08-17', dueDate: '2026-08-20', status: 'new', baseStatus: 'new', baselineIndicator: 'إتقان 47%', targetIndicator: '60% فأعلى', outcomeIndicator: '', notes: '', createdAt: '2026-08-10T10:12:00+00:00', updatedAt: '2026-08-10T10:12:00+00:00' },
+    ],
+    timeline: [{ id: 8201, activity_type: 'achievement', title: 'تسجيل نتيجة: تقويم الروابط الكيميائية', detail: 'الكيمياء • العاشر', created_at: '2026-08-10T10:00:00+00:00' }],
+    analysisReady: true,
+  },
+  3: { ...previewBootstrap.assessments[2], actions: [{ id: 301, assessmentId: 3, actionType: 'followup', title: 'متابعة طالبين في التقويم التالي', targetGroup: 'طالبان دون حد الإتقان', responsibleTeacherId: 3, responsibleName: 'محمد المعمري', startDate: '2026-08-13', dueDate: '2026-08-20', status: 'completed', baseStatus: 'completed', baselineIndicator: '2 من 26 دون الحد', targetIndicator: 'تحسن في التقويم التالي', outcomeIndicator: 'تحسن مسجل', notes: '', completedAt: '2026-08-20T08:00:00+00:00', createdAt: '2026-08-13T08:00:00+00:00', updatedAt: '2026-08-20T08:00:00+00:00' }], timeline: [{ id: 8301, activity_type: 'achievement', title: 'مراجعة نتيجة: تقويم الوراثة والتنوع', detail: 'العلوم • التاسع', created_at: '2026-08-13T08:00:00+00:00' }], analysisReady: true },
+};
+
+export function getPreviewAssessmentDetails(assessmentId: number): AchievementAssessmentDetails {
+  const detail = previewAssessmentDetails[assessmentId];
+  if (!detail) throw new Error('سجل التحصيل غير موجود في بيانات المعاينة.');
+  return detail;
+}
 
 
 const previewSupervisionDetails: Record<number, SupervisionVisitDetails> = {

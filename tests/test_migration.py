@@ -346,7 +346,7 @@ class MarsadMigrationTests(unittest.TestCase):
 
         self.assertEqual(
             set(new_tables) - expected_old_names,
-            {"meetings", "meeting_attendees", "meeting_decisions", "curriculum_plans", "curriculum_units", "supervision_visits", "supervision_actions"},
+            {"meetings", "meeting_attendees", "meeting_decisions", "curriculum_plans", "curriculum_units", "supervision_visits", "supervision_actions", "achievement_assessments", "achievement_actions"},
         )
         self.assertTrue({"idx_meetings_date", "idx_meeting_attendees_meeting", "idx_meeting_decisions_meeting", "idx_meeting_decisions_open"}.issubset(new_indexes))
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM meetings").fetchone()[0], 0)
@@ -616,7 +616,7 @@ CREATE INDEX idx_teacher_cv_items_teacher ON teacher_cv_items(teacher_id, item_t
             self.assertEqual(new_indexes[name], sql, f"old index definition changed: {name}")
         for name, rows in old_data.items():
             self.assertEqual(conn.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall(), rows, f"old data changed: {name}")
-        self.assertEqual(set(new_tables) - expected_old_names, {"curriculum_plans", "curriculum_units", "supervision_visits", "supervision_actions"})
+        self.assertEqual(set(new_tables) - expected_old_names, {"curriculum_plans", "curriculum_units", "supervision_visits", "supervision_actions", "achievement_assessments", "achievement_actions"})
         self.assertTrue({"idx_curriculum_plans_scope", "idx_curriculum_units_plan", "idx_curriculum_units_due"}.issubset(new_indexes))
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM curriculum_plans").fetchone()[0], 0)
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM curriculum_units").fetchone()[0], 0)
@@ -643,6 +643,10 @@ CREATE INDEX idx_teacher_cv_items_teacher ON teacher_cv_items(teacher_id, item_t
         )
         conn = sqlite3.connect(db_path)
         conn.execute("PRAGMA foreign_keys = OFF")
+        # Remove every schema object introduced after v0.6 before capturing the baseline.
+        # This keeps the historical migration contract exact as later releases add tables.
+        conn.execute("DROP TABLE IF EXISTS achievement_actions")
+        conn.execute("DROP TABLE IF EXISTS achievement_assessments")
         conn.execute("DROP TABLE IF EXISTS supervision_actions")
         conn.execute("DROP TABLE IF EXISTS supervision_visits")
         conn.execute("PRAGMA foreign_keys = ON")
@@ -729,7 +733,7 @@ CREATE INDEX idx_teacher_cv_items_teacher ON teacher_cv_items(teacher_id, item_t
                 f"v0.6 data changed: {name}",
             )
 
-        self.assertEqual(set(new_tables) - expected_v06_tables, {"supervision_visits", "supervision_actions"})
+        self.assertEqual(set(new_tables) - expected_v06_tables, {"supervision_visits", "supervision_actions", "achievement_assessments", "achievement_actions"})
         expected_new_indexes = {
             "idx_supervision_visits_scope",
             "idx_supervision_visits_teacher",
@@ -743,6 +747,121 @@ CREATE INDEX idx_teacher_cv_items_teacher ON teacher_cv_items(teacher_id, item_t
         self.assertEqual(conn.execute("PRAGMA foreign_key_check").fetchall(), [])
         conn.close()
 
+
+
+    def test_v07_schema_and_data_survive_v08_achievement_migration_atomically(self):
+        data_dir = Path(tempfile.mkdtemp(prefix="marsad-v07-to-v08-achievement-"))
+        db_path = data_dir / "marsad_alinjazat.sqlite3"
+        repo_root = Path(__file__).resolve().parents[1]
+        env = os.environ.copy()
+        env["APP_DATA_DIR"] = str(data_dir)
+        env["APP_UPLOADS_DIR"] = str(data_dir / "inbox")
+        env["APP_EVENT_UPLOADS_DIR"] = str(data_dir / "events")
+        env["STORAGE_MODE"] = "local"
+
+        # Build the current schema, then remove only v0.8-owned objects.
+        # The remaining database is the exact v0.7 contract to preserve.
+        subprocess.run(
+            [sys.executable, "-c", "from server.db import init_db; init_db()"],
+            cwd=repo_root, env=env, capture_output=True, text=True, check=True,
+        )
+        conn = sqlite3.connect(db_path)
+        conn.execute("PRAGMA foreign_keys = OFF")
+        conn.execute("DROP TABLE IF EXISTS achievement_actions")
+        conn.execute("DROP TABLE IF EXISTS achievement_assessments")
+        conn.execute("PRAGMA foreign_keys = ON")
+
+        now = "2026-08-15T08:45:00+00:00"
+        conn.execute(
+            """INSERT INTO supervision_visits
+               (id,teacher_id,visit_type,visit_date,period_label,grade,lesson_title,objectives,strengths,
+                development_areas,recommendations,followup_date,followup_notes,academic_year,status,closed_at,created_at,updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (9801, 1, "زيارة v0.7 محفوظة", "2026-08-14", "الحصة الثانية", "العاشر", "درس محفوظ",
+             "هدف محفوظ", "قوة محفوظة", "تطوير محفوظ", "توصية محفوظة", "2026-08-20", "متابعة محفوظة",
+             "2026/2027", "needs_followup", None, now, now),
+        )
+        conn.execute(
+            """INSERT INTO supervision_actions
+               (id,visit_id,title,responsible_teacher_id,due_date,status,notes,completed_at,created_at,updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (9802, 9801, "إجراء v0.7 محفوظ", 1, "2026-08-20", "in_progress", "ملاحظة محفوظة", None, now, now),
+        )
+        conn.commit()
+
+        old_tables = {
+            row[0]: row[1] for row in conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            )
+        }
+        old_indexes = {
+            row[0]: row[1] for row in conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY name"
+            )
+        }
+        expected_v07_tables = {
+            "settings", "teachers", "upload_requests", "documents", "events", "event_media", "activities",
+            "teacher_profiles", "teacher_cv_items", "event_teacher_links", "event_media_meta",
+            "meetings", "meeting_attendees", "meeting_decisions", "curriculum_plans", "curriculum_units",
+            "supervision_visits", "supervision_actions",
+        }
+        self.assertEqual(set(old_tables), expected_v07_tables)
+        old_data = {
+            name: conn.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall()
+            for name in sorted(expected_v07_tables)
+        }
+        conn.close()
+
+        code = (
+            "from server.db import init_db; init_db(); "
+            "import sqlite3, os, json; "
+            "db=os.path.join(os.environ['APP_DATA_DIR'],'marsad_alinjazat.sqlite3'); "
+            "c=sqlite3.connect(db); "
+            "print(json.dumps({'integrity':c.execute('pragma integrity_check').fetchone()[0],"
+            "'fk':c.execute('pragma foreign_key_check').fetchall()}))"
+        )
+        completed = subprocess.run(
+            [sys.executable, "-c", code], cwd=repo_root, env=env,
+            capture_output=True, text=True, check=True,
+        )
+        status = json.loads(completed.stdout.strip().splitlines()[-1])
+        self.assertEqual(status["integrity"], "ok")
+        self.assertEqual(status["fk"], [])
+
+        conn = sqlite3.connect(db_path)
+        new_tables = {
+            row[0]: row[1] for row in conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            )
+        }
+        new_indexes = {
+            row[0]: row[1] for row in conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY name"
+            )
+        }
+        for name, sql in old_tables.items():
+            self.assertEqual(new_tables[name], sql, f"v0.7 table definition changed: {name}")
+        for name, sql in old_indexes.items():
+            self.assertEqual(new_indexes[name], sql, f"v0.7 index definition changed: {name}")
+        for name, rows in old_data.items():
+            self.assertEqual(
+                conn.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall(), rows,
+                f"v0.7 data changed: {name}",
+            )
+
+        self.assertEqual(set(new_tables) - expected_v07_tables, {"achievement_assessments", "achievement_actions"})
+        expected_new_indexes = {
+            "idx_achievement_assessments_scope", "idx_achievement_assessments_teacher",
+            "idx_achievement_actions_assessment", "idx_achievement_actions_open",
+        }
+        self.assertTrue(expected_new_indexes.issubset(new_indexes))
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM achievement_assessments").fetchone()[0], 0)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM achievement_actions").fetchone()[0], 0)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM supervision_visits WHERE id=9801").fetchone()[0], 1)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM supervision_actions WHERE id=9802").fetchone()[0], 1)
+        self.assertEqual(conn.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+        self.assertEqual(conn.execute("PRAGMA foreign_key_check").fetchall(), [])
+        conn.close()
 
 
 if __name__ == "__main__":

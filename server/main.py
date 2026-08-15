@@ -33,7 +33,7 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 EVENT_UPLOADS_DIR = Path(os.getenv("APP_EVENT_UPLOADS_DIR", BASE_DIR / "uploads" / "events"))
 EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="مرصد الإنجازات API", version="0.7.0")
+app = FastAPI(title="مرصد الإنجازات API", version="0.8.0")
 
 
 class CreateRequestPayload(BaseModel):
@@ -169,6 +169,42 @@ class SupervisionActionPayload(BaseModel):
     responsibleTeacherId: int | None = None
     dueDate: str | None = None
     status: Literal["new", "in_progress", "completed", "cancelled"] = "new"
+    notes: str = Field(default="", max_length=2500)
+
+
+class AchievementAssessmentPayload(BaseModel):
+    title: str = Field(min_length=3, max_length=220)
+    assessmentType: str = Field(default="اختبار", min_length=2, max_length=80)
+    subject: str = Field(min_length=2, max_length=80)
+    grade: str = Field(min_length=1, max_length=40)
+    assessmentDate: str
+    term: str = Field(min_length=2, max_length=80)
+    academicYear: str = Field(min_length=4, max_length=20)
+    teacherId: int | None = None
+    maxScore: float = Field(gt=0, le=10000)
+    studentCount: int = Field(default=0, ge=0, le=10000)
+    averageScore: float | None = Field(default=None, ge=0)
+    highestScore: float | None = Field(default=None, ge=0)
+    lowestScore: float | None = Field(default=None, ge=0)
+    masteryThresholdPct: float = Field(default=60, ge=0, le=100)
+    masteredCount: int = Field(default=0, ge=0, le=10000)
+    nearMasteryCount: int = Field(default=0, ge=0, le=10000)
+    interventionCount: int = Field(default=0, ge=0, le=10000)
+    notes: str = Field(default="", max_length=4000)
+    status: Literal["draft", "recorded", "reviewed"] = "recorded"
+
+
+class AchievementActionPayload(BaseModel):
+    actionType: Literal["remedial", "enrichment", "followup"] = "remedial"
+    title: str = Field(min_length=3, max_length=500)
+    targetGroup: str = Field(default="", max_length=500)
+    responsibleTeacherId: int | None = None
+    startDate: str | None = None
+    dueDate: str | None = None
+    status: Literal["new", "in_progress", "completed", "cancelled"] = "new"
+    baselineIndicator: str = Field(default="", max_length=1000)
+    targetIndicator: str = Field(default="", max_length=1000)
+    outcomeIndicator: str = Field(default="", max_length=1000)
     notes: str = Field(default="", max_length=2500)
 
 
@@ -848,6 +884,165 @@ def _request_from_token(token: str):
         ).fetchone()
 
 
+def _achievement_action_dict(row):
+    item = dict(row)
+    for source, target in [
+        ("assessment_id", "assessmentId"),
+        ("action_type", "actionType"),
+        ("target_group", "targetGroup"),
+        ("responsible_teacher_id", "responsibleTeacherId"),
+        ("responsible_name", "responsibleName"),
+        ("start_date", "startDate"),
+        ("due_date", "dueDate"),
+        ("baseline_indicator", "baselineIndicator"),
+        ("target_indicator", "targetIndicator"),
+        ("outcome_indicator", "outcomeIndicator"),
+        ("completed_at", "completedAt"),
+        ("created_at", "createdAt"),
+        ("updated_at", "updatedAt"),
+    ]:
+        if source in item:
+            item[target] = item.pop(source)
+    base_status = item.get("status", "new")
+    item["baseStatus"] = base_status
+    due_date = item.get("dueDate")
+    if base_status not in {"completed", "cancelled"} and due_date and due_date < _oman_today_iso():
+        item["status"] = "overdue"
+    return item
+
+
+def _achievement_assessment_dict(row):
+    item = dict(row)
+    for source, target in [
+        ("assessment_type", "assessmentType"),
+        ("assessment_date", "assessmentDate"),
+        ("academic_year", "academicYear"),
+        ("teacher_id", "teacherId"),
+        ("teacher_name", "teacherName"),
+        ("max_score", "maxScore"),
+        ("student_count", "studentCount"),
+        ("average_score", "averageScore"),
+        ("highest_score", "highestScore"),
+        ("lowest_score", "lowestScore"),
+        ("mastery_threshold_pct", "masteryThresholdPct"),
+        ("mastered_count", "masteredCount"),
+        ("near_mastery_count", "nearMasteryCount"),
+        ("intervention_count", "interventionCount"),
+        ("action_count", "actionCount"),
+        ("open_action_count", "openActionCount"),
+        ("overdue_action_count", "overdueActionCount"),
+        ("created_at", "createdAt"),
+        ("updated_at", "updatedAt"),
+    ]:
+        if source in item:
+            item[target] = item.pop(source)
+    student_count = int(item.get("studentCount") or 0)
+    mastered = int(item.get("masteredCount") or 0)
+    max_score = float(item.get("maxScore") or 0)
+    avg = item.get("averageScore")
+    item["masteryPercent"] = int(round(100 * mastered / student_count)) if student_count else 0
+    item["averagePercent"] = int(round(100 * float(avg) / max_score)) if avg is not None and max_score > 0 else 0
+    return item
+
+
+def _achievement_summary_rows(conn, assessment_id: int | None = None):
+    where = "WHERE a.id = ?" if assessment_id is not None else ""
+    today = _oman_today_iso()
+    params: tuple = (today, assessment_id) if assessment_id is not None else (today,)
+    return conn.execute(
+        f"""SELECT a.*, t.name AS teacher_name,
+               (SELECT COUNT(*) FROM achievement_actions x WHERE x.assessment_id = a.id) AS action_count,
+               (SELECT COUNT(*) FROM achievement_actions x WHERE x.assessment_id = a.id AND x.status NOT IN ('completed','cancelled')) AS open_action_count,
+               (SELECT COUNT(*) FROM achievement_actions x WHERE x.assessment_id = a.id AND x.status NOT IN ('completed','cancelled') AND x.due_date IS NOT NULL AND x.due_date < ?) AS overdue_action_count
+           FROM achievement_assessments a
+           LEFT JOIN teachers t ON t.id = a.teacher_id
+           {where}
+           ORDER BY a.assessment_date DESC, a.id DESC""",
+        params,
+    ).fetchall()
+
+
+def _achievement_detail(assessment_id: int):
+    with connect() as conn:
+        rows = _achievement_summary_rows(conn, assessment_id)
+        if not rows:
+            return None
+        assessment = _achievement_assessment_dict(rows[0])
+        action_rows = conn.execute(
+            """SELECT x.*, t.name AS responsible_name
+               FROM achievement_actions x
+               LEFT JOIN teachers t ON t.id = x.responsible_teacher_id
+               WHERE x.assessment_id = ?
+               ORDER BY CASE WHEN x.status IN ('completed','cancelled') THEN 1 ELSE 0 END,
+                        CASE WHEN x.due_date IS NULL THEN 1 ELSE 0 END, x.due_date, x.id""",
+            (assessment_id,),
+        ).fetchall()
+        timeline_rows = conn.execute(
+            """SELECT id, activity_type, title, detail, created_at
+               FROM activities WHERE entity_type = 'achievement_assessment' AND entity_id = ?
+               ORDER BY created_at DESC, id DESC LIMIT 40""",
+            (assessment_id,),
+        ).fetchall()
+    assessment["actions"] = [_achievement_action_dict(row) for row in action_rows]
+    assessment["timeline"] = [dict(row) for row in timeline_rows]
+    assessment["analysisReady"] = bool(
+        assessment["status"] != "draft"
+        and assessment["studentCount"] > 0
+        and assessment["masteredCount"] + assessment["nearMasteryCount"] + assessment["interventionCount"] == assessment["studentCount"]
+    )
+    return assessment
+
+
+def _achievement_attention(conn, limit: int = 6):
+    rows = _achievement_summary_rows(conn)
+    items = [_achievement_assessment_dict(row) for row in rows]
+    needs = [
+        item for item in items
+        if item["status"] != "draft" and (
+            item["overdueActionCount"] > 0
+            or (item["studentCount"] > 0 and item["masteryPercent"] < item["masteryThresholdPct"])
+        )
+    ]
+    needs.sort(key=lambda item: (0 if item["overdueActionCount"] else 1, item["masteryPercent"], item["assessmentDate"], item["id"]))
+    return needs[:limit]
+
+
+def _validate_achievement_payload(payload: AchievementAssessmentPayload) -> None:
+    _validate_iso_date(payload.assessmentDate, "تاريخ التقويم")
+    if payload.teacherId is not None:
+        with connect() as conn:
+            if not conn.execute("SELECT 1 FROM teachers WHERE id = ?", (payload.teacherId,)).fetchone():
+                raise HTTPException(status_code=422, detail="المعلم المسؤول غير موجود.")
+    for value, label in [
+        (payload.averageScore, "المتوسط"),
+        (payload.highestScore, "أعلى درجة"),
+        (payload.lowestScore, "أدنى درجة"),
+    ]:
+        if value is not None and value > payload.maxScore:
+            raise HTTPException(status_code=422, detail=f"{label} لا يمكن أن يتجاوز الدرجة الكلية.")
+    if payload.lowestScore is not None and payload.highestScore is not None and payload.lowestScore > payload.highestScore:
+        raise HTTPException(status_code=422, detail="أدنى درجة لا يمكن أن تتجاوز أعلى درجة.")
+    if payload.averageScore is not None and payload.lowestScore is not None and payload.averageScore < payload.lowestScore:
+        raise HTTPException(status_code=422, detail="المتوسط لا يمكن أن يكون أقل من أدنى درجة.")
+    if payload.averageScore is not None and payload.highestScore is not None and payload.averageScore > payload.highestScore:
+        raise HTTPException(status_code=422, detail="المتوسط لا يمكن أن يتجاوز أعلى درجة.")
+    classified = payload.masteredCount + payload.nearMasteryCount + payload.interventionCount
+    if classified > payload.studentCount:
+        raise HTTPException(status_code=422, detail="مجموع فئات الأداء لا يمكن أن يتجاوز عدد الطلبة.")
+
+
+def _validate_achievement_action(payload: AchievementActionPayload) -> tuple[str | None, str | None]:
+    start = _validate_iso_date(payload.startDate, "بداية التدخل") if payload.startDate else None
+    due = _validate_iso_date(payload.dueDate, "موعد المتابعة") if payload.dueDate else None
+    if start and due and due < start:
+        raise HTTPException(status_code=422, detail="موعد المتابعة يجب ألا يسبق بداية التدخل.")
+    if payload.responsibleTeacherId is not None:
+        with connect() as conn:
+            if not conn.execute("SELECT 1 FROM teachers WHERE id = ?", (payload.responsibleTeacherId,)).fetchone():
+                raise HTTPException(status_code=422, detail="المعلم المسؤول عن التدخل غير موجود.")
+    return start, due
+
+
 def _safe_filename(name: str) -> str:
     name = Path(name).name
     name = re.sub(r"[^\w.()\-\u0600-\u06FF ]+", "_", name, flags=re.UNICODE)
@@ -867,7 +1062,7 @@ def _resolve_event_local_path(storage_path: str) -> Path:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "0.7.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
+    return {"ok": True, "version": "0.8.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
 
 
 @app.get("/api/bootstrap")
@@ -892,6 +1087,8 @@ def bootstrap():
         planning_attention = _planning_attention(conn)
         visits = [_supervision_visit_dict(r) for r in _supervision_summary_rows(conn)]
         supervision_attention = _supervision_attention(conn)
+        assessments = [_achievement_assessment_dict(r) for r in _achievement_summary_rows(conn)]
+        achievement_attention = _achievement_attention(conn)
         documents = [_document_dict(r) for r in conn.execute("SELECT * FROM documents ORDER BY uploaded_at DESC LIMIT 30").fetchall()]
         activities = [dict(r) for r in conn.execute("SELECT * FROM activities ORDER BY created_at DESC LIMIT 8").fetchall()]
 
@@ -906,6 +1103,8 @@ def bootstrap():
         "planProgress": int(round(sum(item["progressPercent"] for item in plans if item["status"] == "active") / sum(1 for item in plans if item["status"] == "active"))) if any(item["status"] == "active" for item in plans) else 0,
         "visitProgress": int(round(100 * sum(1 for item in visits if item["status"] in {"completed", "needs_followup", "closed"}) / len(visits))) if visits else 0,
         "requestCompletion": 91,
+        "achievementMastery": int(round(sum(item["masteryPercent"] for item in assessments if item["status"] != "draft" and item["studentCount"] > 0) / sum(1 for item in assessments if item["status"] != "draft" and item["studentCount"] > 0))) if any(item["status"] != "draft" and item["studentCount"] > 0 for item in assessments) else 0,
+        "openAchievementActions": sum(item["openActionCount"] for item in assessments),
     }
     return {
         "academicYear": ACADEMIC_YEAR,
@@ -920,6 +1119,8 @@ def bootstrap():
         "planningAttention": planning_attention,
         "visits": visits,
         "supervisionAttention": supervision_attention,
+        "assessments": assessments,
+        "achievementAttention": achievement_attention,
         "documents": documents,
         "activities": activities,
         "drive": drive.status(),
@@ -1745,6 +1946,144 @@ def delete_meeting_decision(meeting_id: int, decision_id: int):
         conn.execute(
             "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             ("meeting", f"حذف قرار: {row['title']}", "تم الحذف من محضر الاجتماع", "meeting", meeting_id, now),
+        )
+    return {"ok": True}
+
+
+@app.get("/api/achievement/assessments")
+def list_achievement_assessments():
+    with connect() as conn:
+        return [_achievement_assessment_dict(row) for row in _achievement_summary_rows(conn)]
+
+
+@app.post("/api/achievement/assessments", status_code=201)
+def create_achievement_assessment(payload: AchievementAssessmentPayload):
+    _validate_achievement_payload(payload)
+    now = utc_now()
+    with connect() as conn:
+        cursor = conn.execute(
+            """INSERT INTO achievement_assessments
+               (title, assessment_type, subject, grade, assessment_date, term, academic_year, teacher_id,
+                max_score, student_count, average_score, highest_score, lowest_score, mastery_threshold_pct,
+                mastered_count, near_mastery_count, intervention_count, notes, status, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (payload.title, payload.assessmentType, payload.subject, payload.grade, payload.assessmentDate, payload.term,
+             payload.academicYear, payload.teacherId, payload.maxScore, payload.studentCount, payload.averageScore,
+             payload.highestScore, payload.lowestScore, payload.masteryThresholdPct, payload.masteredCount,
+             payload.nearMasteryCount, payload.interventionCount, payload.notes, payload.status, now, now),
+        )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?,?,?,?,?,?)",
+            ("achievement", f"تسجيل نتيجة: {payload.title}", f"{payload.subject} • {payload.grade}", "achievement_assessment", cursor.lastrowid, now),
+        )
+    return _achievement_detail(cursor.lastrowid)
+
+
+@app.get("/api/achievement/assessments/{assessment_id}")
+def get_achievement_assessment(assessment_id: int):
+    detail = _achievement_detail(assessment_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="سجل التحصيل غير موجود.")
+    return detail
+
+
+@app.patch("/api/achievement/assessments/{assessment_id}")
+def update_achievement_assessment(assessment_id: int, payload: AchievementAssessmentPayload):
+    _validate_achievement_payload(payload)
+    now = utc_now()
+    with connect() as conn:
+        if not conn.execute("SELECT 1 FROM achievement_assessments WHERE id = ?", (assessment_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="سجل التحصيل غير موجود.")
+        conn.execute(
+            """UPDATE achievement_assessments SET
+               title=?, assessment_type=?, subject=?, grade=?, assessment_date=?, term=?, academic_year=?, teacher_id=?,
+               max_score=?, student_count=?, average_score=?, highest_score=?, lowest_score=?, mastery_threshold_pct=?,
+               mastered_count=?, near_mastery_count=?, intervention_count=?, notes=?, status=?, updated_at=?
+               WHERE id=?""",
+            (payload.title, payload.assessmentType, payload.subject, payload.grade, payload.assessmentDate, payload.term,
+             payload.academicYear, payload.teacherId, payload.maxScore, payload.studentCount, payload.averageScore,
+             payload.highestScore, payload.lowestScore, payload.masteryThresholdPct, payload.masteredCount,
+             payload.nearMasteryCount, payload.interventionCount, payload.notes, payload.status, now, assessment_id),
+        )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?,?,?,?,?,?)",
+            ("achievement", f"تحديث نتيجة: {payload.title}", f"{payload.subject} • {payload.grade}", "achievement_assessment", assessment_id, now),
+        )
+    return _achievement_detail(assessment_id)
+
+
+@app.post("/api/achievement/assessments/{assessment_id}/actions", status_code=201)
+def create_achievement_action(assessment_id: int, payload: AchievementActionPayload):
+    start, due = _validate_achievement_action(payload)
+    now = utc_now()
+    with connect() as conn:
+        assessment = conn.execute("SELECT title FROM achievement_assessments WHERE id = ?", (assessment_id,)).fetchone()
+        if not assessment:
+            raise HTTPException(status_code=404, detail="سجل التحصيل غير موجود.")
+        completed_at = now if payload.status == "completed" else None
+        cursor = conn.execute(
+            """INSERT INTO achievement_actions
+               (assessment_id, action_type, title, target_group, responsible_teacher_id, start_date, due_date, status,
+                baseline_indicator, target_indicator, outcome_indicator, notes, completed_at, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (assessment_id, payload.actionType, payload.title, payload.targetGroup, payload.responsibleTeacherId, start, due,
+             payload.status, payload.baselineIndicator, payload.targetIndicator, payload.outcomeIndicator, payload.notes,
+             completed_at, now, now),
+        )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?,?,?,?,?,?)",
+            ("achievement", f"إجراء تحصيلي: {payload.title}", assessment["title"], "achievement_assessment", assessment_id, now),
+        )
+        row = conn.execute(
+            """SELECT x.*, t.name AS responsible_name FROM achievement_actions x
+               LEFT JOIN teachers t ON t.id = x.responsible_teacher_id WHERE x.id = ?""",
+            (cursor.lastrowid,),
+        ).fetchone()
+    return _achievement_action_dict(row)
+
+
+@app.patch("/api/achievement/assessments/{assessment_id}/actions/{action_id}")
+def update_achievement_action(assessment_id: int, action_id: int, payload: AchievementActionPayload):
+    start, due = _validate_achievement_action(payload)
+    now = utc_now()
+    with connect() as conn:
+        row = conn.execute("SELECT id FROM achievement_actions WHERE id = ? AND assessment_id = ?", (action_id, assessment_id)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="الإجراء التحصيلي غير موجود.")
+        current = conn.execute("SELECT completed_at FROM achievement_actions WHERE id = ?", (action_id,)).fetchone()
+        completed_at = current["completed_at"]
+        if payload.status == "completed" and not completed_at:
+            completed_at = now
+        elif payload.status != "completed":
+            completed_at = None
+        conn.execute(
+            """UPDATE achievement_actions SET action_type=?, title=?, target_group=?, responsible_teacher_id=?, start_date=?, due_date=?,
+               status=?, baseline_indicator=?, target_indicator=?, outcome_indicator=?, notes=?, completed_at=?, updated_at=? WHERE id=?""",
+            (payload.actionType, payload.title, payload.targetGroup, payload.responsibleTeacherId, start, due, payload.status,
+             payload.baselineIndicator, payload.targetIndicator, payload.outcomeIndicator, payload.notes, completed_at, now, action_id),
+        )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?,?,?,?,?,?)",
+            ("achievement", f"تحديث إجراء تحصيلي: {payload.title}", payload.status, "achievement_assessment", assessment_id, now),
+        )
+        updated = conn.execute(
+            """SELECT x.*, t.name AS responsible_name FROM achievement_actions x
+               LEFT JOIN teachers t ON t.id = x.responsible_teacher_id WHERE x.id = ?""",
+            (action_id,),
+        ).fetchone()
+    return _achievement_action_dict(updated)
+
+
+@app.delete("/api/achievement/assessments/{assessment_id}/actions/{action_id}")
+def delete_achievement_action(assessment_id: int, action_id: int):
+    with connect() as conn:
+        row = conn.execute("SELECT title FROM achievement_actions WHERE id = ? AND assessment_id = ?", (action_id, assessment_id)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="الإجراء التحصيلي غير موجود.")
+        conn.execute("DELETE FROM achievement_actions WHERE id = ?", (action_id,))
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?,?,?,?,?,?)",
+            ("achievement", f"حذف إجراء تحصيلي: {row['title']}", "", "achievement_assessment", assessment_id, utc_now()),
         )
     return {"ok": True}
 

@@ -30,6 +30,9 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         self.assertIn("dashboard", boot.json())
         self.assertIn("visits", boot.json())
         self.assertIn("supervisionAttention", boot.json())
+        self.assertIn("assessments", boot.json())
+        self.assertIn("achievementAttention", boot.json())
+        self.assertEqual(health.json()["version"], "0.8.0")
 
     def test_create_teacher_and_event(self):
         teacher = self.client.post("/api/teachers", json={
@@ -699,6 +702,125 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
             "strengths": "", "developmentAreas": "", "recommendations": "",
             "followupDate": None, "followupNotes": "", "status": "planned",
         }).status_code, 404)
+
+    def test_achievement_assessment_and_intervention_lifecycle(self):
+        created = self.client.post("/api/achievement/assessments", json={
+            "title": "اختبار التحصيل التجريبي", "assessmentType": "اختبار قصير",
+            "subject": "الفيزياء", "grade": "العاشر", "assessmentDate": "2026-09-20",
+            "term": "الفصل الأول", "academicYear": "2026/2027", "teacherId": 1,
+            "maxScore": 40, "studentCount": 30, "averageScore": 22,
+            "highestScore": 39, "lowestScore": 8, "masteryThresholdPct": 60,
+            "masteredCount": 14, "nearMasteryCount": 8, "interventionCount": 8,
+            "notes": "سجل تحصيل اختباري", "status": "recorded",
+        })
+        self.assertEqual(created.status_code, 201)
+        assessment = created.json()
+        assessment_id = assessment["id"]
+        self.assertEqual(assessment["masteryPercent"], 47)
+        self.assertEqual(assessment["averagePercent"], 55)
+        self.assertTrue(assessment["analysisReady"])
+
+        boot = self.client.get("/api/bootstrap").json()
+        self.assertTrue(any(item["id"] == assessment_id for item in boot["assessments"]))
+        self.assertTrue(any(item["id"] == assessment_id for item in boot["achievementAttention"]))
+        self.assertIn("achievementMastery", boot["dashboard"])
+        self.assertIn("openAchievementActions", boot["dashboard"])
+
+        action = self.client.post(f"/api/achievement/assessments/{assessment_id}/actions", json={
+            "actionType": "remedial", "title": "تدخل علاجي موجه",
+            "targetGroup": "الطلبة دون حد الإتقان", "responsibleTeacherId": 1,
+            "startDate": "2026-09-21", "dueDate": "2026-09-28", "status": "in_progress",
+            "baselineIndicator": "إتقان 47%", "targetIndicator": "60% فأعلى",
+            "outcomeIndicator": "", "notes": "إعادة قياس بعد التنفيذ",
+        })
+        self.assertEqual(action.status_code, 201)
+        action_id = action.json()["id"]
+        self.assertEqual(action.json()["actionType"], "remedial")
+
+        detail = self.client.get(f"/api/achievement/assessments/{assessment_id}")
+        self.assertEqual(detail.status_code, 200)
+        self.assertTrue(any(item["id"] == action_id for item in detail.json()["actions"]))
+        self.assertEqual(detail.json()["openActionCount"], 1)
+
+        updated_action = self.client.patch(f"/api/achievement/assessments/{assessment_id}/actions/{action_id}", json={
+            "actionType": "remedial", "title": "تدخل علاجي موجه",
+            "targetGroup": "الطلبة دون حد الإتقان", "responsibleTeacherId": 1,
+            "startDate": "2026-09-21", "dueDate": "2026-09-28", "status": "completed",
+            "baselineIndicator": "إتقان 47%", "targetIndicator": "60% فأعلى",
+            "outcomeIndicator": "إتقان 63% في إعادة القياس", "notes": "تم القياس اللاحق",
+        })
+        self.assertEqual(updated_action.status_code, 200)
+        self.assertEqual(updated_action.json()["status"], "completed")
+        self.assertIsNotNone(updated_action.json()["completedAt"])
+
+        updated = self.client.patch(f"/api/achievement/assessments/{assessment_id}", json={
+            "title": "اختبار التحصيل التجريبي", "assessmentType": "اختبار قصير",
+            "subject": "الفيزياء", "grade": "العاشر", "assessmentDate": "2026-09-20",
+            "term": "الفصل الأول", "academicYear": "2026/2027", "teacherId": 1,
+            "maxScore": 40, "studentCount": 30, "averageScore": 27,
+            "highestScore": 40, "lowestScore": 12, "masteryThresholdPct": 60,
+            "masteredCount": 20, "nearMasteryCount": 6, "interventionCount": 4,
+            "notes": "تحسن بعد التدخل", "status": "reviewed",
+        })
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json()["masteryPercent"], 67)
+        self.assertEqual(updated.json()["status"], "reviewed")
+
+        removed = self.client.delete(f"/api/achievement/assessments/{assessment_id}/actions/{action_id}")
+        self.assertEqual(removed.status_code, 200)
+        final = self.client.get(f"/api/achievement/assessments/{assessment_id}").json()
+        self.assertEqual(final["actionCount"], 0)
+
+    def test_achievement_validation_and_overdue_attention(self):
+        bad_counts = self.client.post("/api/achievement/assessments", json={
+            "title": "نتيجة غير صالحة", "assessmentType": "اختبار", "subject": "الكيمياء",
+            "grade": "العاشر", "assessmentDate": "2026-09-20", "term": "الفصل الأول",
+            "academicYear": "2026/2027", "teacherId": 1, "maxScore": 40, "studentCount": 10,
+            "averageScore": 25, "highestScore": 41, "lowestScore": 5, "masteryThresholdPct": 60,
+            "masteredCount": 6, "nearMasteryCount": 4, "interventionCount": 2, "notes": "", "status": "recorded",
+        })
+        self.assertEqual(bad_counts.status_code, 422)
+
+        missing_teacher = self.client.post("/api/achievement/assessments", json={
+            "title": "نتيجة بمعلم مفقود", "assessmentType": "اختبار", "subject": "الكيمياء",
+            "grade": "العاشر", "assessmentDate": "2026-09-20", "term": "الفصل الأول",
+            "academicYear": "2026/2027", "teacherId": 999999, "maxScore": 40, "studentCount": 10,
+            "averageScore": 20, "highestScore": 35, "lowestScore": 5, "masteryThresholdPct": 60,
+            "masteredCount": 4, "nearMasteryCount": 3, "interventionCount": 3, "notes": "", "status": "recorded",
+        })
+        self.assertEqual(missing_teacher.status_code, 422)
+        self.assertEqual(self.client.get("/api/achievement/assessments/999999").status_code, 404)
+
+        oman_today = datetime.now(timezone(timedelta(hours=4))).date()
+        yesterday = (oman_today - timedelta(days=1)).isoformat()
+        created = self.client.post("/api/achievement/assessments", json={
+            "title": "نتيجة متابعة متأخرة", "assessmentType": "اختبار", "subject": "العلوم",
+            "grade": "الثامن", "assessmentDate": yesterday, "term": "الفصل الأول",
+            "academicYear": "2026/2027", "teacherId": 3, "maxScore": 20, "studentCount": 20,
+            "averageScore": 15, "highestScore": 20, "lowestScore": 8, "masteryThresholdPct": 60,
+            "masteredCount": 15, "nearMasteryCount": 3, "interventionCount": 2, "notes": "", "status": "recorded",
+        })
+        self.assertEqual(created.status_code, 201)
+        assessment_id = created.json()["id"]
+        action = self.client.post(f"/api/achievement/assessments/{assessment_id}/actions", json={
+            "actionType": "followup", "title": "متابعة متأخرة", "targetGroup": "طالبان",
+            "responsibleTeacherId": 3, "startDate": yesterday, "dueDate": yesterday,
+            "status": "in_progress", "baselineIndicator": "", "targetIndicator": "",
+            "outcomeIndicator": "", "notes": "",
+        })
+        self.assertEqual(action.status_code, 201)
+        self.assertEqual(action.json()["status"], "overdue")
+        boot = self.client.get("/api/bootstrap").json()
+        attention = next(item for item in boot["achievementAttention"] if item["id"] == assessment_id)
+        self.assertEqual(attention["overdueActionCount"], 1)
+
+        bad_action = self.client.post(f"/api/achievement/assessments/{assessment_id}/actions", json={
+            "actionType": "remedial", "title": "تاريخ غير صالح", "targetGroup": "",
+            "responsibleTeacherId": 3, "startDate": "2026-10-10", "dueDate": "2026-10-01",
+            "status": "new", "baselineIndicator": "", "targetIndicator": "", "outcomeIndicator": "", "notes": "",
+        })
+        self.assertEqual(bad_action.status_code, 422)
+        self.assertEqual(self.client.delete(f"/api/achievement/assessments/{assessment_id}/actions/999999").status_code, 404)
 
     def test_invalid_extension_is_rejected(self):
         created = self.client.post("/api/requests", json={

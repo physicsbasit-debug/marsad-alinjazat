@@ -24,8 +24,12 @@ import type {
   SupervisionVisitDetails,
   SupervisionActionInput,
   SupervisionAction,
+  AchievementAssessmentInput,
+  AchievementAssessmentDetails,
+  AchievementActionInput,
+  AchievementAction,
 } from '../types';
-import { getPreviewEventDetails, getPreviewMeetingDetails, getPreviewPlanDetails, getPreviewSupervisionVisit, getPreviewTeacherProfile, previewBootstrap } from './preview';
+import { getPreviewAssessmentDetails, getPreviewEventDetails, getPreviewMeetingDetails, getPreviewPlanDetails, getPreviewSupervisionVisit, getPreviewTeacherProfile, previewBootstrap } from './preview';
 
 const PREVIEW_MODE = import.meta.env.VITE_PREVIEW_MODE === 'true';
 const PREVIEW_MESSAGE = 'هذه معاينة GitHub Pages فقط. الحفظ والرفع الفعليان يعملان عند تشغيل خادم مرصد الإنجازات.';
@@ -369,3 +373,34 @@ export async function deleteSupervisionAction(visitId: number, actionId: number)
   requireBackend();
   await parseResponse(await fetch(`/api/supervision/visits/${visitId}/actions/${actionId}`, { method: 'DELETE' }));
 }
+
+export async function createAchievementAssessment(input: AchievementAssessmentInput): Promise<AchievementAssessmentDetails> {
+  requireBackend();
+  return parseResponse(await fetch('/api/achievement/assessments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
+}
+
+export async function getAchievementAssessment(id: number): Promise<AchievementAssessmentDetails> {
+  if (PREVIEW_MODE) return getPreviewAssessmentDetails(id);
+  return parseResponse(await fetch(`/api/achievement/assessments/${id}`));
+}
+
+export async function updateAchievementAssessment(id: number, input: AchievementAssessmentInput): Promise<AchievementAssessmentDetails> {
+  requireBackend();
+  return parseResponse(await fetch(`/api/achievement/assessments/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
+}
+
+export async function createAchievementAction(assessmentId: number, input: AchievementActionInput): Promise<AchievementAction> {
+  requireBackend();
+  return parseResponse(await fetch(`/api/achievement/assessments/${assessmentId}/actions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
+}
+
+export async function updateAchievementAction(assessmentId: number, actionId: number, input: AchievementActionInput): Promise<AchievementAction> {
+  requireBackend();
+  return parseResponse(await fetch(`/api/achievement/assessments/${assessmentId}/actions/${actionId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
+}
+
+export async function deleteAchievementAction(assessmentId: number, actionId: number): Promise<void> {
+  requireBackend();
+  await parseResponse(await fetch(`/api/achievement/assessments/${assessmentId}/actions/${actionId}`, { method: 'DELETE' }));
+}
+

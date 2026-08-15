@@ -4,11 +4,12 @@ import type { BootstrapData } from '../types';
 export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuickAction: (action: string) => void }) {
   const d = data.dashboard;
   const planningAttention = data.planningAttention.slice(0, 1);
-  const supervisionAttention = data.supervisionAttention.slice(0, Math.max(0, 2 - planningAttention.length));
-  const decisionAttention = data.decisionAttention.slice(0, Math.max(0, 3 - planningAttention.length - supervisionAttention.length));
+  const achievementAttention = data.achievementAttention.slice(0, Math.max(0, 2 - planningAttention.length));
+  const supervisionAttention = data.supervisionAttention.slice(0, Math.max(0, 3 - planningAttention.length - achievementAttention.length));
+  const decisionAttention = data.decisionAttention.slice(0, Math.max(0, 4 - planningAttention.length - achievementAttention.length - supervisionAttention.length));
   const requestAttention = data.requests
     .filter((item) => ['late', 'review', 'waiting_upload', 'received'].includes(item.status))
-    .slice(0, Math.max(0, 4 - planningAttention.length - supervisionAttention.length - decisionAttention.length));
+    .slice(0, Math.max(0, 4 - planningAttention.length - achievementAttention.length - supervisionAttention.length - decisionAttention.length));
   const [weekStart, weekEnd] = currentWeekBounds();
   const scheduleEntries = [
     ...data.meetings
@@ -43,9 +44,10 @@ export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuic
 
       <section className="dashboard-grid">
         <article className="panel attention-panel">
-          <div className="panel-heading"><div><span className="eyebrow danger">يحتاج انتباهك</span><h2>الأولوية الآن</h2></div><span className="counter">{d.openRequests + d.openDecisions + data.planningAttention.length + data.supervisionAttention.length}</span></div>
+          <div className="panel-heading"><div><span className="eyebrow danger">يحتاج انتباهك</span><h2>الأولوية الآن</h2></div><span className="counter">{d.openRequests + d.openDecisions + data.planningAttention.length + data.supervisionAttention.length + data.achievementAttention.length}</span></div>
           <div className="attention-list">
             {planningAttention.map((item) => <div className="attention-item" key={`planning-${item.id}`}><span className="attention-dot late"></span><div><strong>{item.title}</strong><small>{item.planSubject} • {item.planGrade} • {item.responsibleName || 'دون مسؤول'}{item.plannedEnd ? ` • انتهت ${formatShortDate(item.plannedEnd)}` : ''}</small></div><Icon name="planning" size={18}/></div>)}
+            {achievementAttention.map((item) => <div className="attention-item" key={`achievement-${item.id}`}><span className="attention-dot late"></span><div><strong>{item.title}</strong><small>{item.subject} • {item.grade} • إتقان {item.masteryPercent}% من حد {item.masteryThresholdPct}%{item.overdueActionCount ? ` • ${item.overdueActionCount} تدخل متأخر` : ''}</small></div><Icon name="chart" size={18}/></div>)}
             {supervisionAttention.map((item) => <div className="attention-item" key={`supervision-${item.id}`}><span className="attention-dot late"></span><div><strong>{item.teacherName}</strong><small>{item.visitType} • {item.grade || 'دون صف'} • {item.status === 'needs_followup' && item.followupDate ? `متابعة ${formatShortDate(item.followupDate)}` : `زيارة ${formatShortDate(item.visitDate)}`}</small></div><Icon name="supervision" size={18}/></div>)}
             {decisionAttention.map((item) => <div className="attention-item" key={`decision-${item.id}`}><span className={`attention-dot ${item.status === 'overdue' ? 'late' : 'received'}`}></span><div><strong>{item.title}</strong><small>{item.meetingTitle || 'قرار اجتماع'} • {item.responsibleName || 'دون مسؤول'}{item.dueDate ? ` • حتى ${formatShortDate(item.dueDate)}` : ''}</small></div><Icon name="meeting" size={18}/></div>)}
             {requestAttention.map((item) => (
@@ -72,11 +74,12 @@ export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuic
           <Progress label="تنفيذ الخطة" value={d.planProgress} />
           <Progress label="الزيارات والمتابعة" value={d.visitProgress} />
           <Progress label="الطلبات المكتملة" value={d.requestCompletion} />
+          <Progress label="الإتقان التحصيلي" value={d.achievementMastery} />
         </article>
         <article className="panel activity-panel">
           <div className="panel-heading"><div><span className="eyebrow">آخر النشاطات</span><h2>ما حدث مؤخرًا</h2></div></div>
           <div className="activity-list">
-            {data.activities.slice(0, 4).map((item) => <div className="activity-row" key={item.id}><span className="activity-icon"><Icon name={item.activity_type === 'event' ? 'spark' : item.activity_type === 'meeting' ? 'meeting' : item.activity_type === 'planning' ? 'planning' : item.activity_type === 'supervision' ? 'supervision' : item.activity_type === 'document' ? 'document' : 'upload'} size={18} /></span><div><strong>{item.title}</strong><small>{item.detail}</small></div></div>)}
+            {data.activities.slice(0, 4).map((item) => <div className="activity-row" key={item.id}><span className="activity-icon"><Icon name={item.activity_type === 'event' ? 'spark' : item.activity_type === 'meeting' ? 'meeting' : item.activity_type === 'planning' ? 'planning' : item.activity_type === 'supervision' ? 'supervision' : item.activity_type === 'achievement' ? 'chart' : item.activity_type === 'document' ? 'document' : 'upload'} size={18} /></span><div><strong>{item.title}</strong><small>{item.detail}</small></div></div>)}
           </div>
         </article>
       </section>

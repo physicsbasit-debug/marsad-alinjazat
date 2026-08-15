@@ -285,6 +285,54 @@ def init_db() -> None:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS achievement_assessments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                assessment_type TEXT NOT NULL DEFAULT 'اختبار',
+                subject TEXT NOT NULL,
+                grade TEXT NOT NULL,
+                assessment_date TEXT NOT NULL,
+                term TEXT NOT NULL,
+                academic_year TEXT NOT NULL,
+                teacher_id INTEGER REFERENCES teachers(id) ON DELETE SET NULL,
+                max_score REAL NOT NULL CHECK (max_score > 0),
+                student_count INTEGER NOT NULL DEFAULT 0 CHECK (student_count >= 0),
+                average_score REAL CHECK (average_score IS NULL OR average_score >= 0),
+                highest_score REAL CHECK (highest_score IS NULL OR highest_score >= 0),
+                lowest_score REAL CHECK (lowest_score IS NULL OR lowest_score >= 0),
+                mastery_threshold_pct REAL NOT NULL DEFAULT 60 CHECK (mastery_threshold_pct BETWEEN 0 AND 100),
+                mastered_count INTEGER NOT NULL DEFAULT 0 CHECK (mastered_count >= 0),
+                near_mastery_count INTEGER NOT NULL DEFAULT 0 CHECK (near_mastery_count >= 0),
+                intervention_count INTEGER NOT NULL DEFAULT 0 CHECK (intervention_count >= 0),
+                notes TEXT,
+                status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'recorded', 'reviewed')),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                CHECK (mastered_count + near_mastery_count + intervention_count <= student_count),
+                CHECK (average_score IS NULL OR average_score <= max_score),
+                CHECK (highest_score IS NULL OR highest_score <= max_score),
+                CHECK (lowest_score IS NULL OR lowest_score <= max_score)
+            );
+
+            CREATE TABLE IF NOT EXISTS achievement_actions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                assessment_id INTEGER NOT NULL REFERENCES achievement_assessments(id) ON DELETE CASCADE,
+                action_type TEXT NOT NULL DEFAULT 'remedial' CHECK (action_type IN ('remedial', 'enrichment', 'followup')),
+                title TEXT NOT NULL,
+                target_group TEXT,
+                responsible_teacher_id INTEGER REFERENCES teachers(id) ON DELETE SET NULL,
+                start_date TEXT,
+                due_date TEXT,
+                status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'in_progress', 'completed', 'cancelled')),
+                baseline_indicator TEXT,
+                target_indicator TEXT,
+                outcome_indicator TEXT,
+                notes TEXT,
+                completed_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_requests_status ON upload_requests(status);
             CREATE INDEX IF NOT EXISTS idx_documents_request ON documents(request_id);
             CREATE INDEX IF NOT EXISTS idx_activities_created ON activities(created_at DESC);
@@ -303,6 +351,10 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_supervision_visits_teacher ON supervision_visits(teacher_id, visit_date DESC, id DESC);
             CREATE INDEX IF NOT EXISTS idx_supervision_actions_visit ON supervision_actions(visit_id, status, due_date);
             CREATE INDEX IF NOT EXISTS idx_supervision_actions_open ON supervision_actions(status, due_date);
+            CREATE INDEX IF NOT EXISTS idx_achievement_assessments_scope ON achievement_assessments(academic_year, term, subject, grade, assessment_date DESC);
+            CREATE INDEX IF NOT EXISTS idx_achievement_assessments_teacher ON achievement_assessments(teacher_id, assessment_date DESC);
+            CREATE INDEX IF NOT EXISTS idx_achievement_actions_assessment ON achievement_actions(assessment_id, status, due_date);
+            CREATE INDEX IF NOT EXISTS idx_achievement_actions_open ON achievement_actions(status, due_date);
             """
         )
         _backfill_event_media_meta(conn)
