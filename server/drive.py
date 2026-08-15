@@ -218,6 +218,79 @@ def upload_file(path: Path, filename: str, mime_type: str, academic_year: str, r
     return upload.json()
 
 
+def upload_event_file(path: Path, filename: str, mime_type: str, academic_year: str, event_id: int, event_title: str) -> dict[str, Any]:
+    token = get_access_token()
+    root = ensure_root_folder()
+    year_folder = ensure_child_folder(academic_year, root)
+    events_folder = ensure_child_folder("03 - الفعاليات والتوثيق", year_folder)
+    safe_title = " ".join(event_title.replace("/", "-").replace("\\", "-").split())[:80] or "فعالية"
+    event_folder = ensure_child_folder(f"فعالية {event_id} - {safe_title}", events_folder)
+
+    metadata = {
+        "name": filename,
+        "parents": [event_folder],
+        "appProperties": {"marsadEventId": str(event_id)},
+    }
+    init = requests.post(
+        f"{DRIVE_UPLOAD_API}/files",
+        timeout=30,
+        headers={
+            **_headers(token),
+            "Content-Type": "application/json; charset=UTF-8",
+            "X-Upload-Content-Type": mime_type or "application/octet-stream",
+            "X-Upload-Content-Length": str(path.stat().st_size),
+        },
+        params={"uploadType": "resumable", "supportsAllDrives": "true", "fields": "id,name,webViewLink,size,mimeType"},
+        data=json.dumps(metadata, ensure_ascii=False).encode("utf-8"),
+    )
+    init.raise_for_status()
+    session_uri = init.headers.get("Location")
+    if not session_uri:
+        raise RuntimeError("لم يعِد Google جلسة رفع قابلة للاستئناف للفعالية.")
+
+    with path.open("rb") as handle:
+        upload = requests.put(
+            session_uri,
+            timeout=120,
+            headers={"Content-Type": mime_type or "application/octet-stream"},
+            data=handle,
+        )
+    upload.raise_for_status()
+    return upload.json()
+
+
+def download_file(file_id: str) -> tuple[bytes, str]:
+    token = get_access_token()
+    metadata = requests.get(
+        f"{DRIVE_API}/files/{file_id}",
+        timeout=30,
+        headers=_headers(token),
+        params={"fields": "mimeType", "supportsAllDrives": "true"},
+    )
+    metadata.raise_for_status()
+    mime_type = metadata.json().get("mimeType") or "application/octet-stream"
+    response = requests.get(
+        f"{DRIVE_API}/files/{file_id}",
+        timeout=120,
+        headers=_headers(token),
+        params={"alt": "media", "supportsAllDrives": "true"},
+    )
+    response.raise_for_status()
+    return response.content, mime_type
+
+
+def delete_file(file_id: str) -> None:
+    token = get_access_token()
+    response = requests.delete(
+        f"{DRIVE_API}/files/{file_id}",
+        timeout=30,
+        headers=_headers(token),
+        params={"supportsAllDrives": "true"},
+    )
+    if response.status_code not in {204, 404}:
+        response.raise_for_status()
+
+
 def status() -> dict[str, Any]:
     return {
         "configured": oauth_configured(),

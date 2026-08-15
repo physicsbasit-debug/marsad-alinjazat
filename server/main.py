@@ -13,7 +13,7 @@ from typing import Literal
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -30,8 +30,10 @@ MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "25"))
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 UPLOADS_DIR = Path(os.getenv("APP_UPLOADS_DIR", BASE_DIR / "uploads" / "inbox"))
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+EVENT_UPLOADS_DIR = Path(os.getenv("APP_EVENT_UPLOADS_DIR", BASE_DIR / "uploads" / "events"))
+EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="مرصد الإنجازات API", version="0.3.0")
+app = FastAPI(title="مرصد الإنجازات API", version="0.4.0")
 
 
 class CreateRequestPayload(BaseModel):
@@ -88,6 +90,17 @@ class EventPayload(BaseModel):
     summary: str = Field(default="", max_length=4000)
     outcomes: str = Field(default="", max_length=3000)
     recommendations: str = Field(default="", max_length=3000)
+    teacherIds: list[int] = Field(default_factory=list, max_length=100)
+
+
+class EventMediaMetaPayload(BaseModel):
+    caption: str = Field(default="", max_length=500)
+    position: int = Field(default=0, ge=0, le=10000)
+    isCover: bool = False
+
+
+class EventMediaOrderPayload(BaseModel):
+    mediaIds: list[int] = Field(min_length=1, max_length=500)
 
 
 def _teacher_dict(row):
@@ -229,8 +242,65 @@ def _event_dict(row):
         ("updated_at", "updatedAt"),
         ("media_count", "mediaCount"),
     ]:
-        item[target] = item.pop(source)
+        if source in item:
+            item[target] = item.pop(source)
     return item
+
+
+def _event_media_dict(row):
+    item = dict(row)
+    for source, target in [
+        ("event_id", "eventId"),
+        ("original_name", "originalName"),
+        ("mime_type", "mimeType"),
+        ("size_bytes", "sizeBytes"),
+        ("storage_provider", "storageProvider"),
+        ("storage_file_id", "storageFileId"),
+        ("storage_path", "storagePath"),
+        ("web_view_link", "webViewLink"),
+        ("created_at", "createdAt"),
+        ("is_cover", "isCover"),
+    ]:
+        if source in item:
+            item[target] = item.pop(source)
+    item["isCover"] = bool(item.get("isCover", False))
+    item["contentUrl"] = f"/api/events/{item['eventId']}/media/{item['id']}/content"
+    return item
+
+
+def _event_detail(event_id: int):
+    with connect() as conn:
+        row = conn.execute(
+            """SELECT e.*, COUNT(m.id) AS media_count
+               FROM events e LEFT JOIN event_media m ON m.event_id = e.id
+               WHERE e.id = ? GROUP BY e.id""",
+            (event_id,),
+        ).fetchone()
+        if not row:
+            return None
+        media_rows = conn.execute(
+            """SELECT m.*, COALESCE(meta.caption, '') AS caption, COALESCE(meta.position, 0) AS position,
+                      COALESCE(meta.is_cover, 0) AS is_cover
+               FROM event_media m
+               LEFT JOIN event_media_meta meta ON meta.media_id = m.id
+               WHERE m.event_id = ?
+               ORDER BY COALESCE(meta.position, 0), m.id""",
+            (event_id,),
+        ).fetchall()
+        teacher_rows = conn.execute(
+            """SELECT t.*, l.role AS event_role
+               FROM event_teacher_links l JOIN teachers t ON t.id = l.teacher_id
+               WHERE l.event_id = ? ORDER BY t.name""",
+            (event_id,),
+        ).fetchall()
+    event = _event_dict(row)
+    media = [_event_media_dict(item) for item in media_rows]
+    event["media"] = media
+    event["teachers"] = [_teacher_dict(teacher_row) for teacher_row in teacher_rows]
+    cover = next((item for item in media if item["isCover"]), None)
+    event["coverMediaId"] = cover["id"] if cover else None
+    event["coverMediaUrl"] = cover["contentUrl"] if cover else None
+    return event
 
 
 def _get_request_rows():
@@ -270,9 +340,20 @@ def _safe_filename(name: str) -> str:
     return name[:180] or "file"
 
 
+def _resolve_event_local_path(storage_path: str) -> Path:
+    path = Path(storage_path)
+    if not path.is_absolute():
+        path = BASE_DIR / path
+    resolved = path.resolve()
+    root = EVENT_UPLOADS_DIR.resolve()
+    if resolved != root and root not in resolved.parents:
+        raise HTTPException(status_code=400, detail="مسار ملف الفعالية غير صالح.")
+    return resolved
+
+
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "0.3.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
+    return {"ok": True, "version": "0.4.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
 
 
 @app.get("/api/bootstrap")
@@ -281,6 +362,16 @@ def bootstrap():
         teachers = [_teacher_dict(r) for r in conn.execute("SELECT * FROM teachers ORDER BY name").fetchall()]
         request_items = [_request_dict(r) for r in _get_request_rows()]
         events = [_event_dict(r) for r in conn.execute("""SELECT e.*, COUNT(m.id) AS media_count FROM events e LEFT JOIN event_media m ON m.event_id = e.id GROUP BY e.id ORDER BY e.event_date DESC""").fetchall()]
+        cover_rows = conn.execute(
+            """SELECT m.event_id, m.id AS media_id
+               FROM event_media m JOIN event_media_meta meta ON meta.media_id = m.id
+               WHERE meta.is_cover = 1"""
+        ).fetchall()
+        cover_by_event = {row["event_id"]: row["media_id"] for row in cover_rows}
+        for event in events:
+            cover_id = cover_by_event.get(event["id"])
+            event["coverMediaId"] = cover_id
+            event["coverMediaUrl"] = f"/api/events/{event['id']}/media/{cover_id}/content" if cover_id else None
         documents = [_document_dict(r) for r in conn.execute("SELECT * FROM documents ORDER BY uploaded_at DESC LIMIT 30").fetchall()]
         activities = [dict(r) for r in conn.execute("SELECT * FROM activities ORDER BY created_at DESC LIMIT 8").fetchall()]
 
@@ -421,9 +512,17 @@ def create_event(payload: EventPayload):
         datetime.fromisoformat(payload.eventDate)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail="تاريخ الفعالية غير صالح.") from exc
+    teacher_ids = list(dict.fromkeys(payload.teacherIds))
     now = utc_now()
     tones = ["teal", "navy", "gold"]
     with connect() as conn:
+        if teacher_ids:
+            found = conn.execute(
+                f"SELECT id FROM teachers WHERE id IN ({','.join('?' for _ in teacher_ids)})",
+                teacher_ids,
+            ).fetchall()
+            if len(found) != len(teacher_ids):
+                raise HTTPException(status_code=422, detail="تتضمن قائمة المشاركين معلمًا غير موجود.")
         count = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
         cursor = conn.execute(
             """INSERT INTO events
@@ -431,11 +530,274 @@ def create_event(payload: EventPayload):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (payload.title, payload.eventType, payload.eventDate, payload.location, payload.audience, payload.participantCount, payload.goals, payload.summary, payload.outcomes, payload.recommendations, tones[count % len(tones)], now, now),
         )
+        event_id = cursor.lastrowid
+        if teacher_ids:
+            conn.executemany(
+                "INSERT INTO event_teacher_links (event_id, teacher_id, role, created_at) VALUES (?, ?, 'مشارك', ?)",
+                [(event_id, teacher_id, now) for teacher_id in teacher_ids],
+            )
         conn.execute(
             "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            ("event", f"توثيق {payload.title}", payload.eventType, "event", cursor.lastrowid, now),
+            ("event", f"توثيق {payload.title}", payload.eventType, "event", event_id, now),
         )
-    return {"id": cursor.lastrowid}
+    return {"id": event_id}
+
+
+@app.get("/api/events/{event_id}")
+def get_event(event_id: int):
+    detail = _event_detail(event_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="الفعالية غير موجودة.")
+    return detail
+
+
+@app.patch("/api/events/{event_id}")
+def update_event(event_id: int, payload: EventPayload):
+    try:
+        datetime.fromisoformat(payload.eventDate)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="تاريخ الفعالية غير صالح.") from exc
+    teacher_ids = list(dict.fromkeys(payload.teacherIds))
+    now = utc_now()
+    with connect() as conn:
+        row = conn.execute("SELECT id FROM events WHERE id = ?", (event_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="الفعالية غير موجودة.")
+        if teacher_ids:
+            found = conn.execute(
+                f"SELECT id FROM teachers WHERE id IN ({','.join('?' for _ in teacher_ids)})",
+                teacher_ids,
+            ).fetchall()
+            if len(found) != len(teacher_ids):
+                raise HTTPException(status_code=422, detail="تتضمن قائمة المشاركين معلمًا غير موجود.")
+        conn.execute(
+            """UPDATE events SET title = ?, event_type = ?, event_date = ?, location = ?, audience = ?,
+               participant_count = ?, goals = ?, summary = ?, outcomes = ?, recommendations = ?, updated_at = ?
+               WHERE id = ?""",
+            (payload.title, payload.eventType, payload.eventDate, payload.location, payload.audience,
+             payload.participantCount, payload.goals, payload.summary, payload.outcomes, payload.recommendations,
+             now, event_id),
+        )
+        conn.execute("DELETE FROM event_teacher_links WHERE event_id = ?", (event_id,))
+        if teacher_ids:
+            conn.executemany(
+                "INSERT INTO event_teacher_links (event_id, teacher_id, role, created_at) VALUES (?, ?, 'مشارك', ?)",
+                [(event_id, teacher_id, now) for teacher_id in teacher_ids],
+            )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("event", f"تحديث توثيق {payload.title}", f"{len(teacher_ids)} معلمًا مشاركًا", "event", event_id, now),
+        )
+    return _event_detail(event_id)
+
+
+@app.post("/api/events/{event_id}/media", status_code=201)
+async def upload_event_media(event_id: int, file: UploadFile = File(...), caption: str = Form(default="")):
+    detail = _event_detail(event_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="الفعالية غير موجودة.")
+    if len(caption) > 500:
+        raise HTTPException(status_code=422, detail="وصف الدليل طويل جدًا.")
+
+    safe_name = _safe_filename(file.filename or "file")
+    suffix = Path(safe_name).suffix.lower()
+    allowed = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".jpg", ".jpeg", ".png", ".webp"}
+    if suffix not in allowed:
+        raise HTTPException(status_code=415, detail="نوع ملف التوثيق غير مسموح به.")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp:
+        temp_path = Path(temp.name)
+        total = 0
+        while chunk := await file.read(1024 * 1024):
+            total += len(chunk)
+            if total > MAX_UPLOAD_BYTES:
+                temp_path.unlink(missing_ok=True)
+                raise HTTPException(status_code=413, detail=f"الحد الأقصى للملف {MAX_UPLOAD_MB} MB.")
+            temp.write(chunk)
+
+    mime_type = mimetypes.guess_type(safe_name)[0] or file.content_type or "application/octet-stream"
+    storage_mode = os.getenv("STORAGE_MODE", "auto")
+    storage_provider = "local"
+    storage_file_id = None
+    storage_path = None
+    web_view_link = None
+
+    try:
+        use_drive = storage_mode == "google_drive" or (storage_mode == "auto" and drive.is_connected())
+        if use_drive:
+            if not drive.is_connected():
+                raise HTTPException(status_code=503, detail="Google Drive غير مربوط بعد.")
+            try:
+                result = drive.upload_event_file(temp_path, safe_name, mime_type, ACADEMIC_YEAR, event_id, detail["title"])
+            except Exception as exc:
+                raise HTTPException(status_code=502, detail=f"فشل رفع دليل الفعالية إلى Google Drive: {exc}") from exc
+            storage_provider = "google_drive"
+            storage_file_id = result.get("id")
+            web_view_link = result.get("webViewLink")
+        else:
+            event_dir = EVENT_UPLOADS_DIR / str(event_id)
+            event_dir.mkdir(parents=True, exist_ok=True)
+            target = event_dir / f"{secrets.token_hex(4)}-{safe_name}"
+            shutil.move(str(temp_path), target)
+            try:
+                storage_path = str(target.relative_to(BASE_DIR))
+            except ValueError:
+                storage_path = str(target)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+    now = utc_now()
+    with connect() as conn:
+        max_position = conn.execute(
+            """SELECT COALESCE(MAX(meta.position), -1) FROM event_media m
+               LEFT JOIN event_media_meta meta ON meta.media_id = m.id WHERE m.event_id = ?""",
+            (event_id,),
+        ).fetchone()[0]
+        has_cover = conn.execute(
+            """SELECT 1 FROM event_media m JOIN event_media_meta meta ON meta.media_id = m.id
+               WHERE m.event_id = ? AND meta.is_cover = 1 LIMIT 1""",
+            (event_id,),
+        ).fetchone()
+        cursor = conn.execute(
+            """INSERT INTO event_media
+               (event_id, original_name, mime_type, size_bytes, storage_provider, storage_file_id, storage_path, web_view_link, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (event_id, safe_name, mime_type, total, storage_provider, storage_file_id, storage_path, web_view_link, now),
+        )
+        media_id = cursor.lastrowid
+        is_cover = 1 if mime_type.startswith("image/") and not has_cover else 0
+        conn.execute(
+            "INSERT INTO event_media_meta (media_id, caption, position, is_cover, updated_at) VALUES (?, ?, ?, ?, ?)",
+            (media_id, caption.strip(), max_position + 1, is_cover, now),
+        )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("event", f"إضافة دليل إلى {detail['title']}", safe_name, "event", event_id, now),
+        )
+    return _event_media_dict({
+        "id": media_id, "event_id": event_id, "original_name": safe_name, "mime_type": mime_type,
+        "size_bytes": total, "storage_provider": storage_provider, "storage_file_id": storage_file_id,
+        "storage_path": storage_path, "web_view_link": web_view_link, "created_at": now,
+        "caption": caption.strip(), "position": max_position + 1, "is_cover": is_cover,
+    })
+
+
+@app.patch("/api/events/{event_id}/media-order")
+def reorder_event_media(event_id: int, payload: EventMediaOrderPayload):
+    now = utc_now()
+    ordered_ids = payload.mediaIds
+    if len(set(ordered_ids)) != len(ordered_ids):
+        raise HTTPException(status_code=422, detail="ترتيب الأدلة يحتوي عناصر مكررة.")
+    with connect() as conn:
+        event = conn.execute("SELECT id FROM events WHERE id = ?", (event_id,)).fetchone()
+        if not event:
+            raise HTTPException(status_code=404, detail="الفعالية غير موجودة.")
+        existing = [row["id"] for row in conn.execute("SELECT id FROM event_media WHERE event_id = ? ORDER BY id", (event_id,)).fetchall()]
+        if set(existing) != set(ordered_ids) or len(existing) != len(ordered_ids):
+            raise HTTPException(status_code=422, detail="قائمة ترتيب الأدلة لا تطابق أدلة الفعالية الحالية.")
+        for position, media_id in enumerate(ordered_ids):
+            conn.execute(
+                "INSERT OR IGNORE INTO event_media_meta (media_id, caption, position, is_cover, updated_at) VALUES (?, '', ?, 0, ?)",
+                (media_id, position, now),
+            )
+            conn.execute("UPDATE event_media_meta SET position = ?, updated_at = ? WHERE media_id = ?", (position, now, media_id))
+    return _event_detail(event_id)
+
+
+@app.patch("/api/events/{event_id}/media/{media_id}")
+def update_event_media(event_id: int, media_id: int, payload: EventMediaMetaPayload):
+    now = utc_now()
+    with connect() as conn:
+        row = conn.execute("SELECT id, mime_type FROM event_media WHERE id = ? AND event_id = ?", (media_id, event_id)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="دليل الفعالية غير موجود.")
+        if payload.isCover and not (row["mime_type"] or "").startswith("image/"):
+            raise HTTPException(status_code=422, detail="يمكن استخدام الصور فقط كغلاف للفعالية.")
+        conn.execute(
+            "INSERT OR IGNORE INTO event_media_meta (media_id, caption, position, is_cover, updated_at) VALUES (?, '', 0, 0, ?)",
+            (media_id, now),
+        )
+        if payload.isCover:
+            conn.execute(
+                "UPDATE event_media_meta SET is_cover = 0, updated_at = ? WHERE media_id IN (SELECT id FROM event_media WHERE event_id = ?)",
+                (now, event_id),
+            )
+        conn.execute(
+            "UPDATE event_media_meta SET caption = ?, position = ?, is_cover = ?, updated_at = ? WHERE media_id = ?",
+            (payload.caption.strip(), payload.position, int(payload.isCover), now, media_id),
+        )
+    return _event_detail(event_id)
+
+
+@app.delete("/api/events/{event_id}/media/{media_id}")
+def delete_event_media(event_id: int, media_id: int):
+    detail = _event_detail(event_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="الفعالية غير موجودة.")
+    with connect() as conn:
+        row = conn.execute(
+            """SELECT m.*, COALESCE(meta.is_cover, 0) AS is_cover
+               FROM event_media m LEFT JOIN event_media_meta meta ON meta.media_id = m.id
+               WHERE m.id = ? AND m.event_id = ?""",
+            (media_id, event_id),
+        ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="دليل الفعالية غير موجود.")
+
+    if row["storage_provider"] == "google_drive" and row["storage_file_id"]:
+        try:
+            drive.delete_file(row["storage_file_id"])
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"تعذر حذف الملف من Google Drive: {exc}") from exc
+    elif row["storage_provider"] == "local" and row["storage_path"]:
+        path = _resolve_event_local_path(row["storage_path"])
+        path.unlink(missing_ok=True)
+
+    now = utc_now()
+    with connect() as conn:
+        was_cover = bool(row["is_cover"])
+        conn.execute("DELETE FROM event_media WHERE id = ? AND event_id = ?", (media_id, event_id))
+        if was_cover:
+            fallback = conn.execute(
+                """SELECT m.id FROM event_media m
+                   LEFT JOIN event_media_meta meta ON meta.media_id = m.id
+                   WHERE m.event_id = ? AND m.mime_type LIKE 'image/%'
+                   ORDER BY COALESCE(meta.position, 0), m.id LIMIT 1""",
+                (event_id,),
+            ).fetchone()
+            if fallback:
+                conn.execute(
+                    "INSERT OR IGNORE INTO event_media_meta (media_id, caption, position, is_cover, updated_at) VALUES (?, '', 0, 0, ?)",
+                    (fallback["id"], now),
+                )
+                conn.execute("UPDATE event_media_meta SET is_cover = 1, updated_at = ? WHERE media_id = ?", (now, fallback["id"]))
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("event", f"حذف دليل من {detail['title']}", row["original_name"], "event", event_id, now),
+        )
+    return {"ok": True}
+
+
+@app.get("/api/events/{event_id}/media/{media_id}/content")
+def event_media_content(event_id: int, media_id: int):
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM event_media WHERE id = ? AND event_id = ?", (media_id, event_id)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="دليل الفعالية غير موجود.")
+    if row["storage_provider"] == "local" and row["storage_path"]:
+        path = _resolve_event_local_path(row["storage_path"])
+        if not path.exists() or not path.is_file():
+            raise HTTPException(status_code=404, detail="ملف التوثيق غير موجود على الخادم.")
+        return FileResponse(path, media_type=row["mime_type"] or None)
+    if row["storage_provider"] == "google_drive" and row["storage_file_id"]:
+        try:
+            content, mime_type = drive.download_file(row["storage_file_id"])
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"تعذر قراءة الملف من Google Drive: {exc}") from exc
+        return Response(content=content, media_type=mime_type)
+    if row["web_view_link"]:
+        return RedirectResponse(row["web_view_link"], status_code=302)
+    raise HTTPException(status_code=404, detail="لا يوجد مصدر متاح لهذا الدليل.")
 
 
 @app.post("/api/requests", status_code=201)

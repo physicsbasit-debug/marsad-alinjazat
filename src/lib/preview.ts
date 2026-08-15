@@ -1,4 +1,16 @@
-import type { BootstrapData, TeacherCvItem, TeacherProfileDetails } from '../types';
+import type { BootstrapData, EventDetails, EventMediaRecord, TeacherCvItem, TeacherProfileDetails } from '../types';
+
+function eventVisual(title: string, accent: string, secondary: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${accent}"/><stop offset="1" stop-color="${secondary}"/></linearGradient><radialGradient id="r"><stop stop-color="#fff" stop-opacity=".34"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="1400" height="800" fill="url(#g)"/><circle cx="1100" cy="170" r="270" fill="url(#r)"/><circle cx="240" cy="650" r="330" fill="url(#r)"/><g fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="10"><circle cx="700" cy="400" r="150"/><path d="M430 400h540M700 130v540M520 220l360 360M880 220L520 580"/></g><text x="700" y="410" text-anchor="middle" direction="rtl" fill="#fff" font-size="72" font-family="Arial" font-weight="700">${title}</text><text x="700" y="475" text-anchor="middle" direction="rtl" fill="#fff" fill-opacity=".78" font-size="30" font-family="Arial">مرصد الإنجازات • التوثيق المهني</text></svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+const eventVisuals = {
+  science: eventVisual('أسبوع العلوم', '#167d77', '#123f58'),
+  physics: eventVisual('مسابقة الفيزياء', '#17364d', '#4c728d'),
+  reading: eventVisual('مبادرة اقرأ علمًا', '#9a7433', '#52604a'),
+  student: eventVisual('منتجات طلابية', '#27635e', '#74a99d'),
+};
 
 export const previewBootstrap: BootstrapData = {
   academicYear: '2026/2027',
@@ -29,9 +41,9 @@ export const previewBootstrap: BootstrapData = {
     { id: 4, teacherId: 4, teacherName: 'سالم الرواحي', requestType: 'تحليل نتائج', subject: 'الأحياء', grade: 'التاسع', title: 'تحليل النتائج', deadline: '2026-08-20', notes: '', allowedFiles: 'PDF / Word / Excel', status: 'approved', expiresAt: '2026-09-20T00:00:00+00:00', createdAt: '2026-08-12T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
   ],
   events: [
-    { id: 1, title: 'أسبوع العلوم', eventType: 'فعالية', eventDate: '2026-10-12', location: 'المدرسة', audience: 'طلبة الصفوف 8-10', participantCount: 42, goals: 'تعزيز الثقافة العلمية', summary: 'فعاليات وتجارب تعليمية ومسابقات', outcomes: 'مشاركة واسعة', recommendations: 'توسيع مشاركة الطلبة', coverTone: 'teal', mediaCount: 8, createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
-    { id: 2, title: 'مسابقة الفيزياء', eventType: 'مسابقة', eventDate: '2026-11-27', location: 'قاعة متعددة الأغراض', audience: 'الصف العاشر', participantCount: 18, goals: 'تنمية حل المشكلات', summary: 'مسابقة تطبيقية', outcomes: 'تحسن التفاعل', recommendations: 'تكرارها فصليًا', coverTone: 'navy', mediaCount: 12, createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
-    { id: 3, title: 'مبادرة اقرأ علمًا', eventType: 'مبادرة', eventDate: '2026-09-30', location: 'مركز مصادر التعلم', audience: 'الصف التاسع', participantCount: 31, goals: 'تعزيز القراءة العلمية', summary: 'قراءات قصيرة ونقاشات', outcomes: 'منتجات طلابية', recommendations: 'ربطها بالمنهج', coverTone: 'gold', mediaCount: 6, createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
+    { id: 1, title: 'أسبوع العلوم', eventType: 'فعالية', eventDate: '2026-10-12', location: 'المدرسة', audience: 'طلبة الصفوف 8-10', participantCount: 42, goals: 'تعزيز الثقافة العلمية', summary: 'فعاليات وتجارب تعليمية ومسابقات', outcomes: 'مشاركة واسعة', recommendations: 'توسيع مشاركة الطلبة', coverTone: 'teal', mediaCount: 3, coverMediaId: 1001, coverMediaUrl: eventVisuals.science, createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
+    { id: 2, title: 'مسابقة الفيزياء', eventType: 'مسابقة', eventDate: '2026-11-27', location: 'قاعة متعددة الأغراض', audience: 'الصف العاشر', participantCount: 18, goals: 'تنمية حل المشكلات', summary: 'مسابقة تطبيقية', outcomes: 'تحسن التفاعل', recommendations: 'تكرارها فصليًا', coverTone: 'navy', mediaCount: 2, coverMediaId: 2001, coverMediaUrl: eventVisuals.physics, createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
+    { id: 3, title: 'مبادرة اقرأ علمًا', eventType: 'مبادرة', eventDate: '2026-09-30', location: 'مركز مصادر التعلم', audience: 'الصف التاسع', participantCount: 31, goals: 'تعزيز القراءة العلمية', summary: 'قراءات قصيرة ونقاشات', outcomes: 'منتجات طلابية', recommendations: 'ربطها بالمنهج', coverTone: 'gold', mediaCount: 2, coverMediaId: 3001, coverMediaUrl: eventVisuals.reading, createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
   ],
   documents: [
     { id: 1, requestId: 2, teacherId: 2, title: 'الخطة الفصلية', category: 'خطة فصلية', subject: 'الكيمياء', grade: 'العاشر', academicYear: '2026/2027', originalName: 'خطة_الكيمياء_الفصل_الأول.pdf', mimeType: 'application/pdf', sizeBytes: 735000, storageProvider: 'preview', status: 'inbox', uploadedAt: '2026-08-15T05:00:00+00:00' },
@@ -50,6 +62,34 @@ export const previewBootstrap: BootstrapData = {
     storageMode: 'local',
   },
 };
+
+
+const previewEventMedia: Record<number, EventMediaRecord[]> = {
+  1: [
+    { id: 1001, eventId: 1, originalName: 'غلاف_أسبوع_العلوم.jpg', mimeType: 'image/jpeg', sizeBytes: 930000, storageProvider: 'preview', contentUrl: eventVisuals.science, caption: 'الغلاف الرسمي للفعالية', position: 0, isCover: true, createdAt: '2026-10-12T08:00:00+04:00' },
+    { id: 1002, eventId: 1, originalName: 'محطات_علمية.jpg', mimeType: 'image/jpeg', sizeBytes: 740000, storageProvider: 'preview', contentUrl: eventVisuals.student, caption: 'نماذج من المحطات والمنتجات الطلابية', position: 1, isCover: false, createdAt: '2026-10-12T09:10:00+04:00' },
+    { id: 1003, eventId: 1, originalName: 'خطة_تنفيذ_الفعالية.pdf', mimeType: 'application/pdf', sizeBytes: 310000, storageProvider: 'preview', caption: 'خطة التنفيذ المعتمدة', position: 2, isCover: false, createdAt: '2026-10-12T09:20:00+04:00' },
+  ],
+  2: [
+    { id: 2001, eventId: 2, originalName: 'غلاف_مسابقة_الفيزياء.jpg', mimeType: 'image/jpeg', sizeBytes: 820000, storageProvider: 'preview', contentUrl: eventVisuals.physics, caption: 'المشهد الرئيس للمسابقة', position: 0, isCover: true, createdAt: '2026-11-27T09:00:00+04:00' },
+    { id: 2002, eventId: 2, originalName: 'نتائج_المسابقة.pdf', mimeType: 'application/pdf', sizeBytes: 220000, storageProvider: 'preview', caption: 'النتائج الختامية', position: 1, isCover: false, createdAt: '2026-11-27T11:00:00+04:00' },
+  ],
+  3: [
+    { id: 3001, eventId: 3, originalName: 'غلاف_اقرأ_علما.jpg', mimeType: 'image/jpeg', sizeBytes: 760000, storageProvider: 'preview', contentUrl: eventVisuals.reading, caption: 'الغلاف الرسمي للمبادرة', position: 0, isCover: true, createdAt: '2026-09-30T08:30:00+04:00' },
+    { id: 3002, eventId: 3, originalName: 'منتجات_الطلبة.jpg', mimeType: 'image/jpeg', sizeBytes: 690000, storageProvider: 'preview', contentUrl: eventVisuals.student, caption: 'نماذج من المنتجات الطلابية', position: 1, isCover: false, createdAt: '2026-09-30T10:00:00+04:00' },
+  ],
+};
+
+export function getPreviewEventDetails(eventId: number): EventDetails {
+  const event = previewBootstrap.events.find((item) => item.id === eventId);
+  if (!event) throw new Error('الفعالية غير موجودة في بيانات المعاينة.');
+  const teacherIds = eventId === 1 ? [1, 2, 3] : eventId === 2 ? [1, 6] : [3, 5];
+  return {
+    ...event,
+    media: previewEventMedia[eventId] || [],
+    teachers: previewBootstrap.teachers.filter((teacher) => teacherIds.includes(teacher.id)).map((teacher) => ({ ...teacher, event_role: 'مشارك' })),
+  };
+}
 
 
 const previewCvItems: Record<number, TeacherCvItem[]> = {

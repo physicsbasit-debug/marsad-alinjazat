@@ -6,10 +6,14 @@ import type {
   PublicUploadInfo,
   RequestStatus,
   CreateTeacherCvItemInput,
+  EventDetails,
+  EventMediaMetaInput,
+  EventMediaRecord,
+  UpdateEventInput,
   TeacherProfileDetails,
   UpdateTeacherProfileInput,
 } from '../types';
-import { getPreviewTeacherProfile, previewBootstrap } from './preview';
+import { getPreviewEventDetails, getPreviewTeacherProfile, previewBootstrap } from './preview';
 
 const PREVIEW_MODE = import.meta.env.VITE_PREVIEW_MODE === 'true';
 const PREVIEW_MESSAGE = 'هذه معاينة GitHub Pages فقط. الحفظ والرفع الفعليان يعملان عند تشغيل خادم مرصد الإنجازات.';
@@ -100,6 +104,61 @@ export async function createEvent(input: CreateEventInput): Promise<{ id: number
       body: JSON.stringify(input),
     }),
   );
+}
+
+
+export async function getEventDetails(id: number): Promise<EventDetails> {
+  if (PREVIEW_MODE) return getPreviewEventDetails(id);
+  return parseResponse(await fetch(`/api/events/${id}`));
+}
+
+export async function updateEvent(id: number, input: UpdateEventInput): Promise<EventDetails> {
+  requireBackend();
+  return parseResponse(
+    await fetch(`/api/events/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function uploadEventMedia(id: number, files: File[]): Promise<EventMediaRecord[]> {
+  requireBackend();
+  const uploaded: EventMediaRecord[] = [];
+  for (const file of files) {
+    const form = new FormData();
+    form.append('file', file);
+    uploaded.push(await parseResponse<EventMediaRecord>(await fetch(`/api/events/${id}/media`, { method: 'POST', body: form })));
+  }
+  return uploaded;
+}
+
+export async function updateEventMedia(eventId: number, mediaId: number, input: EventMediaMetaInput): Promise<EventDetails> {
+  requireBackend();
+  return parseResponse(
+    await fetch(`/api/events/${eventId}/media/${mediaId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function reorderEventMedia(eventId: number, mediaIds: number[]): Promise<EventDetails> {
+  requireBackend();
+  return parseResponse(
+    await fetch(`/api/events/${eventId}/media-order`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mediaIds }),
+    }),
+  );
+}
+
+export async function deleteEventMedia(eventId: number, mediaId: number): Promise<void> {
+  requireBackend();
+  await parseResponse(await fetch(`/api/events/${eventId}/media/${mediaId}`, { method: 'DELETE' }));
 }
 
 

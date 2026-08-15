@@ -80,8 +80,40 @@ export type EventRecord = {
   recommendations?: string | null;
   coverTone: 'teal' | 'navy' | 'gold' | string;
   mediaCount?: number;
+  coverMediaId?: number | null;
+  coverMediaUrl?: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type EventMediaRecord = {
+  id: number;
+  eventId: number;
+  originalName: string;
+  mimeType?: string | null;
+  sizeBytes: number;
+  storageProvider: string;
+  storageFileId?: string | null;
+  storagePath?: string | null;
+  webViewLink?: string | null;
+  contentUrl?: string | null;
+  caption: string;
+  position: number;
+  isCover: boolean;
+  createdAt: string;
+};
+
+export type EventTeacher = Teacher & { event_role?: string | null };
+
+export type EventDetails = EventRecord & {
+  media: EventMediaRecord[];
+  teachers: EventTeacher[];
+};
+
+export type EventMediaMetaInput = {
+  caption: string;
+  position: number;
+  isCover: boolean;
 };
 
 export type Activity = {
@@ -221,4 +253,7 @@ export type CreateEventInput = {
   summary: string;
   outcomes: string;
   recommendations: string;
+  teacherIds?: number[];
 };
+
+export type UpdateEventInput = CreateEventInput;

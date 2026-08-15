@@ -165,13 +165,58 @@ def init_db() -> None:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS event_teacher_links (
+                event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+                teacher_id INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+                role TEXT NOT NULL DEFAULT 'مشارك',
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (event_id, teacher_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS event_media_meta (
+                media_id INTEGER PRIMARY KEY REFERENCES event_media(id) ON DELETE CASCADE,
+                caption TEXT NOT NULL DEFAULT '',
+                position INTEGER NOT NULL DEFAULT 0 CHECK (position >= 0),
+                is_cover INTEGER NOT NULL DEFAULT 0 CHECK (is_cover IN (0, 1)),
+                updated_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_requests_status ON upload_requests(status);
             CREATE INDEX IF NOT EXISTS idx_documents_request ON documents(request_id);
             CREATE INDEX IF NOT EXISTS idx_activities_created ON activities(created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_teacher_cv_items_teacher ON teacher_cv_items(teacher_id, item_type);
+            CREATE INDEX IF NOT EXISTS idx_event_teacher_links_event ON event_teacher_links(event_id, teacher_id);
+            CREATE INDEX IF NOT EXISTS idx_event_media_event ON event_media(event_id);
+            CREATE INDEX IF NOT EXISTS idx_event_media_meta_position ON event_media_meta(position, media_id);
             """
         )
+        _backfill_event_media_meta(conn)
         _seed(conn)
+
+
+def _backfill_event_media_meta(conn: sqlite3.Connection) -> None:
+    """Create metadata rows for legacy event media without mutating legacy records."""
+    now = utc_now()
+    event_ids = [row[0] for row in conn.execute("SELECT DISTINCT event_id FROM event_media ORDER BY event_id").fetchall()]
+    for event_id in event_ids:
+        rows = conn.execute(
+            """SELECT m.id, m.mime_type, meta.media_id, meta.is_cover
+               FROM event_media m LEFT JOIN event_media_meta meta ON meta.media_id = m.id
+               WHERE m.event_id = ? ORDER BY m.id""",
+            (event_id,),
+        ).fetchall()
+        has_cover = any(row["media_id"] is not None and row["is_cover"] for row in rows)
+        first_image_id = next((row["id"] for row in rows if (row["mime_type"] or "").startswith("image/")), None)
+        for position, row in enumerate(rows):
+            if row["media_id"] is not None:
+                continue
+            is_cover = 1 if not has_cover and row["id"] == first_image_id else 0
+            conn.execute(
+                "INSERT INTO event_media_meta (media_id, caption, position, is_cover, updated_at) VALUES (?, '', ?, ?, ?)",
+                (row["id"], position, is_cover, now),
+            )
+            if is_cover:
+                has_cover = True
 
 
 def _seed(conn: sqlite3.Connection) -> None:
