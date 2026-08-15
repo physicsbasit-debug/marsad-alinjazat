@@ -12,8 +12,12 @@ import type {
   UpdateEventInput,
   TeacherProfileDetails,
   UpdateTeacherProfileInput,
+  CreateMeetingInput,
+  MeetingDecisionInput,
+  MeetingDecision,
+  MeetingDetails,
 } from '../types';
-import { getPreviewEventDetails, getPreviewTeacherProfile, previewBootstrap } from './preview';
+import { getPreviewEventDetails, getPreviewMeetingDetails, getPreviewTeacherProfile, previewBootstrap } from './preview';
 
 const PREVIEW_MODE = import.meta.env.VITE_PREVIEW_MODE === 'true';
 const PREVIEW_MESSAGE = 'هذه معاينة GitHub Pages فقط. الحفظ والرفع الفعليان يعملان عند تشغيل خادم مرصد الإنجازات.';
@@ -195,3 +199,58 @@ export async function deleteTeacherCvItem(teacherId: number, itemId: number): Pr
     await fetch(`/api/teachers/${teacherId}/cv-items/${itemId}`, { method: 'DELETE' }),
   );
 }
+
+export async function createMeeting(input: CreateMeetingInput): Promise<{ id: number }> {
+  requireBackend();
+  return parseResponse(
+    await fetch('/api/meetings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function getMeetingDetails(id: number): Promise<MeetingDetails> {
+  if (PREVIEW_MODE) return getPreviewMeetingDetails(id);
+  return parseResponse(await fetch(`/api/meetings/${id}`));
+}
+
+export async function updateMeeting(id: number, input: CreateMeetingInput): Promise<MeetingDetails> {
+  requireBackend();
+  return parseResponse(
+    await fetch(`/api/meetings/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function createMeetingDecision(meetingId: number, input: MeetingDecisionInput): Promise<MeetingDecision> {
+  requireBackend();
+  return parseResponse(
+    await fetch(`/api/meetings/${meetingId}/decisions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function updateMeetingDecision(meetingId: number, decisionId: number, input: MeetingDecisionInput): Promise<MeetingDecision> {
+  requireBackend();
+  return parseResponse(
+    await fetch(`/api/meetings/${meetingId}/decisions/${decisionId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function deleteMeetingDecision(meetingId: number, decisionId: number): Promise<void> {
+  requireBackend();
+  await parseResponse(await fetch(`/api/meetings/${meetingId}/decisions/${decisionId}`, { method: 'DELETE' }));
+}
+

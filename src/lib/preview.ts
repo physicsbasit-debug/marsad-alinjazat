@@ -1,4 +1,4 @@
-import type { BootstrapData, EventDetails, EventMediaRecord, TeacherCvItem, TeacherProfileDetails } from '../types';
+import type { BootstrapData, EventDetails, EventMediaRecord, MeetingDetails, TeacherCvItem, TeacherProfileDetails } from '../types';
 
 function eventVisual(title: string, accent: string, secondary: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${accent}"/><stop offset="1" stop-color="${secondary}"/></linearGradient><radialGradient id="r"><stop stop-color="#fff" stop-opacity=".34"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="1400" height="800" fill="url(#g)"/><circle cx="1100" cy="170" r="270" fill="url(#r)"/><circle cx="240" cy="650" r="330" fill="url(#r)"/><g fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="10"><circle cx="700" cy="400" r="150"/><path d="M430 400h540M700 130v540M520 220l360 360M880 220L520 580"/></g><text x="700" y="410" text-anchor="middle" direction="rtl" fill="#fff" font-size="72" font-family="Arial" font-weight="700">${title}</text><text x="700" y="475" text-anchor="middle" direction="rtl" fill="#fff" fill-opacity=".78" font-size="30" font-family="Arial">مرصد الإنجازات • التوثيق المهني</text></svg>`;
@@ -45,6 +45,17 @@ export const previewBootstrap: BootstrapData = {
     { id: 2, title: 'مسابقة الفيزياء', eventType: 'مسابقة', eventDate: '2026-11-27', location: 'قاعة متعددة الأغراض', audience: 'الصف العاشر', participantCount: 18, goals: 'تنمية حل المشكلات', summary: 'مسابقة تطبيقية', outcomes: 'تحسن التفاعل', recommendations: 'تكرارها فصليًا', coverTone: 'navy', mediaCount: 2, coverMediaId: 2001, coverMediaUrl: eventVisuals.physics, createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
     { id: 3, title: 'مبادرة اقرأ علمًا', eventType: 'مبادرة', eventDate: '2026-09-30', location: 'مركز مصادر التعلم', audience: 'الصف التاسع', participantCount: 31, goals: 'تعزيز القراءة العلمية', summary: 'قراءات قصيرة ونقاشات', outcomes: 'منتجات طلابية', recommendations: 'ربطها بالمنهج', coverTone: 'gold', mediaCount: 2, coverMediaId: 3001, coverMediaUrl: eventVisuals.reading, createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
   ],
+  meetings: [
+    { id: 1, title: 'اجتماع قسم العلوم الأول', meetingType: 'اجتماع قسم', meetingDate: '2026-09-03', meetingTime: '10:30', location: 'قاعة العلوم', academicYear: '2026/2027', status: 'planned', attendeeCount: 6, decisionCount: 3, openDecisionCount: 2, overdueDecisionCount: 0, completedDecisionCount: 1, createdAt: '2026-08-15T06:20:00+00:00', updatedAt: '2026-08-15T06:20:00+00:00' },
+    { id: 2, title: 'مراجعة نتائج الاختبار القصير', meetingType: 'اجتماع متابعة', meetingDate: '2026-09-24', meetingTime: '12:00', location: 'غرفة الاجتماعات', academicYear: '2026/2027', status: 'planned', attendeeCount: 4, decisionCount: 2, openDecisionCount: 1, overdueDecisionCount: 0, completedDecisionCount: 1, createdAt: '2026-08-15T06:25:00+00:00', updatedAt: '2026-08-15T06:25:00+00:00' },
+    { id: 3, title: 'الاستعداد لبداية العام الدراسي', meetingType: 'اجتماع تنسيقي', meetingDate: '2026-08-10', meetingTime: '09:00', location: 'قاعة العلوم', academicYear: '2026/2027', status: 'held', attendeeCount: 5, decisionCount: 2, openDecisionCount: 1, overdueDecisionCount: 1, completedDecisionCount: 1, createdAt: '2026-08-10T05:00:00+00:00', updatedAt: '2026-08-14T05:00:00+00:00' },
+  ],
+  decisionAttention: [
+    { id: 301, meetingId: 3, meetingTitle: 'الاستعداد لبداية العام الدراسي', title: 'تحديث توزيع أعمال القسم', responsibleTeacherId: 1, responsibleName: 'أحمد السالمي', dueDate: '2026-08-14', status: 'overdue', baseStatus: 'in_progress', notes: 'اعتماد النسخة النهائية بعد مراجعة الأنصبة.', createdAt: '2026-08-10T06:00:00+00:00', updatedAt: '2026-08-14T05:00:00+00:00' },
+    { id: 101, meetingId: 1, meetingTitle: 'اجتماع قسم العلوم الأول', title: 'توحيد نموذج التخطيط الأسبوعي', responsibleTeacherId: 2, responsibleName: 'خالد الهنائي', dueDate: '2026-09-10', status: 'in_progress', baseStatus: 'in_progress', notes: '', createdAt: '2026-08-15T06:30:00+00:00', updatedAt: '2026-08-15T06:30:00+00:00' },
+    { id: 102, meetingId: 1, meetingTitle: 'اجتماع قسم العلوم الأول', title: 'تجهيز خطة الزيارات الصفية', responsibleTeacherId: 3, responsibleName: 'محمد المعمري', dueDate: '2026-09-17', status: 'new', baseStatus: 'new', notes: '', createdAt: '2026-08-15T06:31:00+00:00', updatedAt: '2026-08-15T06:31:00+00:00' },
+    { id: 201, meetingId: 2, meetingTitle: 'مراجعة نتائج الاختبار القصير', title: 'تحديد الطلبة المستهدفين بالتدخل', responsibleTeacherId: 4, responsibleName: 'سالم الرواحي', dueDate: '2026-09-28', status: 'new', baseStatus: 'new', notes: '', createdAt: '2026-08-15T06:32:00+00:00', updatedAt: '2026-08-15T06:32:00+00:00' },
+  ],
   documents: [
     { id: 1, requestId: 2, teacherId: 2, title: 'الخطة الفصلية', category: 'خطة فصلية', subject: 'الكيمياء', grade: 'العاشر', academicYear: '2026/2027', originalName: 'خطة_الكيمياء_الفصل_الأول.pdf', mimeType: 'application/pdf', sizeBytes: 735000, storageProvider: 'preview', status: 'inbox', uploadedAt: '2026-08-15T05:00:00+00:00' },
     { id: 2, requestId: 4, teacherId: 4, title: 'تحليل النتائج', category: 'تحليل نتائج', subject: 'الأحياء', grade: 'التاسع', academicYear: '2026/2027', originalName: 'تحليل_نتائج_الأحياء.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', sizeBytes: 184000, storageProvider: 'preview', status: 'approved', uploadedAt: '2026-08-14T05:00:00+00:00', approvedAt: '2026-08-15T05:00:00+00:00' },
@@ -53,6 +64,7 @@ export const previewBootstrap: BootstrapData = {
     { id: 1, activity_type: 'document', title: 'خالد رفع الخطة الفصلية', detail: 'الكيمياء • الصف العاشر', created_at: '2026-08-15T05:00:00+00:00' },
     { id: 2, activity_type: 'request', title: 'طلب اختبار جديد', detail: 'الفيزياء • الصف العاشر', created_at: '2026-08-15T04:00:00+00:00' },
     { id: 3, activity_type: 'event', title: 'توثيق مبادرة اقرأ علمًا', detail: '31 مشاركًا', created_at: '2026-08-14T05:00:00+00:00' },
+    { id: 4, activity_type: 'meeting', title: 'تحديث قرار: توزيع أعمال القسم', detail: 'قيد التنفيذ', created_at: '2026-08-14T04:30:00+00:00' },
   ],
   drive: {
     configured: false,
@@ -63,6 +75,64 @@ export const previewBootstrap: BootstrapData = {
   },
 };
 
+
+const previewMeetingDetails: Record<number, MeetingDetails> = {
+  1: {
+    ...previewBootstrap.meetings[0],
+    agenda: 'مراجعة خطة القسم للفصل الأول\nتوحيد أدوات التخطيط الأسبوعي\nتنظيم الزيارات الصفية والتبادل المهني',
+    discussionSummary: 'ناقش الفريق أولويات بداية الفصل، وتم الاتفاق على توحيد نموذج التخطيط وربط الزيارات بأهداف تطويرية واضحة لكل معلم.',
+    notes: 'يراجع تنفيذ القرارات في الاجتماع القادم.',
+    attendees: previewBootstrap.teachers.map((teacher) => ({ ...teacher, attendanceStatus: 'present' as const })),
+    decisions: [
+      { id: 101, meetingId: 1, title: 'توحيد نموذج التخطيط الأسبوعي', responsibleTeacherId: 2, responsibleName: 'خالد الهنائي', dueDate: '2026-09-10', status: 'in_progress', baseStatus: 'in_progress', notes: 'إعداد نموذج موحد مختصر قابل للتوثيق.', createdAt: '2026-08-15T06:30:00+00:00', updatedAt: '2026-08-15T06:30:00+00:00' },
+      { id: 102, meetingId: 1, title: 'تجهيز خطة الزيارات الصفية', responsibleTeacherId: 3, responsibleName: 'محمد المعمري', dueDate: '2026-09-17', status: 'new', baseStatus: 'new', notes: 'توزيع الزيارات حسب الاحتياج المهني.', createdAt: '2026-08-15T06:31:00+00:00', updatedAt: '2026-08-15T06:31:00+00:00' },
+      { id: 103, meetingId: 1, title: 'اعتماد توزيع منسقي الأنشطة', responsibleTeacherId: 1, responsibleName: 'أحمد السالمي', dueDate: '2026-09-05', status: 'completed', baseStatus: 'completed', notes: '', completedAt: '2026-08-15T07:00:00+00:00', createdAt: '2026-08-15T06:32:00+00:00', updatedAt: '2026-08-15T07:00:00+00:00' },
+    ],
+    timeline: [
+      { id: 5003, activity_type: 'meeting', title: 'اعتماد قرار: توزيع منسقي الأنشطة', detail: 'مكتمل', created_at: '2026-08-15T07:00:00+00:00' },
+      { id: 5002, activity_type: 'meeting', title: 'إضافة قرارات الاجتماع', detail: '3 قرارات قابلة للمتابعة', created_at: '2026-08-15T06:32:00+00:00' },
+      { id: 5001, activity_type: 'meeting', title: 'إنشاء اجتماع: اجتماع قسم العلوم الأول', detail: '6 حاضرًا', created_at: '2026-08-15T06:20:00+00:00' },
+    ],
+    minutesReady: true,
+  },
+  2: {
+    ...previewBootstrap.meetings[1],
+    agenda: 'قراءة المؤشرات العامة\nتحديد الفئات المستهدفة\nتوزيع مسؤوليات المتابعة',
+    discussionSummary: 'تم الاتفاق على التعامل مع النتائج كمدخل تشخيصي وتحديد تدخلات قابلة للقياس بدل الاكتفاء بوصف الانخفاض.',
+    notes: '',
+    attendees: previewBootstrap.teachers.slice(0, 4).map((teacher) => ({ ...teacher, attendanceStatus: 'present' as const })),
+    decisions: [
+      { id: 201, meetingId: 2, title: 'تحديد الطلبة المستهدفين بالتدخل', responsibleTeacherId: 4, responsibleName: 'سالم الرواحي', dueDate: '2026-09-28', status: 'new', baseStatus: 'new', notes: '', createdAt: '2026-08-15T06:32:00+00:00', updatedAt: '2026-08-15T06:32:00+00:00' },
+      { id: 202, meetingId: 2, title: 'إعداد نموذج متابعة الأثر', responsibleTeacherId: 6, responsibleName: 'ناصر الحوسني', dueDate: '2026-10-02', status: 'completed', baseStatus: 'completed', notes: '', completedAt: '2026-08-15T07:15:00+00:00', createdAt: '2026-08-15T06:35:00+00:00', updatedAt: '2026-08-15T07:15:00+00:00' },
+    ],
+    timeline: [
+      { id: 5101, activity_type: 'meeting', title: 'إنشاء اجتماع: مراجعة نتائج الاختبار القصير', detail: '4 حاضرين', created_at: '2026-08-15T06:25:00+00:00' },
+    ],
+    minutesReady: true,
+  },
+  3: {
+    ...previewBootstrap.meetings[2],
+    agenda: 'توزيع أعمال القسم\nالاستعداد للخطط الفصلية\nتنظيم ملفات المادة',
+    discussionSummary: 'راجع الفريق جاهزية بداية العام وحدد مسؤوليات أساسية لضمان وضوح العمل منذ الأسبوع الأول.',
+    notes: 'قرار توزيع الأعمال يحتاج إغلاقًا.',
+    attendees: previewBootstrap.teachers.slice(0, 5).map((teacher) => ({ ...teacher, attendanceStatus: 'present' as const })),
+    decisions: [
+      { id: 301, meetingId: 3, title: 'تحديث توزيع أعمال القسم', responsibleTeacherId: 1, responsibleName: 'أحمد السالمي', dueDate: '2026-08-14', status: 'overdue', baseStatus: 'in_progress', notes: 'اعتماد النسخة النهائية بعد مراجعة الأنصبة.', createdAt: '2026-08-10T06:00:00+00:00', updatedAt: '2026-08-14T05:00:00+00:00' },
+      { id: 302, meetingId: 3, title: 'إنشاء مجلدات العام الدراسي', responsibleTeacherId: 5, responsibleName: 'يوسف البلوشي', dueDate: '2026-08-12', status: 'completed', baseStatus: 'completed', notes: '', completedAt: '2026-08-12T08:00:00+00:00', createdAt: '2026-08-10T06:10:00+00:00', updatedAt: '2026-08-12T08:00:00+00:00' },
+    ],
+    timeline: [
+      { id: 5202, activity_type: 'meeting', title: 'تحديث قرار: توزيع أعمال القسم', detail: 'قيد التنفيذ', created_at: '2026-08-14T05:00:00+00:00' },
+      { id: 5201, activity_type: 'meeting', title: 'إنشاء اجتماع: الاستعداد لبداية العام الدراسي', detail: '5 حاضرين', created_at: '2026-08-10T05:00:00+00:00' },
+    ],
+    minutesReady: true,
+  },
+};
+
+export function getPreviewMeetingDetails(meetingId: number): MeetingDetails {
+  const detail = previewMeetingDetails[meetingId];
+  if (!detail) throw new Error('الاجتماع غير موجود في بيانات المعاينة.');
+  return detail;
+}
 
 const previewEventMedia: Record<number, EventMediaRecord[]> = {
   1: [

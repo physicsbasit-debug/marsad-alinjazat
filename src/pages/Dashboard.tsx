@@ -3,6 +3,10 @@ import type { BootstrapData } from '../types';
 
 export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuickAction: (action: string) => void }) {
   const d = data.dashboard;
+  const decisionAttention = data.decisionAttention.slice(0, 2);
+  const requestAttention = data.requests.filter((item) => ['late', 'review', 'waiting_upload', 'received'].includes(item.status)).slice(0, Math.max(0, 4 - decisionAttention.length));
+  const [weekStart, weekEnd] = currentWeekBounds();
+  const scheduleMeetings = data.meetings.filter((item) => item.status !== 'cancelled' && item.meetingDate >= weekStart && item.meetingDate <= weekEnd).sort((a, b) => `${a.meetingDate} ${a.meetingTime || ''}`.localeCompare(`${b.meetingDate} ${b.meetingTime || ''}`)).slice(0, 3);
   return (
     <div className="page dashboard-page">
       <header className="hero-block">
@@ -28,10 +32,11 @@ export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuic
 
       <section className="dashboard-grid">
         <article className="panel attention-panel">
-          <div className="panel-heading"><div><span className="eyebrow danger">يحتاج انتباهك</span><h2>الأولوية الآن</h2></div><span className="counter">{d.openRequests}</span></div>
+          <div className="panel-heading"><div><span className="eyebrow danger">يحتاج انتباهك</span><h2>الأولوية الآن</h2></div><span className="counter">{d.openRequests + d.openDecisions}</span></div>
           <div className="attention-list">
-            {data.requests.filter((item) => ['late', 'review', 'waiting_upload', 'received'].includes(item.status)).slice(0, 4).map((item) => (
-              <div className="attention-item" key={item.id}>
+            {decisionAttention.map((item) => <div className="attention-item" key={`decision-${item.id}`}><span className={`attention-dot ${item.status === 'overdue' ? 'late' : 'received'}`}></span><div><strong>{item.title}</strong><small>{item.meetingTitle || 'قرار اجتماع'} • {item.responsibleName || 'دون مسؤول'}{item.dueDate ? ` • حتى ${formatShortDate(item.dueDate)}` : ''}</small></div><Icon name="meeting" size={18}/></div>)}
+            {requestAttention.map((item) => (
+              <div className="attention-item" key={`request-${item.id}`}>
                 <span className={`attention-dot ${item.status}`}></span>
                 <div><strong>{item.title}</strong><small>{item.teacherName} • {item.subject} • {item.grade}</small></div>
                 <Icon name="chevron" size={18} />
@@ -43,9 +48,7 @@ export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuic
         <article className="panel week-panel">
           <div className="panel-heading"><div><span className="eyebrow">هذا الأسبوع</span><h2>جدول مختصر</h2></div><Icon name="calendar" /></div>
           <div className="week-list">
-            <ScheduleItem day="الأحد" title="اجتماع قسم العلوم" meta="10:30 صباحًا" />
-            <ScheduleItem day="الثلاثاء" title="زيارة صفية" meta="الحصة الثالثة" />
-            <ScheduleItem day="الخميس" title="نشاط علمي" meta="الصف التاسع" />
+            {scheduleMeetings.length ? scheduleMeetings.map((meeting) => <ScheduleItem key={meeting.id} day={weekdayName(meeting.meetingDate)} title={meeting.title} meta={`${meeting.meetingTime || 'دون وقت'} • ${meeting.location || 'دون مكان'}`} />) : <div className="quiet-note">لا توجد اجتماعات مجدولة بعد.</div>}
           </div>
         </article>
       </section>
@@ -60,7 +63,7 @@ export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuic
         <article className="panel activity-panel">
           <div className="panel-heading"><div><span className="eyebrow">آخر النشاطات</span><h2>ما حدث مؤخرًا</h2></div></div>
           <div className="activity-list">
-            {data.activities.slice(0, 4).map((item) => <div className="activity-row" key={item.id}><span className="activity-icon"><Icon name={item.activity_type === 'event' ? 'spark' : item.activity_type === 'document' ? 'document' : 'upload'} size={18} /></span><div><strong>{item.title}</strong><small>{item.detail}</small></div></div>)}
+            {data.activities.slice(0, 4).map((item) => <div className="activity-row" key={item.id}><span className="activity-icon"><Icon name={item.activity_type === 'event' ? 'spark' : item.activity_type === 'meeting' ? 'meeting' : item.activity_type === 'document' ? 'document' : 'upload'} size={18} /></span><div><strong>{item.title}</strong><small>{item.detail}</small></div></div>)}
           </div>
         </article>
       </section>
@@ -76,4 +79,13 @@ function ScheduleItem({ day, title, meta }: { day: string; title: string; meta: 
 }
 function Progress({ label, value }: { label: string; value: number }) {
   return <div className="progress-row"><div className="progress-meta"><strong>{label}</strong><span>{value}%</span></div><div className="progress-track"><span style={{ width: `${value}%` }} /></div></div>;
+}
+function weekdayName(value: string) { return new Intl.DateTimeFormat('ar-OM', { weekday: 'long' }).format(new Date(`${value}T12:00:00`)); }
+function formatShortDate(value: string) { return new Intl.DateTimeFormat('ar-OM', { day: 'numeric', month: 'short' }).format(new Date(`${value}T12:00:00`)); }
+function currentWeekBounds(): [string, string] {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  const format = (date: Date) => { const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000); return local.toISOString().slice(0, 10); };
+  return [format(start), format(end)];
 }

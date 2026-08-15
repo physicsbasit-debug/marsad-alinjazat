@@ -181,6 +181,44 @@ def init_db() -> None:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS meetings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                meeting_type TEXT NOT NULL DEFAULT 'اجتماع قسم',
+                meeting_date TEXT NOT NULL,
+                meeting_time TEXT,
+                location TEXT,
+                agenda TEXT,
+                discussion_summary TEXT,
+                notes TEXT,
+                academic_year TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'held', 'cancelled')),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS meeting_attendees (
+                meeting_id INTEGER NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+                teacher_id INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+                attendance_status TEXT NOT NULL DEFAULT 'present' CHECK (attendance_status IN ('present', 'absent', 'excused')),
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (meeting_id, teacher_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS meeting_decisions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                meeting_id INTEGER NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                responsible_teacher_id INTEGER REFERENCES teachers(id) ON DELETE SET NULL,
+                responsible_name TEXT,
+                due_date TEXT,
+                status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'in_progress', 'completed', 'cancelled')),
+                notes TEXT,
+                completed_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_requests_status ON upload_requests(status);
             CREATE INDEX IF NOT EXISTS idx_documents_request ON documents(request_id);
             CREATE INDEX IF NOT EXISTS idx_activities_created ON activities(created_at DESC);
@@ -188,6 +226,10 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_event_teacher_links_event ON event_teacher_links(event_id, teacher_id);
             CREATE INDEX IF NOT EXISTS idx_event_media_event ON event_media(event_id);
             CREATE INDEX IF NOT EXISTS idx_event_media_meta_position ON event_media_meta(position, media_id);
+            CREATE INDEX IF NOT EXISTS idx_meetings_date ON meetings(meeting_date DESC, id DESC);
+            CREATE INDEX IF NOT EXISTS idx_meeting_attendees_meeting ON meeting_attendees(meeting_id, teacher_id);
+            CREATE INDEX IF NOT EXISTS idx_meeting_decisions_meeting ON meeting_decisions(meeting_id, status, due_date);
+            CREATE INDEX IF NOT EXISTS idx_meeting_decisions_open ON meeting_decisions(status, due_date);
             """
         )
         _backfill_event_media_meta(conn)

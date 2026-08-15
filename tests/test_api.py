@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 
 TEST_DATA_DIR = tempfile.mkdtemp(prefix="marsad-test-db-")
 os.environ["APP_DATA_DIR"] = TEST_DATA_DIR
@@ -268,6 +269,137 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         self.assertEqual(uploaded.status_code, 201)
         self.assertEqual(uploaded.json()["mimeType"], "image/jpeg")
         self.assertTrue(uploaded.json()["isCover"])
+
+    def test_meeting_decisions_end_to_end_flow(self):
+        before = self.client.get("/api/bootstrap").json()["dashboard"]["openDecisions"]
+        yesterday = (datetime.now(timezone(timedelta(hours=4))).date() - timedelta(days=1)).isoformat()
+
+        created = self.client.post("/api/meetings", json={
+            "title": "اجتماع متابعة القرارات",
+            "meetingType": "اجتماع متابعة",
+            "meetingDate": "2026-09-03",
+            "meetingTime": "10:30",
+            "location": "قاعة العلوم",
+            "agenda": "متابعة تنفيذ خطة القسم ومراجعة القرارات المفتوحة.",
+            "discussionSummary": "تمت مراجعة الأولويات وتحديد المسؤوليات ومواعيد الإنجاز.",
+            "notes": "اختبار تكامل للمحضر.",
+            "status": "held",
+            "attendeeIds": [1, 2],
+        })
+        self.assertEqual(created.status_code, 201)
+        meeting_id = created.json()["id"]
+
+        detail = self.client.get(f"/api/meetings/{meeting_id}")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual({row["id"] for row in detail.json()["attendees"]}, {1, 2})
+        self.assertFalse(detail.json()["minutesReady"])
+
+        decision = self.client.post(f"/api/meetings/{meeting_id}/decisions", json={
+            "title": "إغلاق متابعة الخطة العلاجية",
+            "responsibleTeacherId": 1,
+            "responsibleName": "",
+            "dueDate": yesterday,
+            "status": "in_progress",
+            "notes": "إرفاق دليل التنفيذ قبل الإغلاق.",
+        })
+        self.assertEqual(decision.status_code, 201)
+        decision_body = decision.json()
+        decision_id = decision_body["id"]
+        self.assertEqual(decision_body["responsibleName"], "أحمد السالمي")
+        self.assertEqual(decision_body["status"], "overdue")
+        self.assertEqual(decision_body["baseStatus"], "in_progress")
+
+        after_create = self.client.get("/api/bootstrap").json()
+        self.assertEqual(after_create["dashboard"]["openDecisions"], before + 1)
+        attention = next(item for item in after_create["decisionAttention"] if item["id"] == decision_id)
+        self.assertEqual(attention["status"], "overdue")
+        self.assertEqual(attention["meetingTitle"], "اجتماع متابعة القرارات")
+
+        detail_after = self.client.get(f"/api/meetings/{meeting_id}").json()
+        self.assertTrue(detail_after["minutesReady"])
+        self.assertEqual(detail_after["openDecisionCount"], 1)
+        self.assertEqual(detail_after["overdueDecisionCount"], 1)
+        self.assertTrue(any("قرار جديد" in item["title"] for item in detail_after["timeline"]))
+
+        updated_meeting = self.client.patch(f"/api/meetings/{meeting_id}", json={
+            "title": "اجتماع متابعة القرارات",
+            "meetingType": "اجتماع متابعة",
+            "meetingDate": "2026-09-03",
+            "meetingTime": "11:00",
+            "location": "قاعة العلوم",
+            "agenda": "متابعة تنفيذ خطة القسم ومراجعة القرارات المفتوحة.",
+            "discussionSummary": "تمت مراجعة الأولويات وتحديد المسؤوليات ومواعيد الإنجاز.",
+            "notes": "تم تحديث وقت الاجتماع.",
+            "status": "held",
+            "attendeeIds": [2, 3],
+        })
+        self.assertEqual(updated_meeting.status_code, 200)
+        self.assertEqual({row["id"] for row in updated_meeting.json()["attendees"]}, {2, 3})
+        self.assertEqual(updated_meeting.json()["meetingTime"], "11:00")
+
+        completed = self.client.patch(f"/api/meetings/{meeting_id}/decisions/{decision_id}", json={
+            "title": "إغلاق متابعة الخطة العلاجية",
+            "responsibleTeacherId": 1,
+            "responsibleName": "أحمد السالمي",
+            "dueDate": yesterday,
+            "status": "completed",
+            "notes": "تم إرفاق دليل التنفيذ.",
+        })
+        self.assertEqual(completed.status_code, 200)
+        self.assertEqual(completed.json()["status"], "completed")
+        self.assertEqual(completed.json()["baseStatus"], "completed")
+        self.assertIsNotNone(completed.json()["completedAt"])
+
+        after_complete = self.client.get("/api/bootstrap").json()
+        self.assertEqual(after_complete["dashboard"]["openDecisions"], before)
+        summary = next(item for item in after_complete["meetings"] if item["id"] == meeting_id)
+        self.assertEqual(summary["openDecisionCount"], 0)
+        self.assertEqual(summary["completedDecisionCount"], 1)
+        self.assertEqual(summary["overdueDecisionCount"], 0)
+
+        removed = self.client.delete(f"/api/meetings/{meeting_id}/decisions/{decision_id}")
+        self.assertEqual(removed.status_code, 200)
+        final_detail = self.client.get(f"/api/meetings/{meeting_id}").json()
+        self.assertEqual(final_detail["decisions"], [])
+        self.assertTrue(any("حذف قرار" in item["title"] for item in final_detail["timeline"]))
+
+    def test_meeting_validation_and_not_found_guards(self):
+        invalid_date = self.client.post("/api/meetings", json={
+            "title": "اجتماع بتاريخ خاطئ", "meetingDate": "2026-99-03", "meetingTime": "10:00",
+            "attendeeIds": []
+        })
+        self.assertEqual(invalid_date.status_code, 422)
+
+        invalid_time = self.client.post("/api/meetings", json={
+            "title": "اجتماع بوقت خاطئ", "meetingDate": "2026-09-03", "meetingTime": "25:90",
+            "attendeeIds": []
+        })
+        self.assertEqual(invalid_time.status_code, 422)
+
+        invalid_attendee = self.client.post("/api/meetings", json={
+            "title": "اجتماع بحضور غير صالح", "meetingDate": "2026-09-03", "meetingTime": "",
+            "attendeeIds": [999999]
+        })
+        self.assertEqual(invalid_attendee.status_code, 422)
+        self.assertEqual(self.client.get("/api/meetings/999999").status_code, 404)
+
+        meeting = self.client.post("/api/meetings", json={
+            "title": "اجتماع اختبار الحراس", "meetingDate": "2026-09-04", "meetingTime": "09:00",
+            "attendeeIds": [1]
+        })
+        self.assertEqual(meeting.status_code, 201)
+        meeting_id = meeting.json()["id"]
+        invalid_responsible = self.client.post(f"/api/meetings/{meeting_id}/decisions", json={
+            "title": "قرار بمسؤول غير صالح", "responsibleTeacherId": 999999, "responsibleName": "",
+            "dueDate": "2026-09-10", "status": "new", "notes": ""
+        })
+        self.assertEqual(invalid_responsible.status_code, 422)
+        missing_meeting = self.client.post("/api/meetings/999999/decisions", json={
+            "title": "قرار لاجتماع مفقود", "responsibleTeacherId": None, "responsibleName": "",
+            "dueDate": None, "status": "new", "notes": ""
+        })
+        self.assertEqual(missing_meeting.status_code, 404)
+        self.assertEqual(self.client.delete(f"/api/meetings/{meeting_id}/decisions/999999").status_code, 404)
 
     def test_invalid_extension_is_rejected(self):
         created = self.client.post("/api/requests", json={

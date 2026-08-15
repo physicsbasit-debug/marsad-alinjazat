@@ -116,6 +116,86 @@ export type EventMediaMetaInput = {
   isCover: boolean;
 };
 
+export type MeetingStatus = 'planned' | 'held' | 'cancelled';
+export type MeetingDecisionBaseStatus = 'new' | 'in_progress' | 'completed' | 'cancelled';
+export type MeetingDecisionStatus = MeetingDecisionBaseStatus | 'overdue';
+
+export type MeetingRecord = {
+  id: number;
+  title: string;
+  meetingType: string;
+  meetingDate: string;
+  meetingTime?: string | null;
+  location?: string | null;
+  academicYear: string;
+  status: MeetingStatus;
+  attendeeCount: number;
+  decisionCount: number;
+  openDecisionCount: number;
+  overdueDecisionCount: number;
+  completedDecisionCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MeetingDecision = {
+  id: number;
+  meetingId: number;
+  meetingTitle?: string;
+  title: string;
+  responsibleTeacherId?: number | null;
+  responsibleName?: string | null;
+  dueDate?: string | null;
+  status: MeetingDecisionStatus;
+  baseStatus: MeetingDecisionBaseStatus;
+  notes?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MeetingAttendee = Teacher & { attendanceStatus: 'present' | 'absent' | 'excused' };
+
+export type MeetingTimelineItem = {
+  id: number;
+  activity_type: string;
+  title: string;
+  detail?: string | null;
+  created_at: string;
+};
+
+export type MeetingDetails = MeetingRecord & {
+  agenda?: string | null;
+  discussionSummary?: string | null;
+  notes?: string | null;
+  attendees: MeetingAttendee[];
+  decisions: MeetingDecision[];
+  timeline: MeetingTimelineItem[];
+  minutesReady: boolean;
+};
+
+export type CreateMeetingInput = {
+  title: string;
+  meetingType: string;
+  meetingDate: string;
+  meetingTime: string;
+  location: string;
+  agenda: string;
+  discussionSummary: string;
+  notes: string;
+  status: MeetingStatus;
+  attendeeIds: number[];
+};
+
+export type MeetingDecisionInput = {
+  title: string;
+  responsibleTeacherId?: number | null;
+  responsibleName: string;
+  dueDate?: string | null;
+  status: MeetingDecisionBaseStatus;
+  notes: string;
+};
+
 export type Activity = {
   id: number;
   activity_type: string;
@@ -143,6 +223,8 @@ export type BootstrapData = {
   teachers: Teacher[];
   requests: UploadRequest[];
   events: EventRecord[];
+  meetings: MeetingRecord[];
+  decisionAttention: MeetingDecision[];
   documents: DocumentRecord[];
   activities: Activity[];
   drive: DriveStatus;

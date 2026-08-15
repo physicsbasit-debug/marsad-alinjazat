@@ -33,7 +33,7 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 EVENT_UPLOADS_DIR = Path(os.getenv("APP_EVENT_UPLOADS_DIR", BASE_DIR / "uploads" / "events"))
 EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="مرصد الإنجازات API", version="0.4.0")
+app = FastAPI(title="مرصد الإنجازات API", version="0.5.0")
 
 
 class CreateRequestPayload(BaseModel):
@@ -101,6 +101,28 @@ class EventMediaMetaPayload(BaseModel):
 
 class EventMediaOrderPayload(BaseModel):
     mediaIds: list[int] = Field(min_length=1, max_length=500)
+
+
+class MeetingPayload(BaseModel):
+    title: str = Field(min_length=3, max_length=180)
+    meetingType: str = Field(default="اجتماع قسم", min_length=2, max_length=80)
+    meetingDate: str
+    meetingTime: str = Field(default="", max_length=5)
+    location: str = Field(default="", max_length=160)
+    agenda: str = Field(default="", max_length=5000)
+    discussionSummary: str = Field(default="", max_length=7000)
+    notes: str = Field(default="", max_length=3000)
+    status: Literal["planned", "held", "cancelled"] = "planned"
+    attendeeIds: list[int] = Field(default_factory=list, max_length=100)
+
+
+class MeetingDecisionPayload(BaseModel):
+    title: str = Field(min_length=3, max_length=500)
+    responsibleTeacherId: int | None = None
+    responsibleName: str = Field(default="", max_length=160)
+    dueDate: str | None = None
+    status: Literal["new", "in_progress", "completed", "cancelled"] = "new"
+    notes: str = Field(default="", max_length=2000)
 
 
 def _teacher_dict(row):
@@ -303,6 +325,157 @@ def _event_detail(event_id: int):
     return event
 
 
+def _oman_today_iso() -> str:
+    return datetime.now(timezone(timedelta(hours=4))).date().isoformat()
+
+
+def _validate_iso_date(value: str, label: str) -> str:
+    try:
+        parsed = datetime.fromisoformat(value).date()
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"{label} غير صالح.") from exc
+    return parsed.isoformat()
+
+
+def _validate_meeting_time(value: str) -> str:
+    value = value.strip()
+    if not value:
+        return ""
+    if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", value):
+        raise HTTPException(status_code=422, detail="وقت الاجتماع غير صالح.")
+    return value
+
+
+def _validate_teacher_ids(conn, teacher_ids: list[int], message: str) -> list[int]:
+    unique_ids = list(dict.fromkeys(teacher_ids))
+    if not unique_ids:
+        return []
+    rows = conn.execute(
+        f"SELECT id FROM teachers WHERE id IN ({','.join('?' for _ in unique_ids)})",
+        unique_ids,
+    ).fetchall()
+    if len(rows) != len(unique_ids):
+        raise HTTPException(status_code=422, detail=message)
+    return unique_ids
+
+
+def _decision_dict(row):
+    item = dict(row)
+    for source, target in [
+        ("meeting_id", "meetingId"),
+        ("responsible_teacher_id", "responsibleTeacherId"),
+        ("responsible_name", "responsibleName"),
+        ("due_date", "dueDate"),
+        ("completed_at", "completedAt"),
+        ("created_at", "createdAt"),
+        ("updated_at", "updatedAt"),
+        ("meeting_title", "meetingTitle"),
+    ]:
+        if source in item:
+            item[target] = item.pop(source)
+    base_status = item.get("status", "new")
+    item["baseStatus"] = base_status
+    due_date = item.get("dueDate")
+    if base_status not in {"completed", "cancelled"} and due_date and due_date < _oman_today_iso():
+        item["status"] = "overdue"
+    return item
+
+
+def _meeting_dict(row):
+    item = dict(row)
+    for source, target in [
+        ("meeting_type", "meetingType"),
+        ("meeting_date", "meetingDate"),
+        ("meeting_time", "meetingTime"),
+        ("academic_year", "academicYear"),
+        ("discussion_summary", "discussionSummary"),
+        ("attendee_count", "attendeeCount"),
+        ("decision_count", "decisionCount"),
+        ("open_decision_count", "openDecisionCount"),
+        ("overdue_decision_count", "overdueDecisionCount"),
+        ("completed_decision_count", "completedDecisionCount"),
+        ("created_at", "createdAt"),
+        ("updated_at", "updatedAt"),
+    ]:
+        if source in item:
+            item[target] = item.pop(source)
+    return item
+
+
+def _meeting_summary_rows(conn, meeting_id: int | None = None):
+    where = "WHERE m.id = ?" if meeting_id is not None else ""
+    params: tuple = (meeting_id,) if meeting_id is not None else ()
+    today = _oman_today_iso()
+    return conn.execute(
+        f"""SELECT m.*,
+               (SELECT COUNT(*) FROM meeting_attendees a WHERE a.meeting_id = m.id) AS attendee_count,
+               (SELECT COUNT(*) FROM meeting_decisions d WHERE d.meeting_id = m.id) AS decision_count,
+               (SELECT COUNT(*) FROM meeting_decisions d WHERE d.meeting_id = m.id AND d.status NOT IN ('completed','cancelled')) AS open_decision_count,
+               (SELECT COUNT(*) FROM meeting_decisions d WHERE d.meeting_id = m.id AND d.status NOT IN ('completed','cancelled') AND d.due_date IS NOT NULL AND d.due_date < ?) AS overdue_decision_count,
+               (SELECT COUNT(*) FROM meeting_decisions d WHERE d.meeting_id = m.id AND d.status = 'completed') AS completed_decision_count
+           FROM meetings m {where}
+           ORDER BY m.meeting_date DESC, m.id DESC""",
+        (today, *params),
+    ).fetchall()
+
+
+def _meeting_detail(meeting_id: int):
+    with connect() as conn:
+        rows = _meeting_summary_rows(conn, meeting_id)
+        if not rows:
+            return None
+        meeting = _meeting_dict(rows[0])
+        attendee_rows = conn.execute(
+            """SELECT t.*, a.attendance_status
+               FROM meeting_attendees a JOIN teachers t ON t.id = a.teacher_id
+               WHERE a.meeting_id = ? ORDER BY t.name""",
+            (meeting_id,),
+        ).fetchall()
+        decision_rows = conn.execute(
+            """SELECT d.* FROM meeting_decisions d
+               WHERE d.meeting_id = ?
+               ORDER BY CASE WHEN d.status = 'completed' THEN 1 ELSE 0 END,
+                        CASE WHEN d.due_date IS NULL THEN 1 ELSE 0 END,
+                        d.due_date, d.id""",
+            (meeting_id,),
+        ).fetchall()
+        timeline_rows = conn.execute(
+            """SELECT id, activity_type, title, detail, created_at
+               FROM activities WHERE entity_type = 'meeting' AND entity_id = ?
+               ORDER BY created_at DESC, id DESC LIMIT 30""",
+            (meeting_id,),
+        ).fetchall()
+    attendees = []
+    for row in attendee_rows:
+        attendee = _teacher_dict(row)
+        attendee["attendanceStatus"] = attendee.pop("attendance_status")
+        attendees.append(attendee)
+    decisions = [_decision_dict(row) for row in decision_rows]
+    meeting["attendees"] = attendees
+    meeting["decisions"] = decisions
+    meeting["timeline"] = [dict(row) for row in timeline_rows]
+    meeting["minutesReady"] = bool(
+        (meeting.get("agenda") or "").strip()
+        and (meeting.get("discussionSummary") or "").strip()
+        and attendees
+        and decisions
+    )
+    return meeting
+
+
+def _decision_attention(conn, limit: int = 6):
+    rows = conn.execute(
+        """SELECT d.*, m.title AS meeting_title
+           FROM meeting_decisions d JOIN meetings m ON m.id = d.meeting_id
+           WHERE d.status NOT IN ('completed','cancelled')
+           ORDER BY CASE WHEN d.due_date IS NOT NULL AND d.due_date < ? THEN 0 ELSE 1 END,
+                    CASE WHEN d.due_date IS NULL THEN 1 ELSE 0 END,
+                    d.due_date, d.id DESC LIMIT ?""",
+        (_oman_today_iso(), limit),
+    ).fetchall()
+    return [_decision_dict(row) for row in rows]
+
+
 def _get_request_rows():
     with connect() as conn:
         return conn.execute(
@@ -353,7 +526,7 @@ def _resolve_event_local_path(storage_path: str) -> Path:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "0.4.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
+    return {"ok": True, "version": "0.5.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
 
 
 @app.get("/api/bootstrap")
@@ -372,6 +545,8 @@ def bootstrap():
             cover_id = cover_by_event.get(event["id"])
             event["coverMediaId"] = cover_id
             event["coverMediaUrl"] = f"/api/events/{event['id']}/media/{cover_id}/content" if cover_id else None
+        meetings = [_meeting_dict(r) for r in _meeting_summary_rows(conn)]
+        decision_attention = _decision_attention(conn)
         documents = [_document_dict(r) for r in conn.execute("SELECT * FROM documents ORDER BY uploaded_at DESC LIMIT 30").fetchall()]
         activities = [dict(r) for r in conn.execute("SELECT * FROM activities ORDER BY created_at DESC LIMIT 8").fetchall()]
 
@@ -381,7 +556,7 @@ def bootstrap():
         "openRequests": sum(counts.get(k, 0) for k in ["waiting_upload", "received", "review", "needs_revision", "late"]),
         "needsReview": counts.get("review", 0) + counts.get("received", 0),
         "lateRequests": counts.get("late", 0),
-        "openDecisions": 4,
+        "openDecisions": sum(item["openDecisionCount"] for item in meetings),
         "upcomingVisits": 2,
         "planProgress": 82,
         "visitProgress": 70,
@@ -394,6 +569,8 @@ def bootstrap():
         "teachers": teachers,
         "requests": request_items,
         "events": events,
+        "meetings": meetings,
+        "decisionAttention": decision_attention,
         "documents": documents,
         "activities": activities,
         "drive": drive.status(),
@@ -798,6 +975,173 @@ def event_media_content(event_id: int, media_id: int):
     if row["web_view_link"]:
         return RedirectResponse(row["web_view_link"], status_code=302)
     raise HTTPException(status_code=404, detail="لا يوجد مصدر متاح لهذا الدليل.")
+
+
+@app.get("/api/meetings")
+def list_meetings():
+    with connect() as conn:
+        return [_meeting_dict(row) for row in _meeting_summary_rows(conn)]
+
+
+@app.post("/api/meetings", status_code=201)
+def create_meeting(payload: MeetingPayload):
+    meeting_date = _validate_iso_date(payload.meetingDate, "تاريخ الاجتماع")
+    meeting_time = _validate_meeting_time(payload.meetingTime)
+    now = utc_now()
+    with connect() as conn:
+        attendee_ids = _validate_teacher_ids(conn, payload.attendeeIds, "تتضمن قائمة الحضور معلمًا غير موجود.")
+        cursor = conn.execute(
+            """INSERT INTO meetings
+               (title, meeting_type, meeting_date, meeting_time, location, agenda, discussion_summary, notes,
+                academic_year, status, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                payload.title.strip(), payload.meetingType.strip(), meeting_date, meeting_time, payload.location.strip(),
+                payload.agenda.strip(), payload.discussionSummary.strip(), payload.notes.strip(), ACADEMIC_YEAR,
+                payload.status, now, now,
+            ),
+        )
+        meeting_id = cursor.lastrowid
+        if attendee_ids:
+            conn.executemany(
+                "INSERT INTO meeting_attendees (meeting_id, teacher_id, attendance_status, created_at) VALUES (?, ?, 'present', ?)",
+                [(meeting_id, teacher_id, now) for teacher_id in attendee_ids],
+            )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("meeting", f"إنشاء اجتماع: {payload.title.strip()}", f"{len(attendee_ids)} حاضرًا", "meeting", meeting_id, now),
+        )
+    return {"id": meeting_id}
+
+
+@app.get("/api/meetings/{meeting_id}")
+def get_meeting(meeting_id: int):
+    detail = _meeting_detail(meeting_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="الاجتماع غير موجود.")
+    return detail
+
+
+@app.patch("/api/meetings/{meeting_id}")
+def update_meeting(meeting_id: int, payload: MeetingPayload):
+    meeting_date = _validate_iso_date(payload.meetingDate, "تاريخ الاجتماع")
+    meeting_time = _validate_meeting_time(payload.meetingTime)
+    now = utc_now()
+    with connect() as conn:
+        current = conn.execute("SELECT id FROM meetings WHERE id = ?", (meeting_id,)).fetchone()
+        if not current:
+            raise HTTPException(status_code=404, detail="الاجتماع غير موجود.")
+        attendee_ids = _validate_teacher_ids(conn, payload.attendeeIds, "تتضمن قائمة الحضور معلمًا غير موجود.")
+        conn.execute(
+            """UPDATE meetings SET title = ?, meeting_type = ?, meeting_date = ?, meeting_time = ?, location = ?,
+               agenda = ?, discussion_summary = ?, notes = ?, status = ?, updated_at = ? WHERE id = ?""",
+            (
+                payload.title.strip(), payload.meetingType.strip(), meeting_date, meeting_time, payload.location.strip(),
+                payload.agenda.strip(), payload.discussionSummary.strip(), payload.notes.strip(), payload.status, now, meeting_id,
+            ),
+        )
+        conn.execute("DELETE FROM meeting_attendees WHERE meeting_id = ?", (meeting_id,))
+        if attendee_ids:
+            conn.executemany(
+                "INSERT INTO meeting_attendees (meeting_id, teacher_id, attendance_status, created_at) VALUES (?, ?, 'present', ?)",
+                [(meeting_id, teacher_id, now) for teacher_id in attendee_ids],
+            )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("meeting", f"تحديث الاجتماع: {payload.title.strip()}", f"الحضور: {len(attendee_ids)}", "meeting", meeting_id, now),
+        )
+    return _meeting_detail(meeting_id)
+
+
+@app.post("/api/meetings/{meeting_id}/decisions", status_code=201)
+def create_meeting_decision(meeting_id: int, payload: MeetingDecisionPayload):
+    due_date = _validate_iso_date(payload.dueDate, "موعد القرار") if payload.dueDate else None
+    now = utc_now()
+    with connect() as conn:
+        meeting = conn.execute("SELECT id, title FROM meetings WHERE id = ?", (meeting_id,)).fetchone()
+        if not meeting:
+            raise HTTPException(status_code=404, detail="الاجتماع غير موجود.")
+        responsible_name = payload.responsibleName.strip()
+        if payload.responsibleTeacherId is not None:
+            teacher = conn.execute("SELECT id, name FROM teachers WHERE id = ?", (payload.responsibleTeacherId,)).fetchone()
+            if not teacher:
+                raise HTTPException(status_code=422, detail="المسؤول المحدد غير موجود ضمن المعلمين.")
+            if not responsible_name:
+                responsible_name = teacher["name"]
+        completed_at = now if payload.status == "completed" else None
+        cursor = conn.execute(
+            """INSERT INTO meeting_decisions
+               (meeting_id, title, responsible_teacher_id, responsible_name, due_date, status, notes, completed_at, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                meeting_id, payload.title.strip(), payload.responsibleTeacherId, responsible_name, due_date,
+                payload.status, payload.notes.strip(), completed_at, now, now,
+            ),
+        )
+        decision_id = cursor.lastrowid
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("meeting", f"قرار جديد: {payload.title.strip()}", responsible_name or "دون مسؤول محدد", "meeting", meeting_id, now),
+        )
+        row = conn.execute("SELECT * FROM meeting_decisions WHERE id = ?", (decision_id,)).fetchone()
+    return _decision_dict(row)
+
+
+@app.patch("/api/meetings/{meeting_id}/decisions/{decision_id}")
+def update_meeting_decision(meeting_id: int, decision_id: int, payload: MeetingDecisionPayload):
+    due_date = _validate_iso_date(payload.dueDate, "موعد القرار") if payload.dueDate else None
+    now = utc_now()
+    with connect() as conn:
+        current = conn.execute(
+            "SELECT * FROM meeting_decisions WHERE id = ? AND meeting_id = ?",
+            (decision_id, meeting_id),
+        ).fetchone()
+        if not current:
+            raise HTTPException(status_code=404, detail="القرار غير موجود ضمن هذا الاجتماع.")
+        responsible_name = payload.responsibleName.strip()
+        if payload.responsibleTeacherId is not None:
+            teacher = conn.execute("SELECT id, name FROM teachers WHERE id = ?", (payload.responsibleTeacherId,)).fetchone()
+            if not teacher:
+                raise HTTPException(status_code=422, detail="المسؤول المحدد غير موجود ضمن المعلمين.")
+            if not responsible_name:
+                responsible_name = teacher["name"]
+        completed_at = current["completed_at"]
+        if payload.status == "completed" and not completed_at:
+            completed_at = now
+        elif payload.status != "completed":
+            completed_at = None
+        conn.execute(
+            """UPDATE meeting_decisions SET title = ?, responsible_teacher_id = ?, responsible_name = ?, due_date = ?,
+               status = ?, notes = ?, completed_at = ?, updated_at = ? WHERE id = ? AND meeting_id = ?""",
+            (
+                payload.title.strip(), payload.responsibleTeacherId, responsible_name, due_date, payload.status,
+                payload.notes.strip(), completed_at, now, decision_id, meeting_id,
+            ),
+        )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("meeting", f"تحديث قرار: {payload.title.strip()}", payload.status, "meeting", meeting_id, now),
+        )
+        row = conn.execute("SELECT * FROM meeting_decisions WHERE id = ?", (decision_id,)).fetchone()
+    return _decision_dict(row)
+
+
+@app.delete("/api/meetings/{meeting_id}/decisions/{decision_id}")
+def delete_meeting_decision(meeting_id: int, decision_id: int):
+    now = utc_now()
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT id, title FROM meeting_decisions WHERE id = ? AND meeting_id = ?",
+            (decision_id, meeting_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="القرار غير موجود ضمن هذا الاجتماع.")
+        conn.execute("DELETE FROM meeting_decisions WHERE id = ?", (decision_id,))
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("meeting", f"حذف قرار: {row['title']}", "تم الحذف من محضر الاجتماع", "meeting", meeting_id, now),
+        )
+    return {"ok": True}
 
 
 @app.post("/api/requests", status_code=201)
