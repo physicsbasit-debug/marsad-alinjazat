@@ -1,24 +1,29 @@
-# مرصد الإنجازات — v0.2.1 Fix 2
+# مرصد الإنجازات — v0.2.1 Fix 3
 
-## سبب الإصلاح
-GitHub Actions نجح في TypeScript/Vite ثم توقف عند:
-`pytest: command not found`
+## السبب الحقيقي
+الاستيراد `from fastapi.testclient import TestClient` صحيح.
+الفشل الحقيقي كان:
+`ModuleNotFoundError: No module named 'server'`
 
-## التعديل
-ملفان فقط:
-1. `requirements-dev.txt`
-2. `.github/workflows/quality-pages.yml`
+## الإصلاح
+تشغيل الاختبارات عبر مفسر Python نفسه:
 
-`requirements-dev.txt` يضيف متطلبات الاختبارات فقط:
-- pytest
-- httpx
-مع إعادة استخدام `requirements.txt` الأساسي.
+قبل:
+`pytest -q`
 
-## طريقة الرفع
-1. ارفع `requirements-dev.txt` إلى جذر المستودع.
-2. استبدل `.github/workflows/quality-pages.yml` بالنسخة الجديدة.
-3. إذا لم يظهر لك مجلد `.github` في الهاتف، توجد نسخة مرئية احتياطية داخل `GITHUB_WORKFLOW_VISIBLE/quality-pages.yml`.
-4. لا ترفع النسخة المرئية إذا كنت قد رفعت المسار الحقيقي `.github/workflows/quality-pages.yml`.
-5. انتظر GitHub Actions.
+بعد:
+`python -m pytest -q`
 
-لا يوجد أي تعديل على كود التطبيق أو قاعدة البيانات أو Google Drive في هذا الإصلاح.
+هذا يجعل جذر المستودع ضمن مسار الاستيراد، فيتم العثور على حزمة `server`.
+
+## التحقق
+تمت إعادة إنتاج المشكلة محليًا:
+- `pytest -q` → فشل بنفس `No module named 'server'`
+- `python -m pytest -q` → 4 passed
+
+## الرفع
+استبدل فقط:
+`.github/workflows/quality-pages.yml`
+
+النسخة داخل `GITHUB_WORKFLOW_VISIBLE` احتياطية إذا كان مجلد `.github` غير ظاهر لديك.
+لا ترفع النسختين معًا إلى مسارين مختلفين إلا إذا كنت تحتاج النسخة الاحتياطية محليًا.
