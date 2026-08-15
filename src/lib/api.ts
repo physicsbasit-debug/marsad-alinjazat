@@ -28,8 +28,10 @@ import type {
   AchievementAssessmentDetails,
   AchievementActionInput,
   AchievementAction,
+  OfficialReport,
+  OfficialReportQuery,
 } from '../types';
-import { getPreviewAssessmentDetails, getPreviewEventDetails, getPreviewMeetingDetails, getPreviewPlanDetails, getPreviewSupervisionVisit, getPreviewTeacherProfile, previewBootstrap } from './preview';
+import { getPreviewAssessmentDetails, getPreviewEventDetails, getPreviewMeetingDetails, getPreviewOfficialReport, getPreviewPlanDetails, getPreviewSupervisionVisit, getPreviewTeacherProfile, previewBootstrap } from './preview';
 
 const PREVIEW_MODE = import.meta.env.VITE_PREVIEW_MODE === 'true';
 const PREVIEW_MESSAGE = 'هذه معاينة GitHub Pages فقط. الحفظ والرفع الفعليان يعملان عند تشغيل خادم مرصد الإنجازات.';
@@ -53,6 +55,14 @@ function requireBackend(): void {
 export async function getBootstrap(): Promise<BootstrapData> {
   if (PREVIEW_MODE) return previewBootstrap;
   return parseResponse(await fetch('/api/bootstrap'));
+}
+
+
+export async function getOfficialReport(input: OfficialReportQuery): Promise<OfficialReport> {
+  if (PREVIEW_MODE) return getPreviewOfficialReport(input);
+  const params = new URLSearchParams({ reportType: input.reportType, academicYear: input.academicYear, term: input.term });
+  if (input.teacherId) params.set('teacherId', String(input.teacherId));
+  return parseResponse(await fetch(`/api/reports/official?${params.toString()}`));
 }
 
 export async function createUploadRequest(input: CreateRequestInput): Promise<{ id: number; uploadUrl: string; expiresAt: string }> {

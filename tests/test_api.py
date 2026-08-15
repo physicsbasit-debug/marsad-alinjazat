@@ -32,7 +32,7 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         self.assertIn("supervisionAttention", boot.json())
         self.assertIn("assessments", boot.json())
         self.assertIn("achievementAttention", boot.json())
-        self.assertEqual(health.json()["version"], "0.8.0")
+        self.assertEqual(health.json()["version"], "0.9.0")
 
     def test_create_teacher_and_event(self):
         teacher = self.client.post("/api/teachers", json={
@@ -841,3 +841,51 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _marsad_v09_report_contract_test(self):
+    report_types = ["department", "planning", "achievement", "supervision", "meetings", "events"]
+    for report_type in report_types:
+        response = self.client.get("/api/reports/official", params={
+            "reportType": report_type,
+            "academicYear": "2026/2027",
+            "term": "الفصل الأول",
+        })
+        self.assertEqual(response.status_code, 200, report_type)
+        body = response.json()
+        self.assertEqual(body["reportType"], report_type)
+        self.assertEqual(body["academicYear"], "2026/2027")
+        self.assertIn("title", body)
+        self.assertIn("summary", body)
+        self.assertIsInstance(body["metrics"], list)
+        self.assertIsInstance(body["sections"], list)
+        self.assertIsInstance(body["sourceCounts"], dict)
+        for section in body["sections"]:
+            self.assertIn("columns", section)
+            self.assertIn("rows", section)
+
+    teacher_report = self.client.get("/api/reports/official", params={
+        "reportType": "teacher",
+        "academicYear": "2026/2027",
+        "term": "الفصل الأول",
+        "teacherId": 1,
+    })
+    self.assertEqual(teacher_report.status_code, 200)
+    self.assertEqual(teacher_report.json()["teacher"]["id"], 1)
+
+    missing_teacher = self.client.get("/api/reports/official", params={
+        "reportType": "teacher",
+        "academicYear": "2026/2027",
+        "term": "الفصل الأول",
+    })
+    self.assertEqual(missing_teacher.status_code, 422)
+
+    unsupported = self.client.get("/api/reports/official", params={
+        "reportType": "imaginary",
+        "academicYear": "2026/2027",
+        "term": "الفصل الأول",
+    })
+    self.assertEqual(unsupported.status_code, 404)
+
+
+MarsadAlInjazatApiTests.test_official_report_center_contract_and_filters = _marsad_v09_report_contract_test

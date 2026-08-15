@@ -602,3 +602,45 @@ export type CreateEventInput = {
 };
 
 export type UpdateEventInput = CreateEventInput;
+
+export type OfficialReportType = 'department' | 'teacher' | 'planning' | 'achievement' | 'supervision' | 'meetings' | 'events';
+
+export type OfficialReportMetric = {
+  label: string;
+  value: string | number;
+  detail?: string;
+};
+
+export type OfficialReportColumn = {
+  key: string;
+  label: string;
+};
+
+export type OfficialReportSection = {
+  id: string;
+  title: string;
+  description?: string;
+  columns: OfficialReportColumn[];
+  rows: Array<Record<string, string | number | boolean | null | undefined>>;
+};
+
+export type OfficialReport = {
+  reportType: OfficialReportType;
+  title: string;
+  subtitle: string;
+  academicYear: string;
+  term: string;
+  generatedAt: string;
+  summary: string;
+  teacher?: Teacher | null;
+  metrics: OfficialReportMetric[];
+  sections: OfficialReportSection[];
+  sourceCounts: Record<string, number>;
+};
+
+export type OfficialReportQuery = {
+  reportType: OfficialReportType;
+  academicYear: string;
+  term: string;
+  teacherId?: number | null;
+};

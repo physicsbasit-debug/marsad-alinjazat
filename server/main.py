@@ -33,7 +33,7 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 EVENT_UPLOADS_DIR = Path(os.getenv("APP_EVENT_UPLOADS_DIR", BASE_DIR / "uploads" / "events"))
 EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="مرصد الإنجازات API", version="0.8.0")
+app = FastAPI(title="مرصد الإنجازات API", version="0.9.0")
 
 
 class CreateRequestPayload(BaseModel):
@@ -1043,6 +1043,239 @@ def _validate_achievement_action(payload: AchievementActionPayload) -> tuple[str
     return start, due
 
 
+
+REPORT_TYPES = {"department", "teacher", "planning", "achievement", "supervision", "meetings", "events"}
+
+
+def _report_status_label(value: str | None) -> str:
+    labels = {
+        "active": "نشطة", "completed": "مكتملة", "archived": "مؤرشفة",
+        "planned": "مخططة", "held": "منفذة", "cancelled": "ملغاة",
+        "needs_followup": "تحتاج متابعة", "closed": "مغلقة", "overdue": "متأخرة",
+        "draft": "مسودة", "recorded": "مسجلة", "reviewed": "مراجعة مكتملة",
+        "new": "جديد", "in_progress": "قيد التنفيذ", "approved": "معتمد",
+        "review": "قيد المراجعة", "received": "مستلم", "waiting_upload": "بانتظار الرفع",
+        "needs_revision": "يحتاج تعديل", "late": "متأخر",
+    }
+    return labels.get(value or "", value or "—")
+
+
+def _report_pct(numerator: float, denominator: float) -> int:
+    return int(round(100 * numerator / denominator)) if denominator else 0
+
+
+def _academic_year_bounds(academic_year: str) -> tuple[str | None, str | None]:
+    match = re.fullmatch(r"\s*(\d{4})\s*/\s*(\d{4})\s*", academic_year or "")
+    if not match:
+        return None, None
+    first, second = int(match.group(1)), int(match.group(2))
+    if second != first + 1:
+        return None, None
+    return f"{first:04d}-08-01", f"{second:04d}-07-31"
+
+
+def _within_year(date_value: str | None, academic_year: str) -> bool:
+    if not date_value:
+        return False
+    start, end = _academic_year_bounds(academic_year)
+    return bool(start and end and start <= date_value[:10] <= end)
+
+
+def _report_section(section_id: str, title: str, columns: list[tuple[str, str]], rows: list[dict], description: str = "") -> dict:
+    return {
+        "id": section_id,
+        "title": title,
+        "description": description,
+        "columns": [{"key": key, "label": label} for key, label in columns],
+        "rows": rows,
+    }
+
+
+def _report_metric(label: str, value, detail: str = "") -> dict:
+    return {"label": label, "value": value, "detail": detail}
+
+
+def _official_report(report_type: str, academic_year: str, term: str, teacher_id: int | None = None) -> dict:
+    if report_type not in REPORT_TYPES:
+        raise HTTPException(status_code=404, detail="نوع التقرير غير مدعوم.")
+
+    with connect() as conn:
+        teachers = [_teacher_dict(r) for r in conn.execute("SELECT * FROM teachers ORDER BY name").fetchall()]
+        teacher = next((item for item in teachers if item["id"] == teacher_id), None) if teacher_id is not None else None
+        if report_type == "teacher" and teacher is None:
+            raise HTTPException(status_code=422, detail="اختر معلمًا موجودًا لإنشاء تقرير المعلم.")
+
+        requests = [_request_dict(r) for r in conn.execute(
+            """SELECT r.*, t.name AS teacher_name FROM upload_requests r JOIN teachers t ON t.id=r.teacher_id ORDER BY r.created_at DESC"""
+        ).fetchall()]
+        documents = [_document_dict(r) for r in conn.execute("SELECT * FROM documents ORDER BY uploaded_at DESC").fetchall()]
+        events = [_event_dict(r) for r in conn.execute(
+            """SELECT e.*, COUNT(m.id) AS media_count FROM events e LEFT JOIN event_media m ON m.event_id=e.id GROUP BY e.id ORDER BY e.event_date DESC"""
+        ).fetchall()]
+        meetings = [_meeting_dict(r) for r in _meeting_summary_rows(conn)]
+        plans = [_plan_dict(r) for r in _plan_summary_rows(conn)]
+        visits = [_supervision_visit_dict(r) for r in _supervision_summary_rows(conn)]
+        assessments = [_achievement_assessment_dict(r) for r in _achievement_summary_rows(conn)]
+
+        term_filter = "" if term == "العام كاملًا" else term
+        meetings_scope = [x for x in meetings if x["academicYear"] == academic_year]
+        plans_scope = [x for x in plans if x["academicYear"] == academic_year and (not term_filter or x["term"] == term_filter)]
+        visits_scope = [x for x in visits if x["academicYear"] == academic_year]
+        assessments_scope = [x for x in assessments if x["academicYear"] == academic_year and (not term_filter or x["term"] == term_filter)]
+        events_scope = [x for x in events if _within_year(x.get("eventDate"), academic_year)]
+        documents_scope = [x for x in documents if x.get("academicYear") == academic_year or (not x.get("academicYear") and _within_year(x.get("uploadedAt"), academic_year))]
+        requests_scope = [x for x in requests if _within_year(x.get("createdAt"), academic_year)]
+
+        generated_at = utc_now()
+        base = {
+            "reportType": report_type,
+            "academicYear": academic_year,
+            "term": term,
+            "generatedAt": generated_at,
+            "teacher": teacher,
+            "metrics": [],
+            "sections": [],
+            "sourceCounts": {},
+        }
+
+        if report_type == "department":
+            active_plans = [x for x in plans_scope if x["status"] == "active"]
+            assessment_students = sum(x["studentCount"] for x in assessments_scope if x["status"] != "draft")
+            mastered_students = sum(x["masteredCount"] for x in assessments_scope if x["status"] != "draft")
+            decisions_total = sum(x["decisionCount"] for x in meetings_scope)
+            decisions_done = sum(x["completedDecisionCount"] for x in meetings_scope)
+            request_den = sum(1 for x in requests_scope if x["status"] != "cancelled")
+            request_done = sum(1 for x in requests_scope if x["status"] == "approved")
+            base.update({
+                "title": "التقرير الشامل لأعمال القسم",
+                "subtitle": f"ملخص مؤسسي لأعمال القسم خلال {term} من العام الدراسي {academic_year}",
+                "summary": "يجمع هذا التقرير مؤشرات المعلمين والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في وثيقة واحدة، مع إبقاء كل مؤشر مرتبطًا بسجلاته الأصلية.",
+                "metrics": [
+                    _report_metric("المعلمون", len(teachers), "إجمالي السجلات المهنية الحالية"),
+                    _report_metric("تقدم الخطط", f"{int(round(sum(x['progressPercent'] for x in active_plans)/len(active_plans))) if active_plans else 0}%", "متوسط الخطط النشطة في النطاق"),
+                    _report_metric("الإتقان المجمع", f"{_report_pct(mastered_students, assessment_students)}%", f"{mastered_students} من {assessment_students} طالبًا في التقويمات المسجلة"),
+                    _report_metric("إغلاق الزيارات", f"{_report_pct(sum(1 for x in visits_scope if x['status']=='closed'), len(visits_scope))}%", "نسبة الزيارات المغلقة من إجمالي الزيارات"),
+                    _report_metric("تنفيذ القرارات", f"{_report_pct(decisions_done, decisions_total)}%", f"{decisions_done} قرارًا مكتملًا من {decisions_total}"),
+                    _report_metric("اكتمال الطلبات", f"{_report_pct(request_done, request_den)}%", f"{request_done} طلبات معتمدة من {request_den}"),
+                ],
+                "sections": [
+                    _report_section("teachers", "المعلمون", [("name","المعلم"),("subject","المادة"),("workload","النصاب"),("cvCompletion","اكتمال الملف")], [
+                        {"name":x["name"],"subject":x["subject"],"workload":x["workload"],"cvCompletion":f"{x['cvCompletion']}%"} for x in teachers
+                    ]),
+                    _report_section("planning", "التخطيط والمنهج", [("title","الخطة"),("scope","النطاق"),("owner","المسؤول"),("progress","الإنجاز"),("overdue","متأخر")], [
+                        {"title":x["title"],"scope":f"{x['subject']} • {x['grade']}","owner":x.get("ownerName") or "—","progress":f"{x['progressPercent']}%","overdue":x["overdueUnitCount"]} for x in plans_scope
+                    ]),
+                    _report_section("achievement", "التحصيل والنتائج", [("title","التقويم"),("scope","النطاق"),("mastery","الإتقان"),("average","المتوسط"),("actions","تدخلات مفتوحة")], [
+                        {"title":x["title"],"scope":f"{x['subject']} • {x['grade']}","mastery":f"{x['masteryPercent']}%","average":f"{x['averagePercent']}%","actions":x["openActionCount"]} for x in assessments_scope if x["status"] != "draft"
+                    ]),
+                    _report_section("supervision", "الإشراف الفني", [("teacher","المعلم"),("date","التاريخ"),("type","الزيارة"),("status","الحالة"),("followup","متابعات مفتوحة")], [
+                        {"teacher":x["teacherName"],"date":x["visitDate"],"type":x["visitType"],"status":_report_status_label(x["effectiveStatus"]),"followup":x["openActionCount"]} for x in visits_scope
+                    ]),
+                    _report_section("meetings", "الاجتماعات والقرارات", [("title","الاجتماع"),("date","التاريخ"),("status","الحالة"),("decisions","القرارات"),("open","مفتوحة")], [
+                        {"title":x["title"],"date":x["meetingDate"],"status":_report_status_label(x["status"]),"decisions":x["decisionCount"],"open":x["openDecisionCount"]} for x in meetings_scope
+                    ]),
+                    _report_section("events", "الفعاليات والتوثيق", [("title","الفعالية"),("date","التاريخ"),("type","النوع"),("participants","المشاركون"),("evidence","الأدلة")], [
+                        {"title":x["title"],"date":x["eventDate"],"type":x["eventType"],"participants":x["participantCount"],"evidence":x.get("mediaCount",0)} for x in events_scope
+                    ]),
+                ],
+                "sourceCounts": {"teachers":len(teachers),"plans":len(plans_scope),"assessments":len(assessments_scope),"visits":len(visits_scope),"meetings":len(meetings_scope),"events":len(events_scope),"documents":len(documents_scope),"requests":len(requests_scope)},
+            })
+            return base
+
+        if report_type == "teacher":
+            assert teacher is not None
+            tid = teacher["id"]
+            teacher_requests = [x for x in requests_scope if x["teacherId"] == tid]
+            teacher_documents = [x for x in documents_scope if x.get("teacherId") == tid]
+            teacher_visits = [x for x in visits_scope if x["teacherId"] == tid]
+            teacher_assessments = [x for x in assessments_scope if x.get("teacherId") == tid]
+            teacher_events = [dict(r) for r in conn.execute(
+                """SELECT e.id,e.title,e.event_type,e.event_date,l.role FROM event_teacher_links l JOIN events e ON e.id=l.event_id WHERE l.teacher_id=? ORDER BY e.event_date DESC""",
+                (tid,),
+            ).fetchall() if _within_year(r["event_date"], academic_year)]
+            cv_count = conn.execute("SELECT COUNT(*) FROM teacher_cv_items WHERE teacher_id=?", (tid,)).fetchone()[0]
+            open_followups = sum(x["openActionCount"] for x in teacher_visits)
+            base.update({
+                "title": f"التقرير المهني للمعلم: {teacher['name']}",
+                "subtitle": f"سجل مهني وتشغيلي خلال {term} من العام الدراسي {academic_year}",
+                "summary": "يعرض التقرير الأعمال المرتبطة مباشرة بالمعلم من الملفات والتحصيل والإشراف والمشاركات، دون تحويل المؤشرات الكمية إلى أحكام تقويمية غير موثقة.",
+                "metrics": [
+                    _report_metric("اكتمال الملف", f"{teacher['cvCompletion']}%"),
+                    _report_metric("بنود السيرة", cv_count),
+                    _report_metric("الوثائق", len(teacher_documents)),
+                    _report_metric("الزيارات", len(teacher_visits), f"{open_followups} متابعة مفتوحة"),
+                    _report_metric("التقويمات", len(teacher_assessments)),
+                    _report_metric("المشاركات", len(teacher_events), "فعاليات مرتبطة بالمعلم"),
+                ],
+                "sections": [
+                    _report_section("requests", "الطلبات والوثائق", [("title","الطلب"),("status","الحالة"),("documents","المستندات")], [
+                        {"title":x["title"],"status":_report_status_label(x["status"]),"documents":sum(1 for d in teacher_documents if d.get("requestId")==x["id"])} for x in teacher_requests
+                    ]),
+                    _report_section("visits", "الزيارات والإشراف", [("date","التاريخ"),("type","النوع"),("lesson","الدرس"),("status","الحالة"),("followup","متابعة")], [
+                        {"date":x["visitDate"],"type":x["visitType"],"lesson":x.get("lessonTitle") or "—","status":_report_status_label(x["effectiveStatus"]),"followup":x["openActionCount"]} for x in teacher_visits
+                    ]),
+                    _report_section("assessments", "التحصيل", [("title","التقويم"),("scope","النطاق"),("mastery","الإتقان"),("average","المتوسط")], [
+                        {"title":x["title"],"scope":f"{x['subject']} • {x['grade']}","mastery":f"{x['masteryPercent']}%","average":f"{x['averagePercent']}%"} for x in teacher_assessments
+                    ]),
+                    _report_section("events", "المشاركات والفعاليات", [("title","الفعالية"),("date","التاريخ"),("type","النوع"),("role","الدور")], [
+                        {"title":x["title"],"date":x["event_date"],"type":x["event_type"],"role":x["role"]} for x in teacher_events
+                    ]),
+                ],
+                "sourceCounts": {"requests":len(teacher_requests),"documents":len(teacher_documents),"visits":len(teacher_visits),"assessments":len(teacher_assessments),"events":len(teacher_events)},
+            })
+            return base
+
+        if report_type == "planning":
+            rows = plans_scope
+            base.update({
+                "title":"تقرير التخطيط ومتابعة المنهج","subtitle":f"{term} • {academic_year}",
+                "summary":"يعرض التقرير تقدم الخطط والوحدات المتأخرة كما هي مسجلة في مرصد الإنجازات، ولا يفترض اكتمال منهج لمجرد مرور الزمن.",
+                "metrics":[_report_metric("الخطط",len(rows)),_report_metric("متوسط الإنجاز",f"{int(round(sum(x['progressPercent'] for x in rows)/len(rows))) if rows else 0}%"),_report_metric("الوحدات المتأخرة",sum(x["overdueUnitCount"] for x in rows)),_report_metric("خطط مكتملة",sum(1 for x in rows if x["status"]=="completed"))],
+                "sections":[_report_section("plans","الخطط",[("title","الخطة"),("scope","المادة والصف"),("owner","المسؤول"),("progress","الإنجاز"),("status","الحالة"),("overdue","متأخر")],[{"title":x["title"],"scope":f"{x['subject']} • {x['grade']}","owner":x.get("ownerName") or "—","progress":f"{x['progressPercent']}%","status":_report_status_label(x["status"]),"overdue":x["overdueUnitCount"]} for x in rows])],
+                "sourceCounts":{"plans":len(rows)},
+            }); return base
+
+        if report_type == "achievement":
+            rows=[x for x in assessments_scope if x["status"]!="draft"]
+            students=sum(x["studentCount"] for x in rows); mastered=sum(x["masteredCount"] for x in rows)
+            base.update({
+                "title":"تقرير التحصيل والنتائج","subtitle":f"{term} • {academic_year}",
+                "summary":"يجمع التقرير نتائج التقويمات المسجلة والتدخلات المرتبطة بها. لا يحول الدرجة الكلية إلى تشخيص مهاري غير موجود في البيانات.",
+                "metrics":[_report_metric("التقويمات",len(rows)),_report_metric("الطلبة",students),_report_metric("الإتقان المجمع",f"{_report_pct(mastered,students)}%"),_report_metric("تدخلات مفتوحة",sum(x["openActionCount"] for x in rows)),_report_metric("تدخلات متأخرة",sum(x["overdueActionCount"] for x in rows))],
+                "sections":[_report_section("assessments","التقويمات",[("title","التقويم"),("scope","النطاق"),("teacher","المعلم"),("average","المتوسط"),("mastery","الإتقان"),("actions","المتابعة")],[{"title":x["title"],"scope":f"{x['subject']} • {x['grade']}","teacher":x.get("teacherName") or "—","average":f"{x['averagePercent']}%","mastery":f"{x['masteryPercent']}%","actions":x["openActionCount"]} for x in rows])],
+                "sourceCounts":{"assessments":len(rows)},
+            }); return base
+
+        if report_type == "supervision":
+            rows=visits_scope
+            base.update({
+                "title":"تقرير الإشراف الفني والزيارات","subtitle":f"العام الدراسي {academic_year}",
+                "summary":"يوثق التقرير الزيارات وحالات المتابعة المرتبطة بها، ويعرض التأخر كحالة تشغيلية لا كحكم مهني على المعلم.",
+                "metrics":[_report_metric("الزيارات",len(rows)),_report_metric("مغلقة",sum(1 for x in rows if x["status"]=="closed")),_report_metric("متابعات مفتوحة",sum(x["openActionCount"] for x in rows)),_report_metric("متابعات متأخرة",sum(x["overdueActionCount"] for x in rows))],
+                "sections":[_report_section("visits","الزيارات",[("teacher","المعلم"),("date","التاريخ"),("type","النوع"),("lesson","الدرس"),("status","الحالة"),("followup","متابعة")],[{"teacher":x["teacherName"],"date":x["visitDate"],"type":x["visitType"],"lesson":x.get("lessonTitle") or "—","status":_report_status_label(x["effectiveStatus"]),"followup":x["openActionCount"]} for x in rows])],
+                "sourceCounts":{"visits":len(rows)},
+            }); return base
+
+        if report_type == "meetings":
+            rows=meetings_scope; total=sum(x["decisionCount"] for x in rows); done=sum(x["completedDecisionCount"] for x in rows)
+            base.update({
+                "title":"تقرير الاجتماعات والقرارات","subtitle":f"العام الدراسي {academic_year}",
+                "summary":"يعرض التقرير الاجتماعات والقرارات وحالة التنفيذ مع إبراز القرارات المفتوحة والمتأخرة من السجلات الفعلية.",
+                "metrics":[_report_metric("الاجتماعات",len(rows)),_report_metric("القرارات",total),_report_metric("قرارات مكتملة",done),_report_metric("نسبة التنفيذ",f"{_report_pct(done,total)}%"),_report_metric("قرارات مفتوحة",sum(x["openDecisionCount"] for x in rows))],
+                "sections":[_report_section("meetings","الاجتماعات",[("title","الاجتماع"),("date","التاريخ"),("type","النوع"),("attendees","الحضور"),("decisions","القرارات"),("open","مفتوحة")],[{"title":x["title"],"date":x["meetingDate"],"type":x["meetingType"],"attendees":x["attendeeCount"],"decisions":x["decisionCount"],"open":x["openDecisionCount"]} for x in rows])],
+                "sourceCounts":{"meetings":len(rows),"decisions":total},
+            }); return base
+
+        rows=events_scope
+        base.update({
+            "title":"تقرير الفعاليات والتوثيق","subtitle":f"العام الدراسي {academic_year}",
+            "summary":"يلخص التقرير الفعاليات والمبادرات والمشاركة والأدلة التوثيقية المسجلة ضمن نطاق العام الدراسي.",
+            "metrics":[_report_metric("الفعاليات",len(rows)),_report_metric("المشاركون",sum(x["participantCount"] for x in rows)),_report_metric("الأدلة",sum(x.get("mediaCount",0) for x in rows)),_report_metric("بلا أدلة",sum(1 for x in rows if not x.get("mediaCount")))],
+            "sections":[_report_section("events","الفعاليات",[("title","الفعالية"),("date","التاريخ"),("type","النوع"),("audience","الفئة"),("participants","المشاركون"),("evidence","الأدلة")],[{"title":x["title"],"date":x["eventDate"],"type":x["eventType"],"audience":x.get("audience") or "—","participants":x["participantCount"],"evidence":x.get("mediaCount",0)} for x in rows])],
+            "sourceCounts":{"events":len(rows)},
+        }); return base
+
+
 def _safe_filename(name: str) -> str:
     name = Path(name).name
     name = re.sub(r"[^\w.()\-\u0600-\u06FF ]+", "_", name, flags=re.UNICODE)
@@ -1062,7 +1295,7 @@ def _resolve_event_local_path(storage_path: str) -> Path:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "0.8.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
+    return {"ok": True, "version": "0.9.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
 
 
 @app.get("/api/bootstrap")
@@ -1125,6 +1358,11 @@ def bootstrap():
         "activities": activities,
         "drive": drive.status(),
     }
+
+
+@app.get("/api/reports/official")
+def official_report(reportType: str = "department", academicYear: str = ACADEMIC_YEAR, term: str = "الفصل الأول", teacherId: int | None = None):
+    return _official_report(reportType, academicYear, term, teacherId)
 
 
 @app.post("/api/teachers", status_code=201)

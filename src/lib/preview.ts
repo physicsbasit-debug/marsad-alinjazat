@@ -1,4 +1,4 @@
-import type { AchievementAssessmentDetails, BootstrapData, CurriculumPlanDetails, EventDetails, EventMediaRecord, MeetingDetails, SupervisionVisitDetails, TeacherCvItem, TeacherProfileDetails } from '../types';
+import type { AchievementAssessmentDetails, BootstrapData, CurriculumPlanDetails, EventDetails, EventMediaRecord, MeetingDetails, OfficialReport, OfficialReportQuery, OfficialReportSection, SupervisionVisitDetails, TeacherCvItem, TeacherProfileDetails } from '../types';
 
 function eventVisual(title: string, accent: string, secondary: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${accent}"/><stop offset="1" stop-color="${secondary}"/></linearGradient><radialGradient id="r"><stop stop-color="#fff" stop-opacity=".34"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="1400" height="800" fill="url(#g)"/><circle cx="1100" cy="170" r="270" fill="url(#r)"/><circle cx="240" cy="650" r="330" fill="url(#r)"/><g fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="10"><circle cx="700" cy="400" r="150"/><path d="M430 400h540M700 130v540M520 220l360 360M880 220L520 580"/></g><text x="700" y="410" text-anchor="middle" direction="rtl" fill="#fff" font-size="72" font-family="Arial" font-weight="700">${title}</text><text x="700" y="475" text-anchor="middle" direction="rtl" fill="#fff" fill-opacity=".78" font-size="30" font-family="Arial">مرصد الإنجازات • التوثيق المهني</text></svg>`;
@@ -323,4 +323,91 @@ export function getPreviewTeacherProfile(teacherId: number): TeacherProfileDetai
       openFollowupCount: previewBootstrap.visits.filter((item) => item.teacherId === teacherId && item.status === 'needs_followup').length,
     },
   };
+}
+
+function previewStatusLabel(value: string): string {
+  const labels: Record<string, string> = {
+    active: 'نشطة', completed: 'مكتملة', archived: 'مؤرشفة', planned: 'مخططة', held: 'منفذة',
+    cancelled: 'ملغاة', needs_followup: 'تحتاج متابعة', closed: 'مغلقة', overdue: 'متأخرة',
+    draft: 'مسودة', recorded: 'مسجلة', reviewed: 'مراجعة مكتملة', new: 'جديد', in_progress: 'قيد التنفيذ',
+    approved: 'معتمد', review: 'قيد المراجعة', received: 'مستلم', waiting_upload: 'بانتظار الرفع', late: 'متأخر',
+  };
+  return labels[value] || value;
+}
+
+function previewReportSection(id: string, title: string, columns: Array<[string, string]>, rows: OfficialReportSection['rows']): OfficialReportSection {
+  return { id, title, columns: columns.map(([key, label]) => ({ key, label })), rows };
+}
+
+function previewPct(numerator: number, denominator: number): number {
+  return denominator ? Math.round((100 * numerator) / denominator) : 0;
+}
+
+export function getPreviewOfficialReport(input: OfficialReportQuery): OfficialReport {
+  const { reportType, academicYear, term, teacherId } = input;
+  const termFilter = term === 'العام كاملًا' ? '' : term;
+  const plans = previewBootstrap.plans.filter((item) => item.academicYear === academicYear && (!termFilter || item.term === termFilter));
+  const assessments = previewBootstrap.assessments.filter((item) => item.academicYear === academicYear && (!termFilter || item.term === termFilter));
+  const visits = previewBootstrap.visits.filter((item) => item.academicYear === academicYear);
+  const meetings = previewBootstrap.meetings.filter((item) => item.academicYear === academicYear);
+  const events = previewBootstrap.events;
+  const generatedAt = new Date().toISOString();
+  const base: OfficialReport = { reportType, academicYear, term, generatedAt, teacher: null, title: '', subtitle: '', summary: '', metrics: [], sections: [], sourceCounts: {} };
+
+  if (reportType === 'teacher') {
+    const teacher = previewBootstrap.teachers.find((item) => item.id === teacherId);
+    if (!teacher) throw new Error('اختر معلمًا موجودًا لإنشاء تقرير المعلم.');
+    const requests = previewBootstrap.requests.filter((item) => item.teacherId === teacher.id);
+    const documents = previewBootstrap.documents.filter((item) => item.teacherId === teacher.id);
+    const teacherVisits = visits.filter((item) => item.teacherId === teacher.id);
+    const teacherAssessments = assessments.filter((item) => item.teacherId === teacher.id);
+    return {
+      ...base, teacher,
+      title: `التقرير المهني للمعلم: ${teacher.name}`,
+      subtitle: `سجل مهني وتشغيلي خلال ${term} من العام الدراسي ${academicYear}`,
+      summary: 'يعرض التقرير الأعمال المرتبطة مباشرة بالمعلم من الملفات والتحصيل والإشراف والمشاركات دون تحويل المؤشرات إلى أحكام غير موثقة.',
+      metrics: [
+        { label: 'اكتمال الملف', value: `${teacher.cvCompletion}%` },
+        { label: 'الوثائق', value: documents.length },
+        { label: 'الزيارات', value: teacherVisits.length },
+        { label: 'التقويمات', value: teacherAssessments.length },
+      ],
+      sections: [
+        previewReportSection('requests', 'الطلبات', [['title','الطلب'],['status','الحالة'],['subject','المادة']], requests.map((item) => ({ title: item.title, status: previewStatusLabel(item.status), subject: item.subject }))),
+        previewReportSection('visits', 'الزيارات والإشراف', [['date','التاريخ'],['type','النوع'],['lesson','الدرس'],['status','الحالة']], teacherVisits.map((item) => ({ date: item.visitDate, type: item.visitType, lesson: item.lessonTitle || '—', status: previewStatusLabel(item.effectiveStatus) }))),
+        previewReportSection('assessments', 'التحصيل', [['title','التقويم'],['scope','النطاق'],['mastery','الإتقان'],['average','المتوسط']], teacherAssessments.map((item) => ({ title: item.title, scope: `${item.subject} • ${item.grade}`, mastery: `${item.masteryPercent}%`, average: `${item.averagePercent}%` }))),
+      ],
+      sourceCounts: { requests: requests.length, documents: documents.length, visits: teacherVisits.length, assessments: teacherAssessments.length },
+    };
+  }
+
+  if (reportType === 'planning') return {
+    ...base, title: 'تقرير التخطيط ومتابعة المنهج', subtitle: `${term} • ${academicYear}`,
+    summary: 'يعرض التقرير تقدم الخطط والوحدات المتأخرة كما هي مسجلة في مرصد الإنجازات.',
+    metrics: [
+      { label: 'الخطط', value: plans.length },
+      { label: 'متوسط الإنجاز', value: `${plans.length ? Math.round(plans.reduce((s,x)=>s+x.progressPercent,0)/plans.length) : 0}%` },
+      { label: 'الوحدات المتأخرة', value: plans.reduce((s,x)=>s+x.overdueUnitCount,0) },
+    ],
+    sections: [previewReportSection('plans','الخطط',[['title','الخطة'],['scope','المادة والصف'],['owner','المسؤول'],['progress','الإنجاز'],['status','الحالة']], plans.map((x)=>({title:x.title,scope:`${x.subject} • ${x.grade}`,owner:x.ownerName||'—',progress:`${x.progressPercent}%`,status:previewStatusLabel(x.status)})))],
+    sourceCounts: { plans: plans.length },
+  };
+
+  if (reportType === 'achievement') {
+    const rows = assessments.filter((item) => item.status !== 'draft');
+    const students = rows.reduce((s,x)=>s+x.studentCount,0); const mastered = rows.reduce((s,x)=>s+x.masteredCount,0);
+    return { ...base, title:'تقرير التحصيل والنتائج', subtitle:`${term} • ${academicYear}`, summary:'يجمع التقرير نتائج التقويمات المسجلة والتدخلات المرتبطة بها دون استنتاج تشخيص مهاري من الدرجة الكلية.', metrics:[{label:'التقويمات',value:rows.length},{label:'الطلبة',value:students},{label:'الإتقان المجمع',value:`${previewPct(mastered,students)}%`},{label:'تدخلات مفتوحة',value:rows.reduce((s,x)=>s+x.openActionCount,0)}], sections:[previewReportSection('assessments','التقويمات',[['title','التقويم'],['scope','النطاق'],['teacher','المعلم'],['average','المتوسط'],['mastery','الإتقان']],rows.map((x)=>({title:x.title,scope:`${x.subject} • ${x.grade}`,teacher:x.teacherName||'—',average:`${x.averagePercent}%`,mastery:`${x.masteryPercent}%`})))], sourceCounts:{assessments:rows.length} };
+  }
+
+  if (reportType === 'supervision') return { ...base, title:'تقرير الإشراف الفني والزيارات', subtitle:`العام الدراسي ${academicYear}`, summary:'يوثق التقرير الزيارات وحالات المتابعة من السجلات الفعلية.', metrics:[{label:'الزيارات',value:visits.length},{label:'مغلقة',value:visits.filter(x=>x.status==='closed').length},{label:'متابعات مفتوحة',value:visits.reduce((s,x)=>s+x.openActionCount,0)}], sections:[previewReportSection('visits','الزيارات',[['teacher','المعلم'],['date','التاريخ'],['type','النوع'],['status','الحالة']],visits.map((x)=>({teacher:x.teacherName,date:x.visitDate,type:x.visitType,status:previewStatusLabel(x.effectiveStatus)})))], sourceCounts:{visits:visits.length} };
+
+  if (reportType === 'meetings') {
+    const total=meetings.reduce((s,x)=>s+x.decisionCount,0), done=meetings.reduce((s,x)=>s+x.completedDecisionCount,0);
+    return { ...base, title:'تقرير الاجتماعات والقرارات', subtitle:`العام الدراسي ${academicYear}`, summary:'يعرض التقرير الاجتماعات والقرارات وحالة التنفيذ.', metrics:[{label:'الاجتماعات',value:meetings.length},{label:'القرارات',value:total},{label:'نسبة التنفيذ',value:`${previewPct(done,total)}%`},{label:'قرارات مفتوحة',value:meetings.reduce((s,x)=>s+x.openDecisionCount,0)}], sections:[previewReportSection('meetings','الاجتماعات',[['title','الاجتماع'],['date','التاريخ'],['type','النوع'],['decisions','القرارات'],['open','مفتوحة']],meetings.map((x)=>({title:x.title,date:x.meetingDate,type:x.meetingType,decisions:x.decisionCount,open:x.openDecisionCount})))], sourceCounts:{meetings:meetings.length,decisions:total} };
+  }
+
+  if (reportType === 'events') return { ...base, title:'تقرير الفعاليات والتوثيق', subtitle:`العام الدراسي ${academicYear}`, summary:'يلخص التقرير الفعاليات والمبادرات والمشاركة والأدلة التوثيقية.', metrics:[{label:'الفعاليات',value:events.length},{label:'المشاركون',value:events.reduce((s,x)=>s+x.participantCount,0)},{label:'الأدلة',value:events.reduce((s,x)=>s+(x.mediaCount||0),0)}], sections:[previewReportSection('events','الفعاليات',[['title','الفعالية'],['date','التاريخ'],['type','النوع'],['participants','المشاركون'],['evidence','الأدلة']],events.map((x)=>({title:x.title,date:x.eventDate,type:x.eventType,participants:x.participantCount,evidence:x.mediaCount||0})))], sourceCounts:{events:events.length} };
+
+  const activePlans=plans.filter((x)=>x.status==='active'); const students=assessments.filter(x=>x.status!=='draft').reduce((s,x)=>s+x.studentCount,0); const mastered=assessments.filter(x=>x.status!=='draft').reduce((s,x)=>s+x.masteredCount,0); const decisions=meetings.reduce((s,x)=>s+x.decisionCount,0); const done=meetings.reduce((s,x)=>s+x.completedDecisionCount,0);
+  return { ...base, title:'التقرير الشامل لأعمال القسم', subtitle:`ملخص مؤسسي لأعمال القسم خلال ${term} من العام الدراسي ${academicYear}`, summary:'يجمع هذا التقرير مؤشرات المعلمين والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في وثيقة واحدة مرتبطة بسجلاتها الأصلية.', metrics:[{label:'المعلمون',value:previewBootstrap.teachers.length},{label:'تقدم الخطط',value:`${activePlans.length?Math.round(activePlans.reduce((s,x)=>s+x.progressPercent,0)/activePlans.length):0}%`},{label:'الإتقان المجمع',value:`${previewPct(mastered,students)}%`},{label:'إغلاق الزيارات',value:`${previewPct(visits.filter(x=>x.status==='closed').length,visits.length)}%`},{label:'تنفيذ القرارات',value:`${previewPct(done,decisions)}%`}], sections:[previewReportSection('teachers','المعلمون',[['name','المعلم'],['subject','المادة'],['workload','النصاب'],['cv','اكتمال الملف']],previewBootstrap.teachers.map(x=>({name:x.name,subject:x.subject,workload:x.workload,cv:`${x.cvCompletion}%`}))),previewReportSection('planning','التخطيط والمنهج',[['title','الخطة'],['scope','النطاق'],['progress','الإنجاز']],plans.map(x=>({title:x.title,scope:`${x.subject} • ${x.grade}`,progress:`${x.progressPercent}%`}))),previewReportSection('achievement','التحصيل',[['title','التقويم'],['mastery','الإتقان'],['average','المتوسط']],assessments.filter(x=>x.status!=='draft').map(x=>({title:x.title,mastery:`${x.masteryPercent}%`,average:`${x.averagePercent}%`}))),previewReportSection('events','الفعاليات',[['title','الفعالية'],['date','التاريخ'],['participants','المشاركون']],events.map(x=>({title:x.title,date:x.eventDate,participants:x.participantCount})))], sourceCounts:{teachers:previewBootstrap.teachers.length,plans:plans.length,assessments:assessments.length,visits:visits.length,meetings:meetings.length,events:events.length} };
 }
