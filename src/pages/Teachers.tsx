@@ -16,18 +16,21 @@ import type {
   TeacherProfileDetails,
   UpdateTeacherProfileInput,
   UploadRequest,
+  SupervisionVisitRecord,
 } from '../types';
 
 export function Teachers({
   teachers,
   requests,
   documents,
+  visits,
   onAddTeacher,
   onChanged,
 }: {
   teachers: Teacher[];
   requests: UploadRequest[];
   documents: DocumentRecord[];
+  visits: SupervisionVisitRecord[];
   onAddTeacher: () => void;
   onChanged: () => Promise<void>;
 }) {
@@ -103,6 +106,7 @@ export function Teachers({
             teacher={selected}
             requests={requests.filter((item) => item.teacherId === selected.id)}
             documents={documents.filter((item) => item.teacherId === selected.id)}
+            visits={visits.filter((item) => item.teacherId === selected.id)}
             onChanged={onChanged}
           />
         )}
@@ -111,17 +115,19 @@ export function Teachers({
   );
 }
 
-type ProfileTab = 'overview' | 'cv' | 'works' | 'achievements';
+type ProfileTab = 'overview' | 'cv' | 'works' | 'visits' | 'achievements';
 
 function TeacherProfile({
   teacher,
   requests,
   documents,
+  visits,
   onChanged,
 }: {
   teacher: Teacher;
   requests: UploadRequest[];
   documents: DocumentRecord[];
+  visits: SupervisionVisitRecord[];
   onChanged: () => Promise<void>;
 }) {
   const [details, setDetails] = useState<TeacherProfileDetails | null>(null);
@@ -254,6 +260,7 @@ function TeacherProfile({
         <Tab id="overview" current={activeTab} onSelect={setActiveTab}>نظرة عامة</Tab>
         <Tab id="cv" current={activeTab} onSelect={setActiveTab}>السيرة الذاتية</Tab>
         <Tab id="works" current={activeTab} onSelect={setActiveTab}>الأعمال</Tab>
+        <Tab id="visits" current={activeTab} onSelect={setActiveTab}>الزيارات</Tab>
         <Tab id="achievements" current={activeTab} onSelect={setActiveTab}>الإنجازات</Tab>
       </div>
 
@@ -267,6 +274,8 @@ function TeacherProfile({
         <CvSection details={details} busy={busy} addingItem={addingItem} setAddingItem={setAddingItem} onAdd={addCvItem} onDelete={removeCvItem} />
       ) : activeTab === 'works' ? (
         <WorksSection requests={requests} documents={documents} stats={details.stats} />
+      ) : activeTab === 'visits' ? (
+        <VisitsSection visits={visits} stats={details.stats} />
       ) : (
         <AchievementsSection items={achievementItems} onAdd={() => { setActiveTab('cv'); setAddingItem(true); }} />
       )}
@@ -286,6 +295,7 @@ function Overview({ details }: { details: TeacherProfileDetails }) {
         <div><strong>{stats.requestCount}</strong><span>طلبات ملفات</span></div>
         <div><strong>{stats.documentCount}</strong><span>ملفات مرتبطة</span></div>
         <div><strong>{stats.approvedDocumentCount}</strong><span>ملفات معتمدة</span></div>
+        <div><strong>{stats.visitCount}</strong><span>زيارات إشرافية</span></div>
       </div>
       <div className="profile-summary-card">
         <span className="eyebrow">نبذة مهنية</span>
@@ -422,6 +432,26 @@ function WorksSection({ requests, documents, stats }: { requests: UploadRequest[
     </div>
   );
 }
+
+function VisitsSection({ visits, stats }: { visits: SupervisionVisitRecord[]; stats: TeacherProfileDetails['stats'] }) {
+  const labels: Record<string, string> = { planned: 'مخططة', completed: 'منفذة', needs_followup: 'تحتاج متابعة', closed: 'مغلقة', overdue: 'متأخرة' };
+  return (
+    <div className="profile-panel">
+      <div className="profile-stats">
+        <div><strong>{stats.visitCount}</strong><span>إجمالي الزيارات</span></div>
+        <div><strong>{visits.filter((item) => item.status !== 'planned').length}</strong><span>زيارات منفذة</span></div>
+        <div><strong>{stats.openFollowupCount}</strong><span>متابعات مفتوحة</span></div>
+      </div>
+      <div className="profile-section-head compact"><div><span className="eyebrow">الإشراف الفني</span><h3>سجل الزيارات المرتبط بالمعلم</h3></div></div>
+      <div className="teacher-visit-list">
+        {visits.map((visit) => <article key={visit.id} className={visit.effectiveStatus === 'overdue' ? 'overdue' : ''}><span className="work-icon"><Icon name="supervision" size={16}/></span><div><strong>{visit.lessonTitle || visit.visitType}</strong><small>{visit.visitType} • {visit.grade || 'دون صف'} • {formatProfileDate(visit.visitDate)}</small></div><span className={`status-pill ${visit.effectiveStatus === 'closed' ? 'approved' : visit.effectiveStatus === 'overdue' ? 'late' : 'review'}`}>{labels[visit.effectiveStatus]}</span></article>)}
+        {!visits.length && <div className="empty-state-compact">لا توجد زيارات إشرافية مرتبطة بهذا المعلم بعد.</div>}
+      </div>
+    </div>
+  );
+}
+
+function formatProfileDate(value: string) { return new Intl.DateTimeFormat('ar-OM', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`)); }
 
 function AchievementsSection({ items, onAdd }: { items: TeacherCvItem[]; onAdd: () => void }) {
   return (

@@ -1,4 +1,4 @@
-import type { BootstrapData, CurriculumPlanDetails, EventDetails, EventMediaRecord, MeetingDetails, TeacherCvItem, TeacherProfileDetails } from '../types';
+import type { BootstrapData, CurriculumPlanDetails, EventDetails, EventMediaRecord, MeetingDetails, SupervisionVisitDetails, TeacherCvItem, TeacherProfileDetails } from '../types';
 
 function eventVisual(title: string, accent: string, secondary: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${accent}"/><stop offset="1" stop-color="${secondary}"/></linearGradient><radialGradient id="r"><stop stop-color="#fff" stop-opacity=".34"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="1400" height="800" fill="url(#g)"/><circle cx="1100" cy="170" r="270" fill="url(#r)"/><circle cx="240" cy="650" r="330" fill="url(#r)"/><g fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="10"><circle cx="700" cy="400" r="150"/><path d="M430 400h540M700 130v540M520 220l360 360M880 220L520 580"/></g><text x="700" y="410" text-anchor="middle" direction="rtl" fill="#fff" font-size="72" font-family="Arial" font-weight="700">${title}</text><text x="700" y="475" text-anchor="middle" direction="rtl" fill="#fff" fill-opacity=".78" font-size="30" font-family="Arial">مرصد الإنجازات • التوثيق المهني</text></svg>`;
@@ -21,9 +21,9 @@ export const previewBootstrap: BootstrapData = {
     needsReview: 2,
     lateRequests: 1,
     openDecisions: 4,
-    upcomingVisits: 2,
+    upcomingVisits: 1,
     planProgress: 69,
-    visitProgress: 70,
+    visitProgress: 80,
     requestCompletion: 91,
   },
   teachers: [
@@ -65,6 +65,17 @@ export const previewBootstrap: BootstrapData = {
     { id: 12, planId: 1, planTitle: 'خطة الفيزياء للفصل الأول', planSubject: 'الفيزياء', planGrade: 'العاشر', title: 'الحركة والقوى', sequence: 2, plannedStart: '2026-08-05', plannedEnd: '2026-08-13', progressPercent: 65, status: 'in_progress', effectiveStatus: 'overdue', delayReason: 'احتاجت الوحدة إلى حصص دعم إضافية قبل الانتقال للمحتوى التالي.', notes: '', responsibleTeacherId: 1, responsibleName: 'أحمد السالمي', createdAt: '2026-08-15T07:50:00+00:00', updatedAt: '2026-08-15T08:00:00+00:00' },
     { id: 32, planId: 3, planTitle: 'خطة العلوم للصف التاسع', planSubject: 'العلوم', planGrade: 'التاسع', title: 'الوراثة والتنوع', sequence: 3, plannedStart: '2026-08-08', plannedEnd: '2026-08-14', progressPercent: 55, status: 'in_progress', effectiveStatus: 'overdue', delayReason: 'تأخر النشاط العملي المرتبط بالوحدة.', notes: '', responsibleTeacherId: 3, responsibleName: 'محمد المعمري', createdAt: '2026-08-15T07:54:00+00:00', updatedAt: '2026-08-15T08:04:00+00:00' },
   ],
+  visits: [
+    { id: 1, teacherId: 1, teacherName: 'أحمد السالمي', teacherSubject: 'الفيزياء', visitType: 'زيارة صفية', visitDate: '2026-08-18', periodLabel: 'الحصة الثالثة', grade: 'العاشر', lessonTitle: 'القوى والحركة', objectives: 'متابعة توظيف الأسئلة السابرة وربط المفهوم بالتطبيق.', strengths: '', developmentAreas: '', recommendations: '', followupDate: null, followupNotes: '', academicYear: '2026/2027', status: 'planned', effectiveStatus: 'planned', actionCount: 0, openActionCount: 0, completedActionCount: 0, overdueActionCount: 0, createdAt: '2026-08-15T08:20:00+00:00', updatedAt: '2026-08-15T08:20:00+00:00' },
+    { id: 2, teacherId: 2, teacherName: 'خالد الهنائي', teacherSubject: 'الكيمياء', visitType: 'زيارة تطويرية', visitDate: '2026-08-10', periodLabel: 'الحصة الثانية', grade: 'العاشر', lessonTitle: 'الترابط الكيميائي', objectives: 'متابعة تنويع التمثيلات البصرية والتقويم أثناء التعلم.', strengths: 'تنظيم واضح للمحتوى، وأسئلة تربط المعرفة السابقة بالمفهوم الجديد.', developmentAreas: 'زيادة زمن تعلم الطلبة النشط وتقليل الشرح المباشر في منتصف الدرس.', recommendations: 'إدخال مهمة ثنائية قصيرة قبل التقويم الختامي، وتوثيق أثرها في الزيارة التالية.', followupDate: '2026-08-14', followupNotes: 'ينبغي مراجعة تطبيق المهمة الثنائية وأثرها على مشاركة الطلبة.', academicYear: '2026/2027', status: 'needs_followup', effectiveStatus: 'overdue', actionCount: 2, openActionCount: 1, completedActionCount: 1, overdueActionCount: 1, createdAt: '2026-08-10T09:00:00+00:00', updatedAt: '2026-08-14T09:00:00+00:00' },
+    { id: 3, teacherId: 3, teacherName: 'محمد المعمري', teacherSubject: 'العلوم', visitType: 'زيارة متابعة', visitDate: '2026-08-05', periodLabel: 'الحصة الخامسة', grade: 'التاسع', lessonTitle: 'الوراثة والتنوع', objectives: 'التحقق من تنفيذ توصيات الزيارة السابقة.', strengths: 'تحسن واضح في إدارة الحوار وتوزيع الأسئلة بين الطلبة.', developmentAreas: 'الاستمرار في تنويع التغذية الراجعة.', recommendations: 'المحافظة على الممارسة الحالية ومشاركة نموذج ناجح مع القسم.', followupDate: '2026-08-12', followupNotes: 'أغلقت المتابعة بعد التحقق من التطبيق.', academicYear: '2026/2027', status: 'closed', effectiveStatus: 'closed', actionCount: 1, openActionCount: 0, completedActionCount: 1, overdueActionCount: 0, closedAt: '2026-08-12T08:30:00+00:00', createdAt: '2026-08-05T08:00:00+00:00', updatedAt: '2026-08-12T08:30:00+00:00' },
+    { id: 4, teacherId: 5, teacherName: 'يوسف البلوشي', teacherSubject: 'العلوم', visitType: 'زيارة صفية', visitDate: '2026-08-13', periodLabel: 'الحصة الرابعة', grade: 'الثامن', lessonTitle: 'الموجات', objectives: 'متابعة وضوح التعليمات وإدارة زمن الأنشطة.', strengths: '', developmentAreas: '', recommendations: '', followupDate: null, followupNotes: '', academicYear: '2026/2027', status: 'planned', effectiveStatus: 'overdue', actionCount: 0, openActionCount: 0, completedActionCount: 0, overdueActionCount: 0, createdAt: '2026-08-11T08:00:00+00:00', updatedAt: '2026-08-11T08:00:00+00:00' },
+    { id: 5, teacherId: 4, teacherName: 'سالم الرواحي', teacherSubject: 'الأحياء', visitType: 'زيارة صفية', visitDate: '2026-08-12', periodLabel: 'الحصة الأولى', grade: 'التاسع', lessonTitle: 'النقل في النباتات', objectives: 'متابعة بناء المفهوم من الأدلة والملاحظات.', strengths: 'استخدام جيد للأسئلة والتجربة القصيرة في بداية الدرس.', developmentAreas: 'إتاحة وقت أطول لتفسير الطلبة للنتائج.', recommendations: 'زيادة وقت التفسير قبل تثبيت الإجابة العلمية.', followupDate: null, followupNotes: '', academicYear: '2026/2027', status: 'completed', effectiveStatus: 'completed', actionCount: 0, openActionCount: 0, completedActionCount: 0, overdueActionCount: 0, createdAt: '2026-08-12T07:00:00+00:00', updatedAt: '2026-08-12T08:00:00+00:00' },
+  ],
+  supervisionAttention: [
+    { id: 4, teacherId: 5, teacherName: 'يوسف البلوشي', teacherSubject: 'العلوم', visitType: 'زيارة صفية', visitDate: '2026-08-13', periodLabel: 'الحصة الرابعة', grade: 'الثامن', lessonTitle: 'الموجات', objectives: 'متابعة وضوح التعليمات وإدارة زمن الأنشطة.', strengths: '', developmentAreas: '', recommendations: '', followupDate: null, followupNotes: '', academicYear: '2026/2027', status: 'planned', effectiveStatus: 'overdue', actionCount: 0, openActionCount: 0, completedActionCount: 0, overdueActionCount: 0, createdAt: '2026-08-11T08:00:00+00:00', updatedAt: '2026-08-11T08:00:00+00:00' },
+    { id: 2, teacherId: 2, teacherName: 'خالد الهنائي', teacherSubject: 'الكيمياء', visitType: 'زيارة تطويرية', visitDate: '2026-08-10', periodLabel: 'الحصة الثانية', grade: 'العاشر', lessonTitle: 'الترابط الكيميائي', objectives: 'متابعة تنويع التمثيلات البصرية والتقويم أثناء التعلم.', strengths: 'تنظيم واضح للمحتوى، وأسئلة تربط المعرفة السابقة بالمفهوم الجديد.', developmentAreas: 'زيادة زمن تعلم الطلبة النشط وتقليل الشرح المباشر في منتصف الدرس.', recommendations: 'إدخال مهمة ثنائية قصيرة قبل التقويم الختامي، وتوثيق أثرها في الزيارة التالية.', followupDate: '2026-08-14', followupNotes: 'ينبغي مراجعة تطبيق المهمة الثنائية وأثرها على مشاركة الطلبة.', academicYear: '2026/2027', status: 'needs_followup', effectiveStatus: 'overdue', actionCount: 2, openActionCount: 1, completedActionCount: 1, overdueActionCount: 1, createdAt: '2026-08-10T09:00:00+00:00', updatedAt: '2026-08-14T09:00:00+00:00' },
+  ],
   documents: [
     { id: 1, requestId: 2, teacherId: 2, title: 'الخطة الفصلية', category: 'خطة فصلية', subject: 'الكيمياء', grade: 'العاشر', academicYear: '2026/2027', originalName: 'خطة_الكيمياء_الفصل_الأول.pdf', mimeType: 'application/pdf', sizeBytes: 735000, storageProvider: 'preview', status: 'inbox', uploadedAt: '2026-08-15T05:00:00+00:00' },
     { id: 2, requestId: 4, teacherId: 4, title: 'تحليل النتائج', category: 'تحليل نتائج', subject: 'الأحياء', grade: 'التاسع', academicYear: '2026/2027', originalName: 'تحليل_نتائج_الأحياء.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', sizeBytes: 184000, storageProvider: 'preview', status: 'approved', uploadedAt: '2026-08-14T05:00:00+00:00', approvedAt: '2026-08-15T05:00:00+00:00' },
@@ -75,6 +86,7 @@ export const previewBootstrap: BootstrapData = {
     { id: 3, activity_type: 'event', title: 'توثيق مبادرة اقرأ علمًا', detail: '31 مشاركًا', created_at: '2026-08-14T05:00:00+00:00' },
     { id: 4, activity_type: 'planning', title: 'تحديث وحدة الحركة والقوى', detail: 'الفيزياء • التقدم 65%', created_at: '2026-08-15T08:00:00+00:00' },
     { id: 5, activity_type: 'meeting', title: 'تحديث قرار: توزيع أعمال القسم', detail: 'قيد التنفيذ', created_at: '2026-08-14T04:30:00+00:00' },
+    { id: 6, activity_type: 'supervision', title: 'تحديث متابعة: خالد الهنائي', detail: 'زيارة تطويرية • تحتاج متابعة', created_at: '2026-08-14T09:00:00+00:00' },
   ],
   drive: {
     configured: false,
@@ -84,6 +96,33 @@ export const previewBootstrap: BootstrapData = {
     storageMode: 'local',
   },
 };
+
+
+const previewSupervisionDetails: Record<number, SupervisionVisitDetails> = {
+  1: { ...previewBootstrap.visits[0], actions: [], timeline: [{ id: 7101, activity_type: 'supervision', title: 'إنشاء زيارة: أحمد السالمي', detail: 'زيارة صفية • 2026-08-18', created_at: '2026-08-15T08:20:00+00:00' }], reportReady: false },
+  2: {
+    ...previewBootstrap.visits[1],
+    actions: [
+      { id: 201, visitId: 2, title: 'تنفيذ مهمة تعلم ثنائية قبل التقويم الختامي', responsibleTeacherId: 2, responsibleName: 'خالد الهنائي', dueDate: '2026-08-14', status: 'overdue', baseStatus: 'in_progress', notes: 'تجربتها في درسين وتوثيق ملاحظات المشاركة.', createdAt: '2026-08-10T09:10:00+00:00', updatedAt: '2026-08-14T09:00:00+00:00' },
+      { id: 202, visitId: 2, title: 'إعداد سؤال خروج قصير مرتبط بهدف الدرس', responsibleTeacherId: 2, responsibleName: 'خالد الهنائي', dueDate: '2026-08-12', status: 'completed', baseStatus: 'completed', notes: 'تم تطبيقه وحفظ نموذج منه.', completedAt: '2026-08-12T10:00:00+00:00', createdAt: '2026-08-10T09:12:00+00:00', updatedAt: '2026-08-12T10:00:00+00:00' },
+    ],
+    timeline: [
+      { id: 7203, activity_type: 'supervision', title: 'تحديث إجراء: تنفيذ مهمة تعلم ثنائية قبل التقويم الختامي', detail: 'in_progress', created_at: '2026-08-14T09:00:00+00:00' },
+      { id: 7202, activity_type: 'supervision', title: 'إجراء متابعة: إعداد سؤال خروج قصير مرتبط بهدف الدرس', detail: 'completed', created_at: '2026-08-12T10:00:00+00:00' },
+      { id: 7201, activity_type: 'supervision', title: 'إنشاء زيارة: خالد الهنائي', detail: 'زيارة تطويرية • 2026-08-10', created_at: '2026-08-10T09:00:00+00:00' },
+    ],
+    reportReady: true,
+  },
+  3: { ...previewBootstrap.visits[2], actions: [{ id: 301, visitId: 3, title: 'تطبيق التوصية ومراجعة أثرها', responsibleTeacherId: 3, responsibleName: 'محمد المعمري', dueDate: '2026-08-12', status: 'completed', baseStatus: 'completed', notes: 'تم التحقق خلال زيارة المتابعة.', completedAt: '2026-08-12T08:20:00+00:00', createdAt: '2026-08-05T08:10:00+00:00', updatedAt: '2026-08-12T08:20:00+00:00' }], timeline: [{ id: 7301, activity_type: 'supervision', title: 'إغلاق متابعة: محمد المعمري', detail: 'closed', created_at: '2026-08-12T08:30:00+00:00' }], reportReady: true },
+  4: { ...previewBootstrap.visits[3], actions: [], timeline: [{ id: 7401, activity_type: 'supervision', title: 'إنشاء زيارة: يوسف البلوشي', detail: 'زيارة صفية • 2026-08-13', created_at: '2026-08-11T08:00:00+00:00' }], reportReady: false },
+  5: { ...previewBootstrap.visits[4], actions: [], timeline: [{ id: 7501, activity_type: 'supervision', title: 'تنفيذ زيارة: سالم الرواحي', detail: 'completed', created_at: '2026-08-12T08:00:00+00:00' }], reportReady: true },
+};
+
+export function getPreviewSupervisionVisit(visitId: number): SupervisionVisitDetails {
+  const detail = previewSupervisionDetails[visitId];
+  if (!detail) throw new Error('الزيارة غير موجودة في بيانات المعاينة.');
+  return detail;
+}
 
 
 const previewPlanDetails: Record<number, CurriculumPlanDetails> = {
@@ -240,6 +279,8 @@ export function getPreviewTeacherProfile(teacherId: number): TeacherProfileDetai
       requestCount: previewBootstrap.requests.filter((item) => item.teacherId === teacherId).length,
       documentCount: previewBootstrap.documents.filter((item) => item.teacherId === teacherId).length,
       approvedDocumentCount: previewBootstrap.documents.filter((item) => item.teacherId === teacherId && item.status === 'approved').length,
+      visitCount: previewBootstrap.visits.filter((item) => item.teacherId === teacherId).length,
+      openFollowupCount: previewBootstrap.visits.filter((item) => item.teacherId === teacherId && item.status === 'needs_followup').length,
     },
   };
 }

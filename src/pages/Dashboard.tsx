@@ -3,11 +3,21 @@ import type { BootstrapData } from '../types';
 
 export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuickAction: (action: string) => void }) {
   const d = data.dashboard;
-  const planningAttention = data.planningAttention.slice(0, 2);
-  const decisionAttention = data.decisionAttention.slice(0, Math.max(0, 2 - planningAttention.length));
-  const requestAttention = data.requests.filter((item) => ['late', 'review', 'waiting_upload', 'received'].includes(item.status)).slice(0, Math.max(0, 4 - planningAttention.length - decisionAttention.length));
+  const planningAttention = data.planningAttention.slice(0, 1);
+  const supervisionAttention = data.supervisionAttention.slice(0, Math.max(0, 2 - planningAttention.length));
+  const decisionAttention = data.decisionAttention.slice(0, Math.max(0, 3 - planningAttention.length - supervisionAttention.length));
+  const requestAttention = data.requests
+    .filter((item) => ['late', 'review', 'waiting_upload', 'received'].includes(item.status))
+    .slice(0, Math.max(0, 4 - planningAttention.length - supervisionAttention.length - decisionAttention.length));
   const [weekStart, weekEnd] = currentWeekBounds();
-  const scheduleMeetings = data.meetings.filter((item) => item.status !== 'cancelled' && item.meetingDate >= weekStart && item.meetingDate <= weekEnd).sort((a, b) => `${a.meetingDate} ${a.meetingTime || ''}`.localeCompare(`${b.meetingDate} ${b.meetingTime || ''}`)).slice(0, 3);
+  const scheduleEntries = [
+    ...data.meetings
+      .filter((item) => item.status !== 'cancelled' && item.meetingDate >= weekStart && item.meetingDate <= weekEnd)
+      .map((item) => ({ id: `meeting-${item.id}`, date: item.meetingDate, time: item.meetingTime || '', title: item.title, meta: `${item.meetingTime || 'دون وقت'} • ${item.location || 'دون مكان'}` })),
+    ...data.visits
+      .filter((item) => item.status === 'planned' && item.visitDate >= weekStart && item.visitDate <= weekEnd)
+      .map((item) => ({ id: `visit-${item.id}`, date: item.visitDate, time: '', title: `زيارة ${item.teacherName}`, meta: `${item.visitType} • ${item.grade || 'دون صف'}${item.periodLabel ? ` • ${item.periodLabel}` : ''}` })),
+  ].sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`)).slice(0, 4);
   return (
     <div className="page dashboard-page">
       <header className="hero-block">
@@ -33,9 +43,10 @@ export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuic
 
       <section className="dashboard-grid">
         <article className="panel attention-panel">
-          <div className="panel-heading"><div><span className="eyebrow danger">يحتاج انتباهك</span><h2>الأولوية الآن</h2></div><span className="counter">{d.openRequests + d.openDecisions + data.planningAttention.length}</span></div>
+          <div className="panel-heading"><div><span className="eyebrow danger">يحتاج انتباهك</span><h2>الأولوية الآن</h2></div><span className="counter">{d.openRequests + d.openDecisions + data.planningAttention.length + data.supervisionAttention.length}</span></div>
           <div className="attention-list">
             {planningAttention.map((item) => <div className="attention-item" key={`planning-${item.id}`}><span className="attention-dot late"></span><div><strong>{item.title}</strong><small>{item.planSubject} • {item.planGrade} • {item.responsibleName || 'دون مسؤول'}{item.plannedEnd ? ` • انتهت ${formatShortDate(item.plannedEnd)}` : ''}</small></div><Icon name="planning" size={18}/></div>)}
+            {supervisionAttention.map((item) => <div className="attention-item" key={`supervision-${item.id}`}><span className="attention-dot late"></span><div><strong>{item.teacherName}</strong><small>{item.visitType} • {item.grade || 'دون صف'} • {item.status === 'needs_followup' && item.followupDate ? `متابعة ${formatShortDate(item.followupDate)}` : `زيارة ${formatShortDate(item.visitDate)}`}</small></div><Icon name="supervision" size={18}/></div>)}
             {decisionAttention.map((item) => <div className="attention-item" key={`decision-${item.id}`}><span className={`attention-dot ${item.status === 'overdue' ? 'late' : 'received'}`}></span><div><strong>{item.title}</strong><small>{item.meetingTitle || 'قرار اجتماع'} • {item.responsibleName || 'دون مسؤول'}{item.dueDate ? ` • حتى ${formatShortDate(item.dueDate)}` : ''}</small></div><Icon name="meeting" size={18}/></div>)}
             {requestAttention.map((item) => (
               <div className="attention-item" key={`request-${item.id}`}>
@@ -50,7 +61,7 @@ export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuic
         <article className="panel week-panel">
           <div className="panel-heading"><div><span className="eyebrow">هذا الأسبوع</span><h2>جدول مختصر</h2></div><Icon name="calendar" /></div>
           <div className="week-list">
-            {scheduleMeetings.length ? scheduleMeetings.map((meeting) => <ScheduleItem key={meeting.id} day={weekdayName(meeting.meetingDate)} title={meeting.title} meta={`${meeting.meetingTime || 'دون وقت'} • ${meeting.location || 'دون مكان'}`} />) : <div className="quiet-note">لا توجد اجتماعات مجدولة بعد.</div>}
+            {scheduleEntries.length ? scheduleEntries.map((item) => <ScheduleItem key={item.id} day={weekdayName(item.date)} title={item.title} meta={item.meta} />) : <div className="quiet-note">لا توجد اجتماعات أو زيارات مجدولة هذا الأسبوع.</div>}
           </div>
         </article>
       </section>
@@ -65,7 +76,7 @@ export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuic
         <article className="panel activity-panel">
           <div className="panel-heading"><div><span className="eyebrow">آخر النشاطات</span><h2>ما حدث مؤخرًا</h2></div></div>
           <div className="activity-list">
-            {data.activities.slice(0, 4).map((item) => <div className="activity-row" key={item.id}><span className="activity-icon"><Icon name={item.activity_type === 'event' ? 'spark' : item.activity_type === 'meeting' ? 'meeting' : item.activity_type === 'planning' ? 'planning' : item.activity_type === 'document' ? 'document' : 'upload'} size={18} /></span><div><strong>{item.title}</strong><small>{item.detail}</small></div></div>)}
+            {data.activities.slice(0, 4).map((item) => <div className="activity-row" key={item.id}><span className="activity-icon"><Icon name={item.activity_type === 'event' ? 'spark' : item.activity_type === 'meeting' ? 'meeting' : item.activity_type === 'planning' ? 'planning' : item.activity_type === 'supervision' ? 'supervision' : item.activity_type === 'document' ? 'document' : 'upload'} size={18} /></span><div><strong>{item.title}</strong><small>{item.detail}</small></div></div>)}
           </div>
         </article>
       </section>

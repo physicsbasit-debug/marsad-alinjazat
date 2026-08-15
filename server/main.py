@@ -33,7 +33,7 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 EVENT_UPLOADS_DIR = Path(os.getenv("APP_EVENT_UPLOADS_DIR", BASE_DIR / "uploads" / "events"))
 EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="مرصد الإنجازات API", version="0.6.0")
+app = FastAPI(title="مرصد الإنجازات API", version="0.7.0")
 
 
 class CreateRequestPayload(BaseModel):
@@ -148,6 +148,29 @@ class CurriculumUnitPayload(BaseModel):
     notes: str = Field(default="", max_length=2500)
     responsibleTeacherId: int | None = None
 
+class SupervisionVisitPayload(BaseModel):
+    teacherId: int
+    visitType: str = Field(default="زيارة صفية", min_length=2, max_length=100)
+    visitDate: str
+    periodLabel: str = Field(default="", max_length=80)
+    grade: str = Field(default="", max_length=80)
+    lessonTitle: str = Field(default="", max_length=240)
+    objectives: str = Field(default="", max_length=4000)
+    strengths: str = Field(default="", max_length=5000)
+    developmentAreas: str = Field(default="", max_length=5000)
+    recommendations: str = Field(default="", max_length=5000)
+    followupDate: str | None = None
+    followupNotes: str = Field(default="", max_length=4000)
+    status: Literal["planned", "completed", "needs_followup", "closed"] = "planned"
+
+
+class SupervisionActionPayload(BaseModel):
+    title: str = Field(min_length=3, max_length=500)
+    responsibleTeacherId: int | None = None
+    dueDate: str | None = None
+    status: Literal["new", "in_progress", "completed", "cancelled"] = "new"
+    notes: str = Field(default="", max_length=2500)
+
 
 def _teacher_dict(row):
     item = dict(row)
@@ -209,6 +232,17 @@ def _teacher_profile_details(conn, teacher_id: int):
         "SELECT COUNT(*) FROM documents WHERE teacher_id = ? AND status = 'approved'",
         (teacher_id,),
     ).fetchone()[0]
+    visit_count = conn.execute("SELECT COUNT(*) FROM supervision_visits WHERE teacher_id = ?", (teacher_id,)).fetchone()[0]
+    open_followup_count = conn.execute(
+        """SELECT COUNT(*) FROM supervision_visits v
+           WHERE v.teacher_id = ? AND v.status != 'closed'
+             AND (v.status = 'needs_followup'
+                  OR EXISTS (
+                      SELECT 1 FROM supervision_actions a
+                      WHERE a.visit_id = v.id AND a.status NOT IN ('completed','cancelled')
+                  ))""",
+        (teacher_id,),
+    ).fetchone()[0]
     return {
         "teacher": _teacher_dict(teacher_row),
         "profile": _profile_dict(profile_row),
@@ -217,6 +251,8 @@ def _teacher_profile_details(conn, teacher_id: int):
             "requestCount": request_count,
             "documentCount": document_count,
             "approvedDocumentCount": approved_document_count,
+            "visitCount": visit_count,
+            "openFollowupCount": open_followup_count,
         },
     }
 
@@ -626,6 +662,161 @@ def _normalize_unit_payload(payload: CurriculumUnitPayload) -> tuple[str | None,
     return start, end, progress, status
 
 
+def _supervision_action_dict(row):
+    item = dict(row)
+    for source, target in [
+        ("visit_id", "visitId"),
+        ("responsible_teacher_id", "responsibleTeacherId"),
+        ("responsible_name", "responsibleName"),
+        ("due_date", "dueDate"),
+        ("completed_at", "completedAt"),
+        ("created_at", "createdAt"),
+        ("updated_at", "updatedAt"),
+    ]:
+        if source in item:
+            item[target] = item.pop(source)
+    base_status = item.get("status", "new")
+    item["baseStatus"] = base_status
+    due_date = item.get("dueDate")
+    if base_status not in {"completed", "cancelled"} and due_date and due_date < _oman_today_iso():
+        item["status"] = "overdue"
+    return item
+
+
+def _supervision_visit_dict(row):
+    item = dict(row)
+    for source, target in [
+        ("teacher_id", "teacherId"),
+        ("teacher_name", "teacherName"),
+        ("teacher_subject", "teacherSubject"),
+        ("visit_type", "visitType"),
+        ("visit_date", "visitDate"),
+        ("period_label", "periodLabel"),
+        ("lesson_title", "lessonTitle"),
+        ("development_areas", "developmentAreas"),
+        ("followup_date", "followupDate"),
+        ("followup_notes", "followupNotes"),
+        ("academic_year", "academicYear"),
+        ("action_count", "actionCount"),
+        ("open_action_count", "openActionCount"),
+        ("completed_action_count", "completedActionCount"),
+        ("overdue_action_count", "overdueActionCount"),
+        ("closed_at", "closedAt"),
+        ("created_at", "createdAt"),
+        ("updated_at", "updatedAt"),
+    ]:
+        if source in item:
+            item[target] = item.pop(source)
+    status = item.get("status", "planned")
+    today = _oman_today_iso()
+    if status != "closed" and item.get("overdueActionCount", 0) > 0:
+        item["effectiveStatus"] = "overdue"
+    elif status == "planned" and item.get("visitDate") and item["visitDate"] < today:
+        item["effectiveStatus"] = "overdue"
+    elif status == "needs_followup" and item.get("followupDate") and item["followupDate"] < today:
+        item["effectiveStatus"] = "overdue"
+    else:
+        item["effectiveStatus"] = status
+    return item
+
+
+def _supervision_summary_rows(conn, visit_id: int | None = None):
+    where = "WHERE v.id = ?" if visit_id is not None else ""
+    today = _oman_today_iso()
+    params: tuple = (today, visit_id) if visit_id is not None else (today,)
+    return conn.execute(
+        f"""SELECT v.*, t.name AS teacher_name, t.subject AS teacher_subject,
+               (SELECT COUNT(*) FROM supervision_actions a WHERE a.visit_id = v.id) AS action_count,
+               (SELECT COUNT(*) FROM supervision_actions a WHERE a.visit_id = v.id AND a.status NOT IN ('completed','cancelled')) AS open_action_count,
+               (SELECT COUNT(*) FROM supervision_actions a WHERE a.visit_id = v.id AND a.status = 'completed') AS completed_action_count,
+               (SELECT COUNT(*) FROM supervision_actions a
+                WHERE a.visit_id = v.id AND a.status NOT IN ('completed','cancelled')
+                  AND a.due_date IS NOT NULL AND a.due_date < ?) AS overdue_action_count
+           FROM supervision_visits v
+           JOIN teachers t ON t.id = v.teacher_id
+           {where}
+           ORDER BY v.visit_date DESC, v.id DESC""",
+        params,
+    ).fetchall()
+
+
+def _supervision_detail(visit_id: int):
+    with connect() as conn:
+        rows = _supervision_summary_rows(conn, visit_id)
+        if not rows:
+            return None
+        visit = _supervision_visit_dict(rows[0])
+        action_rows = conn.execute(
+            """SELECT a.*, t.name AS responsible_name
+               FROM supervision_actions a
+               LEFT JOIN teachers t ON t.id = a.responsible_teacher_id
+               WHERE a.visit_id = ?
+               ORDER BY CASE WHEN a.status = 'completed' THEN 1 ELSE 0 END,
+                        CASE WHEN a.due_date IS NULL THEN 1 ELSE 0 END, a.due_date, a.id""",
+            (visit_id,),
+        ).fetchall()
+        timeline_rows = conn.execute(
+            """SELECT id, activity_type, title, detail, created_at
+               FROM activities WHERE entity_type = 'supervision_visit' AND entity_id = ?
+               ORDER BY created_at DESC, id DESC LIMIT 40""",
+            (visit_id,),
+        ).fetchall()
+    visit["actions"] = [_supervision_action_dict(row) for row in action_rows]
+    visit["timeline"] = [dict(row) for row in timeline_rows]
+    visit["reportReady"] = bool(
+        visit.get("status") != "planned"
+        and (visit.get("lessonTitle") or "").strip()
+        and ((visit.get("strengths") or "").strip() or (visit.get("developmentAreas") or "").strip())
+        and (visit.get("recommendations") or "").strip()
+    )
+    return visit
+
+
+def _supervision_attention(conn, limit: int = 6):
+    today = _oman_today_iso()
+    rows = conn.execute(
+        """SELECT v.*, t.name AS teacher_name, t.subject AS teacher_subject,
+                  (SELECT COUNT(*) FROM supervision_actions a WHERE a.visit_id = v.id) AS action_count,
+                  (SELECT COUNT(*) FROM supervision_actions a WHERE a.visit_id = v.id AND a.status NOT IN ('completed','cancelled')) AS open_action_count,
+                  (SELECT COUNT(*) FROM supervision_actions a WHERE a.visit_id = v.id AND a.status = 'completed') AS completed_action_count,
+                  (SELECT COUNT(*) FROM supervision_actions a
+                   WHERE a.visit_id = v.id AND a.status NOT IN ('completed','cancelled')
+                     AND a.due_date IS NOT NULL AND a.due_date < ?) AS overdue_action_count
+           FROM supervision_visits v JOIN teachers t ON t.id = v.teacher_id
+           WHERE v.status != 'closed'
+             AND (
+                  (v.status = 'planned' AND v.visit_date < ?)
+                  OR (v.status = 'needs_followup' AND v.followup_date IS NOT NULL AND v.followup_date < ?)
+                  OR EXISTS (
+                      SELECT 1 FROM supervision_actions a
+                      WHERE a.visit_id = v.id AND a.status NOT IN ('completed','cancelled')
+                        AND a.due_date IS NOT NULL AND a.due_date < ?
+                  )
+             )
+           ORDER BY CASE
+                        WHEN EXISTS (
+                            SELECT 1 FROM supervision_actions a
+                            WHERE a.visit_id = v.id AND a.status NOT IN ('completed','cancelled')
+                              AND a.due_date IS NOT NULL AND a.due_date < ?
+                        ) THEN 0
+                        ELSE 1
+                    END,
+                    CASE WHEN v.status = 'needs_followup' THEN COALESCE(v.followup_date, v.visit_date) ELSE v.visit_date END,
+                    v.id
+           LIMIT ?""",
+        (today, today, today, today, today, limit),
+    ).fetchall()
+    return [_supervision_visit_dict(row) for row in rows]
+
+
+def _normalize_supervision_visit(payload: SupervisionVisitPayload) -> tuple[str, str | None]:
+    visit_date = _validate_iso_date(payload.visitDate, "تاريخ الزيارة")
+    followup_date = _validate_iso_date(payload.followupDate, "موعد المتابعة") if payload.followupDate else None
+    if followup_date and followup_date < visit_date:
+        raise HTTPException(status_code=422, detail="موعد المتابعة يجب ألا يسبق تاريخ الزيارة.")
+    return visit_date, followup_date
+
+
 def _get_request_rows():
     with connect() as conn:
         return conn.execute(
@@ -676,7 +867,7 @@ def _resolve_event_local_path(storage_path: str) -> Path:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "0.6.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
+    return {"ok": True, "version": "0.7.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
 
 
 @app.get("/api/bootstrap")
@@ -699,6 +890,8 @@ def bootstrap():
         decision_attention = _decision_attention(conn)
         plans = [_plan_dict(r) for r in _plan_summary_rows(conn)]
         planning_attention = _planning_attention(conn)
+        visits = [_supervision_visit_dict(r) for r in _supervision_summary_rows(conn)]
+        supervision_attention = _supervision_attention(conn)
         documents = [_document_dict(r) for r in conn.execute("SELECT * FROM documents ORDER BY uploaded_at DESC LIMIT 30").fetchall()]
         activities = [dict(r) for r in conn.execute("SELECT * FROM activities ORDER BY created_at DESC LIMIT 8").fetchall()]
 
@@ -709,9 +902,9 @@ def bootstrap():
         "needsReview": counts.get("review", 0) + counts.get("received", 0),
         "lateRequests": counts.get("late", 0),
         "openDecisions": sum(item["openDecisionCount"] for item in meetings),
-        "upcomingVisits": 2,
+        "upcomingVisits": sum(1 for item in visits if item["status"] == "planned" and item["visitDate"] >= _oman_today_iso()),
         "planProgress": int(round(sum(item["progressPercent"] for item in plans if item["status"] == "active") / sum(1 for item in plans if item["status"] == "active"))) if any(item["status"] == "active" for item in plans) else 0,
-        "visitProgress": 70,
+        "visitProgress": int(round(100 * sum(1 for item in visits if item["status"] in {"completed", "needs_followup", "closed"}) / len(visits))) if visits else 0,
         "requestCompletion": 91,
     }
     return {
@@ -725,6 +918,8 @@ def bootstrap():
         "decisionAttention": decision_attention,
         "plans": plans,
         "planningAttention": planning_attention,
+        "visits": visits,
+        "supervisionAttention": supervision_attention,
         "documents": documents,
         "activities": activities,
         "drive": drive.status(),
@@ -1314,6 +1509,151 @@ def delete_curriculum_unit(plan_id: int, unit_id: int):
         conn.execute(
             "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             ("planning", f"حذف وحدة: {row['title']}", "حذف من توزيع المنهج", "curriculum_plan", plan_id, now),
+        )
+    return {"ok": True}
+
+
+@app.get("/api/supervision/visits")
+def list_supervision_visits():
+    with connect() as conn:
+        return [_supervision_visit_dict(row) for row in _supervision_summary_rows(conn)]
+
+
+@app.post("/api/supervision/visits", status_code=201)
+def create_supervision_visit(payload: SupervisionVisitPayload):
+    visit_date, followup_date = _normalize_supervision_visit(payload)
+    now = utc_now()
+    with connect() as conn:
+        _validate_teacher_ids(conn, [payload.teacherId], "المعلم المحدد للزيارة غير موجود.")
+        teacher = conn.execute("SELECT name FROM teachers WHERE id = ?", (payload.teacherId,)).fetchone()
+        closed_at = now if payload.status == "closed" else None
+        cursor = conn.execute(
+            """INSERT INTO supervision_visits
+               (teacher_id, visit_type, visit_date, period_label, grade, lesson_title, objectives, strengths, development_areas, recommendations,
+                followup_date, followup_notes, academic_year, status, closed_at, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (payload.teacherId, payload.visitType.strip(), visit_date, payload.periodLabel.strip(), payload.grade.strip(), payload.lessonTitle.strip(),
+             payload.objectives.strip(), payload.strengths.strip(), payload.developmentAreas.strip(), payload.recommendations.strip(),
+             followup_date, payload.followupNotes.strip(), ACADEMIC_YEAR, payload.status, closed_at, now, now),
+        )
+        visit_id = cursor.lastrowid
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("supervision", f"إنشاء زيارة: {teacher['name']}", f"{payload.visitType.strip()} • {visit_date}", "supervision_visit", visit_id, now),
+        )
+    return {"id": visit_id}
+
+
+@app.get("/api/supervision/visits/{visit_id}")
+def get_supervision_visit(visit_id: int):
+    detail = _supervision_detail(visit_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="الزيارة غير موجودة.")
+    return detail
+
+
+@app.patch("/api/supervision/visits/{visit_id}")
+def update_supervision_visit(visit_id: int, payload: SupervisionVisitPayload):
+    visit_date, followup_date = _normalize_supervision_visit(payload)
+    now = utc_now()
+    with connect() as conn:
+        current = conn.execute("SELECT * FROM supervision_visits WHERE id = ?", (visit_id,)).fetchone()
+        if not current:
+            raise HTTPException(status_code=404, detail="الزيارة غير موجودة.")
+        _validate_teacher_ids(conn, [payload.teacherId], "المعلم المحدد للزيارة غير موجود.")
+        teacher = conn.execute("SELECT name FROM teachers WHERE id = ?", (payload.teacherId,)).fetchone()
+        closed_at = current["closed_at"]
+        if payload.status == "closed" and not closed_at:
+            closed_at = now
+        elif payload.status != "closed":
+            closed_at = None
+        conn.execute(
+            """UPDATE supervision_visits SET teacher_id=?, visit_type=?, visit_date=?, period_label=?, grade=?, lesson_title=?, objectives=?, strengths=?,
+               development_areas=?, recommendations=?, followup_date=?, followup_notes=?, status=?, closed_at=?, updated_at=? WHERE id=?""",
+            (payload.teacherId, payload.visitType.strip(), visit_date, payload.periodLabel.strip(), payload.grade.strip(), payload.lessonTitle.strip(),
+             payload.objectives.strip(), payload.strengths.strip(), payload.developmentAreas.strip(), payload.recommendations.strip(), followup_date,
+             payload.followupNotes.strip(), payload.status, closed_at, now, visit_id),
+        )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("supervision", f"تحديث زيارة: {teacher['name']}", payload.status, "supervision_visit", visit_id, now),
+        )
+    return _supervision_detail(visit_id)
+
+
+@app.post("/api/supervision/visits/{visit_id}/actions", status_code=201)
+def create_supervision_action(visit_id: int, payload: SupervisionActionPayload):
+    due_date = _validate_iso_date(payload.dueDate, "موعد الإجراء") if payload.dueDate else None
+    now = utc_now()
+    with connect() as conn:
+        visit = conn.execute("SELECT id FROM supervision_visits WHERE id = ?", (visit_id,)).fetchone()
+        if not visit:
+            raise HTTPException(status_code=404, detail="الزيارة غير موجودة.")
+        if payload.responsibleTeacherId is not None:
+            _validate_teacher_ids(conn, [payload.responsibleTeacherId], "المسؤول عن الإجراء غير موجود.")
+        completed_at = now if payload.status == "completed" else None
+        cursor = conn.execute(
+            """INSERT INTO supervision_actions
+               (visit_id, title, responsible_teacher_id, due_date, status, notes, completed_at, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (visit_id, payload.title.strip(), payload.responsibleTeacherId, due_date, payload.status, payload.notes.strip(), completed_at, now, now),
+        )
+        action_id = cursor.lastrowid
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("supervision", f"إجراء متابعة: {payload.title.strip()}", payload.status, "supervision_visit", visit_id, now),
+        )
+        row = conn.execute(
+            """SELECT a.*, t.name AS responsible_name FROM supervision_actions a
+               LEFT JOIN teachers t ON t.id = a.responsible_teacher_id WHERE a.id = ?""",
+            (action_id,),
+        ).fetchone()
+    return _supervision_action_dict(row)
+
+
+@app.patch("/api/supervision/visits/{visit_id}/actions/{action_id}")
+def update_supervision_action(visit_id: int, action_id: int, payload: SupervisionActionPayload):
+    due_date = _validate_iso_date(payload.dueDate, "موعد الإجراء") if payload.dueDate else None
+    now = utc_now()
+    with connect() as conn:
+        current = conn.execute("SELECT * FROM supervision_actions WHERE id = ? AND visit_id = ?", (action_id, visit_id)).fetchone()
+        if not current:
+            raise HTTPException(status_code=404, detail="إجراء المتابعة غير موجود ضمن هذه الزيارة.")
+        if payload.responsibleTeacherId is not None:
+            _validate_teacher_ids(conn, [payload.responsibleTeacherId], "المسؤول عن الإجراء غير موجود.")
+        completed_at = current["completed_at"]
+        if payload.status == "completed" and not completed_at:
+            completed_at = now
+        elif payload.status != "completed":
+            completed_at = None
+        conn.execute(
+            """UPDATE supervision_actions SET title=?, responsible_teacher_id=?, due_date=?, status=?, notes=?, completed_at=?, updated_at=?
+               WHERE id=? AND visit_id=?""",
+            (payload.title.strip(), payload.responsibleTeacherId, due_date, payload.status, payload.notes.strip(), completed_at, now, action_id, visit_id),
+        )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("supervision", f"تحديث إجراء: {payload.title.strip()}", payload.status, "supervision_visit", visit_id, now),
+        )
+        row = conn.execute(
+            """SELECT a.*, t.name AS responsible_name FROM supervision_actions a
+               LEFT JOIN teachers t ON t.id = a.responsible_teacher_id WHERE a.id = ?""",
+            (action_id,),
+        ).fetchone()
+    return _supervision_action_dict(row)
+
+
+@app.delete("/api/supervision/visits/{visit_id}/actions/{action_id}")
+def delete_supervision_action(visit_id: int, action_id: int):
+    now = utc_now()
+    with connect() as conn:
+        row = conn.execute("SELECT title FROM supervision_actions WHERE id = ? AND visit_id = ?", (action_id, visit_id)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="إجراء المتابعة غير موجود ضمن هذه الزيارة.")
+        conn.execute("DELETE FROM supervision_actions WHERE id = ?", (action_id,))
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("supervision", f"حذف إجراء: {row['title']}", "تم الحذف من متابعة الزيارة", "supervision_visit", visit_id, now),
         )
     return {"ok": True}
 

@@ -7,6 +7,7 @@ import { Documents } from './pages/Documents';
 import { Events } from './pages/Events';
 import { MeetingModal, Meetings } from './pages/Meetings';
 import { Planning } from './pages/Planning';
+import { Supervision, SupervisionVisitModal } from './pages/Supervision';
 import { PublicUpload } from './pages/PublicUpload';
 import { Requests } from './pages/Requests';
 import { Teachers } from './pages/Teachers';
@@ -33,6 +34,7 @@ function AdminApp(){
   const [teacherModal,setTeacherModal]=useState(false);
   const [eventModal,setEventModal]=useState(false);
   const [meetingModal,setMeetingModal]=useState(false);
+  const [visitModal,setVisitModal]=useState(false);
   const [resultUrl,setResultUrl]=useState('');
   const [toast,setToast]=useState('');
   const [error,setError]=useState('');
@@ -43,7 +45,7 @@ function AdminApp(){
   useEffect(()=>{if(!toast)return;const timer=setTimeout(()=>setToast(''),2600);return()=>clearTimeout(timer)},[toast]);
 
   async function changeStatus(id:number,status:RequestStatus){try{await updateRequestStatus(id,status);setToast('تم تحديث حالة الطلب');await refresh();}catch(e){setToast(e instanceof Error?e.message:'تعذر تحديث الطلب');}}
-  function action(name:string){setQuick(false);if(name==='request'){setRequestModal(true);return;}if(name==='event'){setEventModal(true);return;}if(name==='meeting'){setMeetingModal(true);return;}setToast('تم تثبيت هذا الإجراء في بنية التطبيق.');}
+  function action(name:string){setQuick(false);if(name==='request'){setRequestModal(true);return;}if(name==='event'){setEventModal(true);return;}if(name==='meeting'){setMeetingModal(true);return;}if(name==='visit'){setVisitModal(true);return;}setToast('تم تثبيت هذا الإجراء في بنية التطبيق.');}
   async function connectDrive(){try{const url=await getDriveAuthUrl();window.location.href=url;}catch(e){setToast(e instanceof Error?e.message:'تعذر بدء ربط Drive');}}
 
   if(!data&&!error) return <Loading/>;
@@ -59,12 +61,13 @@ function AdminApp(){
     {sidebar&&<button className="sidebar-scrim" onClick={()=>setSidebar(false)} aria-label="إغلاق القائمة"/>}
     <main className="main-area">
       <header className="topbar"><button className="icon-button menu-button" onClick={()=>setSidebar(true)}><Icon name="menu"/></button><label className="global-search"><Icon name="search"/><input placeholder="ابحث في أعمال المادة..."/><kbd>⌘ K</kbd></label><div className="top-actions"><span className="term-chip">{data.term}<i>•</i>{data.academicYear}</span><button className="icon-button bell"><Icon name="bell"/><span></span></button><div className="quick-wrap"><button className="primary-button" onClick={()=>setQuick(!quick)}><Icon name="plus"/> إضافة</button>{quick&&<div className="quick-menu"><Quick icon="upload" title="طلب ملف" detail="إنشاء رابط رفع لمعلم" action={()=>action('request')}/><Quick icon="spark" title="توثيق فعالية" detail="أهداف وصور ونتائج" action={()=>action('event')}/><Quick icon="supervision" title="تسجيل زيارة" detail="متابعة فنية" action={()=>action('visit')}/><Quick icon="meeting" title="اجتماع جديد" detail="محاور وقرارات" action={()=>action('meeting')}/></div>}</div></div></header>
-      <section className="workspace">{view==='dashboard'?<Dashboard data={data} onQuickAction={action}/>:view==='teachers'?<Teachers teachers={data.teachers} requests={data.requests} documents={data.documents} onAddTeacher={()=>setTeacherModal(true)} onChanged={refresh}/>:view==='requests'?<Requests requests={data.requests} onNewRequest={()=>setRequestModal(true)} onStatus={changeStatus}/>:view==='planning'?<Planning plans={data.plans} planningAttention={data.planningAttention} teachers={data.teachers} onRefresh={refresh}/>:view==='meetings'?<Meetings meetings={data.meetings} teachers={data.teachers} onAddMeeting={()=>setMeetingModal(true)} onRefresh={refresh}/>:view==='events'?<Events events={data.events} teachers={data.teachers} onAddEvent={()=>setEventModal(true)} onRefresh={refresh}/>:view==='documents'?<Documents documents={data.documents}/>:<Placeholder view={view}/>}</section>
+      <section className="workspace">{view==='dashboard'?<Dashboard data={data} onQuickAction={action}/>:view==='teachers'?<Teachers teachers={data.teachers} requests={data.requests} documents={data.documents} visits={data.visits} onAddTeacher={()=>setTeacherModal(true)} onChanged={refresh}/>:view==='requests'?<Requests requests={data.requests} onNewRequest={()=>setRequestModal(true)} onStatus={changeStatus}/>:view==='planning'?<Planning plans={data.plans} planningAttention={data.planningAttention} teachers={data.teachers} onRefresh={refresh}/>:view==='supervision'?<Supervision visits={data.visits} supervisionAttention={data.supervisionAttention} teachers={data.teachers} onAddVisit={()=>setVisitModal(true)} onRefresh={refresh}/>:view==='meetings'?<Meetings meetings={data.meetings} teachers={data.teachers} onAddMeeting={()=>setMeetingModal(true)} onRefresh={refresh}/>:view==='events'?<Events events={data.events} teachers={data.teachers} onAddEvent={()=>setEventModal(true)} onRefresh={refresh}/>:view==='documents'?<Documents documents={data.documents}/>:<Placeholder view={view}/>}</section>
     </main>
     <RequestModal open={requestModal} teachers={data.teachers} onClose={()=>setRequestModal(false)} onCreated={async(url)=>{setRequestModal(false);setResultUrl(url);await refresh();}}/>
     <TeacherModal open={teacherModal} onClose={()=>setTeacherModal(false)} onCreated={async()=>{setTeacherModal(false);setToast('تمت إضافة المعلم');await refresh();}}/>
     <EventModal open={eventModal} teachers={data.teachers} onClose={()=>setEventModal(false)} onCreated={async()=>{setEventModal(false);setToast('تم توثيق الفعالية');await refresh();}}/>
     <MeetingModal open={meetingModal} teachers={data.teachers} onClose={()=>setMeetingModal(false)} onCreated={async()=>{setMeetingModal(false);setToast('تم إنشاء الاجتماع');await refresh();}}/>
+    <SupervisionVisitModal open={visitModal} teachers={data.teachers} onClose={()=>setVisitModal(false)} onCreated={async()=>{setVisitModal(false);setToast('تم تسجيل الزيارة');await refresh();}}/>
     <Modal open={!!resultUrl} onClose={()=>setResultUrl('')} compact><div className="result-dialog"><span className="success-orb"><Icon name="check" size={26}/></span><span className="eyebrow">تم إنشاء الطلب</span><h2>رابط الرفع جاهز</h2><p>أرسل هذا الرابط للمعلم. يستطيع رفع الملف من الهاتف أو الكمبيوتر دون الدخول إلى لوحة الإدارة.</p><div className="link-box"><code>{resultUrl}</code><button className="icon-button" onClick={async()=>{await navigator.clipboard.writeText(resultUrl);setToast('تم نسخ الرابط')}}><Icon name="copy"/></button></div><button className="primary-button wide" onClick={()=>setResultUrl('')}>تم</button></div></Modal>
     {toast&&<div className="toast">{toast}</div>}
   </div>;
@@ -90,5 +93,5 @@ function EventModal({open,teachers,onClose,onCreated}:{open:boolean;teachers:Boo
 }
 
 function Quick({icon,title,detail,action}:{icon:'upload'|'spark'|'supervision'|'meeting';title:string;detail:string;action:()=>void}){return <button onClick={action}><span><Icon name={icon}/></span><div><strong>{title}</strong><small>{detail}</small></div></button>}
-function Placeholder({view}:{view:View}){const map:Record<string,[string,string,string[]]>={achievement:['التحصيل والنتائج','مسار واضح من النتائج إلى التشخيص والتدخل وقياس الأثر.',['النتائج','التحليل','البرامج العلاجية']],supervision:['الإشراف والمتابعة','خطة زيارات وتوصيات ودعم ومتابعة مرتبطة بملف المعلم.',['الزيارات','الدعم','المتابعة']],reports:['مركز التقارير','تجميع تقارير المادة والفصل والفعاليات وملف الإنجاز في مركز واحد.',['تقرير الفصل','ملف الإنجاز','التسليم والاستلام']],archive:['الأرشيف التاريخي','ذاكرة المادة عبر السنوات بدون خلط الماضي بالحاضر.',['2026/2027','2025/2026','مقارنة الأعوام']]};const item=map[view]||['قريبًا','هذه المساحة ضمن الهيكل الأساسي.',['جاهزة للتوسعة']];return <div className="placeholder"><span className="placeholder-icon"><Icon name="spark" size={30}/></span><span className="eyebrow">ضمن النواة</span><h1>{item[0]}</h1><p>{item[1]}</p><div className="tag-row">{item[2].map(x=><span key={x}>{x}</span>)}</div></div>}
+function Placeholder({view}:{view:View}){const map:Record<string,[string,string,string[]]>={achievement:['التحصيل والنتائج','مسار واضح من النتائج إلى التشخيص والتدخل وقياس الأثر.',['النتائج','التحليل','البرامج العلاجية']],reports:['مركز التقارير','تجميع تقارير المادة والفصل والفعاليات وملف الإنجاز في مركز واحد.',['تقرير الفصل','ملف الإنجاز','التسليم والاستلام']],archive:['الأرشيف التاريخي','ذاكرة المادة عبر السنوات بدون خلط الماضي بالحاضر.',['2026/2027','2025/2026','مقارنة الأعوام']]};const item=map[view]||['قريبًا','هذه المساحة ضمن الهيكل الأساسي.',['جاهزة للتوسعة']];return <div className="placeholder"><span className="placeholder-icon"><Icon name="spark" size={30}/></span><span className="eyebrow">ضمن النواة</span><h1>{item[0]}</h1><p>{item[1]}</p><div className="tag-row">{item[2].map(x=><span key={x}>{x}</span>)}</div></div>}
 function Loading(){return <div className="loading-screen"><span className="brand-mark large">م</span><div className="spinner"></div><p>جاري تجهيز مساحة المادة...</p></div>}

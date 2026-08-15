@@ -346,7 +346,7 @@ class MarsadMigrationTests(unittest.TestCase):
 
         self.assertEqual(
             set(new_tables) - expected_old_names,
-            {"meetings", "meeting_attendees", "meeting_decisions", "curriculum_plans", "curriculum_units"},
+            {"meetings", "meeting_attendees", "meeting_decisions", "curriculum_plans", "curriculum_units", "supervision_visits", "supervision_actions"},
         )
         self.assertTrue({"idx_meetings_date", "idx_meeting_attendees_meeting", "idx_meeting_decisions_meeting", "idx_meeting_decisions_open"}.issubset(new_indexes))
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM meetings").fetchone()[0], 0)
@@ -616,13 +616,133 @@ CREATE INDEX idx_teacher_cv_items_teacher ON teacher_cv_items(teacher_id, item_t
             self.assertEqual(new_indexes[name], sql, f"old index definition changed: {name}")
         for name, rows in old_data.items():
             self.assertEqual(conn.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall(), rows, f"old data changed: {name}")
-        self.assertEqual(set(new_tables) - expected_old_names, {"curriculum_plans", "curriculum_units"})
+        self.assertEqual(set(new_tables) - expected_old_names, {"curriculum_plans", "curriculum_units", "supervision_visits", "supervision_actions"})
         self.assertTrue({"idx_curriculum_plans_scope", "idx_curriculum_units_plan", "idx_curriculum_units_due"}.issubset(new_indexes))
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM curriculum_plans").fetchone()[0], 0)
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM curriculum_units").fetchone()[0], 0)
         self.assertEqual(conn.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertEqual(conn.execute("PRAGMA foreign_key_check").fetchall(), [])
         conn.close()
+
+
+    def test_v06_schema_and_data_survive_v07_supervision_migration_atomically(self):
+        data_dir = Path(tempfile.mkdtemp(prefix="marsad-v06-to-v07-supervision-"))
+        db_path = data_dir / "marsad_alinjazat.sqlite3"
+        repo_root = Path(__file__).resolve().parents[1]
+        env = os.environ.copy()
+        env["APP_DATA_DIR"] = str(data_dir)
+        env["APP_UPLOADS_DIR"] = str(data_dir / "inbox")
+        env["APP_EVENT_UPLOADS_DIR"] = str(data_dir / "events")
+        env["STORAGE_MODE"] = "local"
+
+        # Build the current schema once, then remove only the v0.7-owned objects.
+        # What remains is the exact v0.6 contract that this migration must preserve.
+        subprocess.run(
+            [sys.executable, "-c", "from server.db import init_db; init_db()"],
+            cwd=repo_root, env=env, capture_output=True, text=True, check=True,
+        )
+        conn = sqlite3.connect(db_path)
+        conn.execute("PRAGMA foreign_keys = OFF")
+        conn.execute("DROP TABLE IF EXISTS supervision_actions")
+        conn.execute("DROP TABLE IF EXISTS supervision_visits")
+        conn.execute("PRAGMA foreign_keys = ON")
+
+        now = "2026-08-15T08:00:00+00:00"
+        # Representative v0.6 planning data must survive unchanged.
+        conn.execute(
+            """INSERT INTO curriculum_plans
+               (id,title,subject,grade,term,academic_year,owner_teacher_id,start_date,end_date,notes,status,created_at,updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (901, "خطة v0.6 محفوظة", "الفيزياء", "العاشر", "الفصل الأول", "2026/2027", 1,
+             "2026-08-20", "2026-11-30", "بيانات يجب ألا تتغير", "active", now, now),
+        )
+        conn.execute(
+            """INSERT INTO curriculum_units
+               (id,plan_id,title,sequence,planned_start,planned_end,progress_percent,status,delay_reason,notes,responsible_teacher_id,created_at,updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (902, 901, "وحدة محفوظة", 1, "2026-08-20", "2026-09-10", 35, "in_progress",
+             "سبب محفوظ", "ملاحظة محفوظة", 1, now, now),
+        )
+        conn.commit()
+
+        old_tables = {
+            row[0]: row[1]
+            for row in conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            )
+        }
+        old_indexes = {
+            row[0]: row[1]
+            for row in conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY name"
+            )
+        }
+        expected_v06_tables = {
+            "settings", "teachers", "upload_requests", "documents", "events", "event_media", "activities",
+            "teacher_profiles", "teacher_cv_items", "event_teacher_links", "event_media_meta",
+            "meetings", "meeting_attendees", "meeting_decisions", "curriculum_plans", "curriculum_units",
+        }
+        self.assertEqual(set(old_tables), expected_v06_tables)
+        old_data = {
+            name: conn.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall()
+            for name in sorted(expected_v06_tables)
+        }
+        conn.close()
+
+        code = (
+            "from server.db import init_db; init_db(); "
+            "import sqlite3, os, json; "
+            "db=os.path.join(os.environ['APP_DATA_DIR'],'marsad_alinjazat.sqlite3'); "
+            "c=sqlite3.connect(db); "
+            "print(json.dumps({'integrity':c.execute('pragma integrity_check').fetchone()[0],"
+            "'fk':c.execute('pragma foreign_key_check').fetchall()}))"
+        )
+        completed = subprocess.run(
+            [sys.executable, "-c", code], cwd=repo_root, env=env,
+            capture_output=True, text=True, check=True,
+        )
+        status = json.loads(completed.stdout.strip().splitlines()[-1])
+        self.assertEqual(status["integrity"], "ok")
+        self.assertEqual(status["fk"], [])
+
+        conn = sqlite3.connect(db_path)
+        new_tables = {
+            row[0]: row[1]
+            for row in conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            )
+        }
+        new_indexes = {
+            row[0]: row[1]
+            for row in conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY name"
+            )
+        }
+        for name, sql in old_tables.items():
+            self.assertEqual(new_tables[name], sql, f"v0.6 table definition changed: {name}")
+        for name, sql in old_indexes.items():
+            self.assertEqual(new_indexes[name], sql, f"v0.6 index definition changed: {name}")
+        for name, rows in old_data.items():
+            self.assertEqual(
+                conn.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall(),
+                rows,
+                f"v0.6 data changed: {name}",
+            )
+
+        self.assertEqual(set(new_tables) - expected_v06_tables, {"supervision_visits", "supervision_actions"})
+        expected_new_indexes = {
+            "idx_supervision_visits_scope",
+            "idx_supervision_visits_teacher",
+            "idx_supervision_actions_visit",
+            "idx_supervision_actions_open",
+        }
+        self.assertTrue(expected_new_indexes.issubset(new_indexes))
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM supervision_visits").fetchone()[0], 0)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM supervision_actions").fetchone()[0], 0)
+        self.assertEqual(conn.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+        self.assertEqual(conn.execute("PRAGMA foreign_key_check").fetchall(), [])
+        conn.close()
+
 
 
 if __name__ == "__main__":

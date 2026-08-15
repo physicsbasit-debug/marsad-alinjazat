@@ -271,6 +271,84 @@ export type CurriculumUnitInput = {
   responsibleTeacherId?: number | null;
 };
 
+export type SupervisionVisitStatus = 'planned' | 'completed' | 'needs_followup' | 'closed';
+export type SupervisionVisitEffectiveStatus = SupervisionVisitStatus | 'overdue';
+export type SupervisionActionBaseStatus = 'new' | 'in_progress' | 'completed' | 'cancelled';
+export type SupervisionActionStatus = SupervisionActionBaseStatus | 'overdue';
+
+export type SupervisionVisitRecord = {
+  id: number;
+  teacherId: number;
+  teacherName: string;
+  teacherSubject?: string | null;
+  visitType: string;
+  visitDate: string;
+  periodLabel?: string | null;
+  grade?: string | null;
+  lessonTitle?: string | null;
+  objectives?: string | null;
+  strengths?: string | null;
+  developmentAreas?: string | null;
+  recommendations?: string | null;
+  followupDate?: string | null;
+  followupNotes?: string | null;
+  academicYear: string;
+  status: SupervisionVisitStatus;
+  effectiveStatus: SupervisionVisitEffectiveStatus;
+  actionCount: number;
+  openActionCount: number;
+  completedActionCount: number;
+  overdueActionCount: number;
+  closedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SupervisionAction = {
+  id: number;
+  visitId: number;
+  title: string;
+  responsibleTeacherId?: number | null;
+  responsibleName?: string | null;
+  dueDate?: string | null;
+  status: SupervisionActionStatus;
+  baseStatus: SupervisionActionBaseStatus;
+  notes?: string | null;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SupervisionVisitDetails = SupervisionVisitRecord & {
+  actions: SupervisionAction[];
+  timeline: Activity[];
+  reportReady: boolean;
+};
+
+export type SupervisionVisitInput = {
+  teacherId: number;
+  visitType: string;
+  visitDate: string;
+  periodLabel: string;
+  grade: string;
+  lessonTitle: string;
+  objectives: string;
+  strengths: string;
+  developmentAreas: string;
+  recommendations: string;
+  followupDate?: string | null;
+  followupNotes: string;
+  status: SupervisionVisitStatus;
+};
+
+export type SupervisionActionInput = {
+  title: string;
+  responsibleTeacherId?: number | null;
+  dueDate?: string | null;
+  status: SupervisionActionBaseStatus;
+  notes: string;
+};
+
 export type Activity = {
   id: number;
   activity_type: string;
@@ -302,6 +380,8 @@ export type BootstrapData = {
   decisionAttention: MeetingDecision[];
   plans: CurriculumPlanRecord[];
   planningAttention: CurriculumUnit[];
+  visits: SupervisionVisitRecord[];
+  supervisionAttention: SupervisionVisitRecord[];
   documents: DocumentRecord[];
   activities: Activity[];
   drive: DriveStatus;
@@ -362,6 +442,8 @@ export type TeacherProfileDetails = {
     requestCount: number;
     documentCount: number;
     approvedDocumentCount: number;
+    visitCount: number;
+    openFollowupCount: number;
   };
 };
 

@@ -20,8 +20,12 @@ import type {
   CurriculumPlanDetails,
   CurriculumUnitInput,
   CurriculumUnit,
+  SupervisionVisitInput,
+  SupervisionVisitDetails,
+  SupervisionActionInput,
+  SupervisionAction,
 } from '../types';
-import { getPreviewEventDetails, getPreviewMeetingDetails, getPreviewPlanDetails, getPreviewTeacherProfile, previewBootstrap } from './preview';
+import { getPreviewEventDetails, getPreviewMeetingDetails, getPreviewPlanDetails, getPreviewSupervisionVisit, getPreviewTeacherProfile, previewBootstrap } from './preview';
 
 const PREVIEW_MODE = import.meta.env.VITE_PREVIEW_MODE === 'true';
 const PREVIEW_MESSAGE = 'هذه معاينة GitHub Pages فقط. الحفظ والرفع الفعليان يعملان عند تشغيل خادم مرصد الإنجازات.';
@@ -310,4 +314,58 @@ export async function updateCurriculumUnit(planId: number, unitId: number, input
 export async function deleteCurriculumUnit(planId: number, unitId: number): Promise<void> {
   requireBackend();
   await parseResponse(await fetch(`/api/plans/${planId}/units/${unitId}`, { method: 'DELETE' }));
+}
+
+export async function createSupervisionVisit(input: SupervisionVisitInput): Promise<{ id: number }> {
+  requireBackend();
+  return parseResponse(
+    await fetch('/api/supervision/visits', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function getSupervisionVisit(id: number): Promise<SupervisionVisitDetails> {
+  if (PREVIEW_MODE) return getPreviewSupervisionVisit(id);
+  return parseResponse(await fetch(`/api/supervision/visits/${id}`));
+}
+
+export async function updateSupervisionVisit(id: number, input: SupervisionVisitInput): Promise<SupervisionVisitDetails> {
+  requireBackend();
+  return parseResponse(
+    await fetch(`/api/supervision/visits/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function createSupervisionAction(visitId: number, input: SupervisionActionInput): Promise<SupervisionAction> {
+  requireBackend();
+  return parseResponse(
+    await fetch(`/api/supervision/visits/${visitId}/actions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function updateSupervisionAction(visitId: number, actionId: number, input: SupervisionActionInput): Promise<SupervisionAction> {
+  requireBackend();
+  return parseResponse(
+    await fetch(`/api/supervision/visits/${visitId}/actions/${actionId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function deleteSupervisionAction(visitId: number, actionId: number): Promise<void> {
+  requireBackend();
+  await parseResponse(await fetch(`/api/supervision/visits/${visitId}/actions/${actionId}`, { method: 'DELETE' }));
 }

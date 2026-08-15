@@ -28,6 +28,8 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         self.assertEqual(boot.status_code, 200)
         self.assertGreaterEqual(len(boot.json()["teachers"]), 6)
         self.assertIn("dashboard", boot.json())
+        self.assertIn("visits", boot.json())
+        self.assertIn("supervisionAttention", boot.json())
 
     def test_create_teacher_and_event(self):
         teacher = self.client.post("/api/teachers", json={
@@ -493,6 +495,210 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         })
         self.assertEqual(invalid_unit_teacher.status_code, 422)
         self.assertEqual(self.client.delete(f"/api/plans/{plan_id}/units/999999").status_code, 404)
+
+
+    def test_supervision_visit_lifecycle_dashboard_and_teacher_profile(self):
+        oman_today = datetime.now(timezone(timedelta(hours=4))).date()
+        yesterday = (oman_today - timedelta(days=1)).isoformat()
+        tomorrow = (oman_today + timedelta(days=1)).isoformat()
+        later = (oman_today + timedelta(days=5)).isoformat()
+
+        profile_before = self.client.get("/api/teachers/1/profile").json()["stats"]
+        created = self.client.post("/api/supervision/visits", json={
+            "teacherId": 1,
+            "visitType": "زيارة تطويرية",
+            "visitDate": tomorrow,
+            "periodLabel": "الحصة الثالثة",
+            "grade": "العاشر",
+            "lessonTitle": "القوى والحركة",
+            "objectives": "متابعة تفعيل التعلم النشط.",
+            "strengths": "",
+            "developmentAreas": "",
+            "recommendations": "",
+            "followupDate": later,
+            "followupNotes": "",
+            "status": "planned",
+        })
+        self.assertEqual(created.status_code, 201)
+        visit_id = created.json()["id"]
+
+        planned = self.client.get(f"/api/supervision/visits/{visit_id}")
+        self.assertEqual(planned.status_code, 200)
+        self.assertEqual(planned.json()["effectiveStatus"], "planned")
+        self.assertFalse(planned.json()["reportReady"])
+
+        boot_planned = self.client.get("/api/bootstrap").json()
+        self.assertTrue(any(item["id"] == visit_id for item in boot_planned["visits"]))
+        self.assertGreaterEqual(boot_planned["dashboard"]["upcomingVisits"], 1)
+
+        followup = self.client.patch(f"/api/supervision/visits/{visit_id}", json={
+            "teacherId": 1,
+            "visitType": "زيارة تطويرية",
+            "visitDate": yesterday,
+            "periodLabel": "الحصة الثالثة",
+            "grade": "العاشر",
+            "lessonTitle": "القوى والحركة",
+            "objectives": "متابعة تفعيل التعلم النشط.",
+            "strengths": "وضوح الهدف وتنوع الأسئلة الصفية.",
+            "developmentAreas": "زيادة زمن تعلم الطلبة التعاوني.",
+            "recommendations": "تنفيذ مهمة تعلم ثنائية مع تقويم ختامي قصير.",
+            "followupDate": yesterday,
+            "followupNotes": "تحتاج متابعة أثر التوصية.",
+            "status": "needs_followup",
+        })
+        self.assertEqual(followup.status_code, 200)
+        self.assertEqual(followup.json()["effectiveStatus"], "overdue")
+        self.assertTrue(followup.json()["reportReady"])
+
+        overdue_action = self.client.post(f"/api/supervision/visits/{visit_id}/actions", json={
+            "title": "تنفيذ نشاط تعلم ثنائي",
+            "responsibleTeacherId": 1,
+            "dueDate": yesterday,
+            "status": "in_progress",
+            "notes": "يراجع أثره في الزيارة القادمة.",
+        })
+        self.assertEqual(overdue_action.status_code, 201)
+        self.assertEqual(overdue_action.json()["status"], "overdue")
+        self.assertEqual(overdue_action.json()["baseStatus"], "in_progress")
+        action_id = overdue_action.json()["id"]
+
+        completed_action = self.client.post(f"/api/supervision/visits/{visit_id}/actions", json={
+            "title": "إعداد سؤال خروج قصير",
+            "responsibleTeacherId": 1,
+            "dueDate": yesterday,
+            "status": "completed",
+            "notes": "تم التنفيذ.",
+        })
+        self.assertEqual(completed_action.status_code, 201)
+        self.assertEqual(completed_action.json()["status"], "completed")
+        self.assertIsNotNone(completed_action.json()["completedAt"])
+
+        detail = self.client.get(f"/api/supervision/visits/{visit_id}").json()
+        self.assertEqual(detail["openActionCount"], 1)
+        self.assertEqual(detail["completedActionCount"], 1)
+        self.assertEqual(detail["overdueActionCount"], 1)
+        self.assertEqual(len(detail["actions"]), 2)
+        self.assertTrue(any("إجراء متابعة" in item["title"] for item in detail["timeline"]))
+
+        boot_followup = self.client.get("/api/bootstrap").json()
+        self.assertTrue(any(item["id"] == visit_id for item in boot_followup["supervisionAttention"]))
+        self.assertGreaterEqual(boot_followup["dashboard"]["visitProgress"], 0)
+
+        profile_after = self.client.get("/api/teachers/1/profile").json()["stats"]
+        self.assertEqual(profile_after["visitCount"], profile_before["visitCount"] + 1)
+        self.assertEqual(profile_after["openFollowupCount"], profile_before["openFollowupCount"] + 1)
+
+        action_done = self.client.patch(f"/api/supervision/visits/{visit_id}/actions/{action_id}", json={
+            "title": "تنفيذ نشاط تعلم ثنائي",
+            "responsibleTeacherId": 1,
+            "dueDate": yesterday,
+            "status": "completed",
+            "notes": "تم التنفيذ والتحقق.",
+        })
+        self.assertEqual(action_done.status_code, 200)
+        self.assertEqual(action_done.json()["status"], "completed")
+
+        closed = self.client.patch(f"/api/supervision/visits/{visit_id}", json={
+            "teacherId": 1,
+            "visitType": "زيارة متابعة",
+            "visitDate": yesterday,
+            "periodLabel": "الحصة الثالثة",
+            "grade": "العاشر",
+            "lessonTitle": "القوى والحركة",
+            "objectives": "التحقق من أثر التوصية.",
+            "strengths": "تحسن تفاعل الطلبة.",
+            "developmentAreas": "استمرار الممارسة.",
+            "recommendations": "استمرار الاستراتيجية.",
+            "followupDate": tomorrow,
+            "followupNotes": "أغلقت المتابعة بعد تحقق الأثر.",
+            "status": "closed",
+        })
+        self.assertEqual(closed.status_code, 200)
+        self.assertEqual(closed.json()["status"], "closed")
+        self.assertIsNotNone(closed.json()["closedAt"])
+
+        profile_closed = self.client.get("/api/teachers/1/profile").json()["stats"]
+        self.assertEqual(profile_closed["openFollowupCount"], profile_before["openFollowupCount"])
+        boot_closed = self.client.get("/api/bootstrap").json()
+        self.assertFalse(any(item["id"] == visit_id for item in boot_closed["supervisionAttention"]))
+
+
+    def test_supervision_overdue_action_promotes_visit_to_attention(self):
+        oman_today = datetime.now(timezone(timedelta(hours=4))).date()
+        yesterday = (oman_today - timedelta(days=1)).isoformat()
+        today = oman_today.isoformat()
+        created = self.client.post("/api/supervision/visits", json={
+            "teacherId": 2, "visitType": "زيارة تطويرية", "visitDate": today,
+            "periodLabel": "الحصة الثانية", "grade": "العاشر", "lessonTitle": "تفاعل كيميائي",
+            "objectives": "متابعة التفاعل الصفي.", "strengths": "تنظيم جيد.",
+            "developmentAreas": "زيادة مشاركة الطلبة.", "recommendations": "تنفيذ مهمة متابعة.",
+            "followupDate": None, "followupNotes": "", "status": "completed",
+        })
+        self.assertEqual(created.status_code, 201)
+        visit_id = created.json()["id"]
+
+        action = self.client.post(f"/api/supervision/visits/{visit_id}/actions", json={
+            "title": "تنفيذ مهمة متابعة قصيرة", "responsibleTeacherId": 2,
+            "dueDate": yesterday, "status": "in_progress", "notes": "",
+        })
+        self.assertEqual(action.status_code, 201)
+        self.assertEqual(action.json()["status"], "overdue")
+
+        detail = self.client.get(f"/api/supervision/visits/{visit_id}").json()
+        self.assertEqual(detail["status"], "completed")
+        self.assertEqual(detail["effectiveStatus"], "overdue")
+        self.assertEqual(detail["overdueActionCount"], 1)
+        boot = self.client.get("/api/bootstrap").json()
+        self.assertTrue(any(item["id"] == visit_id for item in boot["supervisionAttention"]))
+
+    def test_supervision_validation_and_not_found_guards(self):
+        oman_today = datetime.now(timezone(timedelta(hours=4))).date()
+        today = oman_today.isoformat()
+        yesterday = (oman_today - timedelta(days=1)).isoformat()
+
+        missing_teacher = self.client.post("/api/supervision/visits", json={
+            "teacherId": 999999, "visitType": "زيارة صفية", "visitDate": today,
+            "periodLabel": "", "grade": "العاشر", "lessonTitle": "", "objectives": "",
+            "strengths": "", "developmentAreas": "", "recommendations": "",
+            "followupDate": None, "followupNotes": "", "status": "planned",
+        })
+        self.assertEqual(missing_teacher.status_code, 422)
+
+        invalid_followup = self.client.post("/api/supervision/visits", json={
+            "teacherId": 1, "visitType": "زيارة صفية", "visitDate": today,
+            "periodLabel": "", "grade": "العاشر", "lessonTitle": "", "objectives": "",
+            "strengths": "", "developmentAreas": "", "recommendations": "",
+            "followupDate": yesterday, "followupNotes": "", "status": "planned",
+        })
+        self.assertEqual(invalid_followup.status_code, 422)
+        self.assertEqual(self.client.get("/api/supervision/visits/999999").status_code, 404)
+
+        visit = self.client.post("/api/supervision/visits", json={
+            "teacherId": 1, "visitType": "زيارة صفية", "visitDate": today,
+            "periodLabel": "", "grade": "العاشر", "lessonTitle": "", "objectives": "",
+            "strengths": "", "developmentAreas": "", "recommendations": "",
+            "followupDate": None, "followupNotes": "", "status": "planned",
+        })
+        self.assertEqual(visit.status_code, 201)
+        visit_id = visit.json()["id"]
+
+        bad_responsible = self.client.post(f"/api/supervision/visits/{visit_id}/actions", json={
+            "title": "إجراء بمسؤول مفقود", "responsibleTeacherId": 999999,
+            "dueDate": today, "status": "new", "notes": "",
+        })
+        self.assertEqual(bad_responsible.status_code, 422)
+        missing_visit_action = self.client.post("/api/supervision/visits/999999/actions", json={
+            "title": "إجراء لزيارة مفقودة", "responsibleTeacherId": None,
+            "dueDate": today, "status": "new", "notes": "",
+        })
+        self.assertEqual(missing_visit_action.status_code, 404)
+        self.assertEqual(self.client.delete(f"/api/supervision/visits/{visit_id}/actions/999999").status_code, 404)
+        self.assertEqual(self.client.patch("/api/supervision/visits/999999", json={
+            "teacherId": 1, "visitType": "زيارة صفية", "visitDate": today,
+            "periodLabel": "", "grade": "", "lessonTitle": "", "objectives": "",
+            "strengths": "", "developmentAreas": "", "recommendations": "",
+            "followupDate": None, "followupNotes": "", "status": "planned",
+        }).status_code, 404)
 
     def test_invalid_extension_is_rejected(self):
         created = self.client.post("/api/requests", json={
