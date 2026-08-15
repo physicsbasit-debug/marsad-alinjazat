@@ -141,6 +141,64 @@ export type PublicUploadInfo = {
 };
 
 
+
+export type TeacherCvItemType = 'qualification' | 'course' | 'achievement' | 'experience';
+
+export type TeacherCvItem = {
+  id: number;
+  teacherId: number;
+  itemType: TeacherCvItemType;
+  title: string;
+  organization?: string | null;
+  startYear?: number | null;
+  endYear?: number | null;
+  description?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TeacherProfileDetails = {
+  teacher: Teacher;
+  profile: {
+    employeeNumber?: string | null;
+    schoolJoinYear?: number | null;
+    grades?: string | null;
+    responsibilities?: string | null;
+    professionalSummary?: string | null;
+  };
+  cvItems: TeacherCvItem[];
+  stats: {
+    requestCount: number;
+    documentCount: number;
+    approvedDocumentCount: number;
+  };
+};
+
+export type UpdateTeacherProfileInput = {
+  name: string;
+  subject: string;
+  specialization: string;
+  qualification: string;
+  experienceYears: number;
+  workload: number;
+  email: string;
+  phone: string;
+  employeeNumber: string;
+  schoolJoinYear?: number | null;
+  grades: string;
+  responsibilities: string;
+  professionalSummary: string;
+};
+
+export type CreateTeacherCvItemInput = {
+  itemType: TeacherCvItemType;
+  title: string;
+  organization: string;
+  startYear?: number | null;
+  endYear?: number | null;
+  description: string;
+};
+
 export type CreateTeacherInput = {
   name: string;
   subject: string;

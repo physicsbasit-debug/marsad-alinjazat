@@ -5,8 +5,11 @@ import type {
   CreateTeacherInput,
   PublicUploadInfo,
   RequestStatus,
+  CreateTeacherCvItemInput,
+  TeacherProfileDetails,
+  UpdateTeacherProfileInput,
 } from '../types';
-import { previewBootstrap } from './preview';
+import { getPreviewTeacherProfile, previewBootstrap } from './preview';
 
 const PREVIEW_MODE = import.meta.env.VITE_PREVIEW_MODE === 'true';
 const PREVIEW_MESSAGE = 'هذه معاينة GitHub Pages فقط. الحفظ والرفع الفعليان يعملان عند تشغيل خادم مرصد الإنجازات.';
@@ -96,5 +99,40 @@ export async function createEvent(input: CreateEventInput): Promise<{ id: number
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     }),
+  );
+}
+
+
+export async function getTeacherProfile(id: number): Promise<TeacherProfileDetails> {
+  if (PREVIEW_MODE) return getPreviewTeacherProfile(id);
+  return parseResponse(await fetch(`/api/teachers/${id}/profile`));
+}
+
+export async function updateTeacherProfile(id: number, input: UpdateTeacherProfileInput): Promise<void> {
+  requireBackend();
+  await parseResponse(
+    await fetch(`/api/teachers/${id}/profile`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function createTeacherCvItem(id: number, input: CreateTeacherCvItemInput): Promise<{ id: number }> {
+  requireBackend();
+  return parseResponse(
+    await fetch(`/api/teachers/${id}/cv-items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function deleteTeacherCvItem(teacherId: number, itemId: number): Promise<void> {
+  requireBackend();
+  await parseResponse(
+    await fetch(`/api/teachers/${teacherId}/cv-items/${itemId}`, { method: 'DELETE' }),
   );
 }

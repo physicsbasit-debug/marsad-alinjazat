@@ -142,9 +142,33 @@ def init_db() -> None:
                 created_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS teacher_profiles (
+                teacher_id INTEGER PRIMARY KEY REFERENCES teachers(id) ON DELETE CASCADE,
+                employee_number TEXT,
+                school_join_year INTEGER CHECK (school_join_year IS NULL OR school_join_year BETWEEN 1950 AND 2100),
+                grades TEXT,
+                responsibilities TEXT,
+                professional_summary TEXT,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS teacher_cv_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                teacher_id INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+                item_type TEXT NOT NULL CHECK (item_type IN ('qualification', 'course', 'achievement', 'experience')),
+                title TEXT NOT NULL,
+                organization TEXT,
+                start_year INTEGER CHECK (start_year IS NULL OR start_year BETWEEN 1950 AND 2100),
+                end_year INTEGER CHECK (end_year IS NULL OR end_year BETWEEN 1950 AND 2100),
+                description TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_requests_status ON upload_requests(status);
             CREATE INDEX IF NOT EXISTS idx_documents_request ON documents(request_id);
             CREATE INDEX IF NOT EXISTS idx_activities_created ON activities(created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_teacher_cv_items_teacher ON teacher_cv_items(teacher_id, item_type);
             """
         )
         _seed(conn)

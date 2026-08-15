@@ -90,6 +90,85 @@ class ScienceLeadHubApiTests(unittest.TestCase):
         request2 = next(item for item in boot2["requests"] if item["id"] == payload["id"])
         self.assertEqual(request2["status"], "approved")
 
+    def test_teacher_profile_and_cv_items_flow(self):
+        profile = self.client.get("/api/teachers/1/profile")
+        self.assertEqual(profile.status_code, 200)
+        self.assertEqual(profile.json()["teacher"]["id"], 1)
+        self.assertIn("stats", profile.json())
+
+        updated = self.client.patch("/api/teachers/1/profile", json={
+            "name": "أحمد السالمي",
+            "subject": "الفيزياء",
+            "specialization": "فيزياء",
+            "qualification": "بكالوريوس تربية",
+            "experienceYears": 12,
+            "workload": 18,
+            "email": "ahmed@example.edu",
+            "phone": "99112233",
+            "employeeNumber": "SCI-001",
+            "schoolJoinYear": 2018,
+            "grades": "العاشر",
+            "responsibilities": "تنسيق الفيزياء ومتابعة الاختبارات.",
+            "professionalSummary": "معلم فيزياء يركز على جودة التعلم وتحسين التحصيل."
+        })
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json()["profile"]["employeeNumber"], "SCI-001")
+        self.assertEqual(updated.json()["profile"]["schoolJoinYear"], 2018)
+
+        item = self.client.post("/api/teachers/1/cv-items", json={
+            "itemType": "course",
+            "title": "التقويم من أجل التعلم",
+            "organization": "برنامج تطوير مهني",
+            "startYear": 2025,
+            "endYear": 2025,
+            "description": "برنامج تدريبي تطبيقي."
+        })
+        self.assertEqual(item.status_code, 201)
+        item_id = item.json()["id"]
+
+        profile_after = self.client.get("/api/teachers/1/profile")
+        self.assertEqual(profile_after.status_code, 200)
+        self.assertTrue(any(row["id"] == item_id and row["itemType"] == "course" for row in profile_after.json()["cvItems"]))
+
+        invalid_years = self.client.post("/api/teachers/1/cv-items", json={
+            "itemType": "experience",
+            "title": "خبرة غير صالحة",
+            "organization": "جهة",
+            "startYear": 2026,
+            "endYear": 2025,
+            "description": ""
+        })
+        self.assertEqual(invalid_years.status_code, 422)
+
+        removed = self.client.delete(f"/api/teachers/1/cv-items/{item_id}")
+        self.assertEqual(removed.status_code, 200)
+        profile_final = self.client.get("/api/teachers/1/profile").json()
+        self.assertFalse(any(row["id"] == item_id for row in profile_final["cvItems"]))
+
+    def test_teacher_profile_not_found_and_year_validation(self):
+        missing = self.client.get("/api/teachers/999999/profile")
+        self.assertEqual(missing.status_code, 404)
+
+        bad_year = self.client.patch("/api/teachers/1/profile", json={
+            "name": "أحمد السالمي",
+            "subject": "الفيزياء",
+            "specialization": "فيزياء",
+            "qualification": "بكالوريوس تربية",
+            "experienceYears": 12,
+            "workload": 18,
+            "email": "ahmed@example.edu",
+            "phone": "",
+            "employeeNumber": "",
+            "schoolJoinYear": 1800,
+            "grades": "العاشر",
+            "responsibilities": "",
+            "professionalSummary": ""
+        })
+        self.assertEqual(bad_year.status_code, 422)
+
+        wrong_owner = self.client.delete("/api/teachers/2/cv-items/999999")
+        self.assertEqual(wrong_owner.status_code, 404)
+
     def test_invalid_extension_is_rejected(self):
         created = self.client.post("/api/requests", json={
             "teacherId": 1,

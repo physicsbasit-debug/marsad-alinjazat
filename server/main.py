@@ -31,7 +31,7 @@ MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 UPLOADS_DIR = Path(os.getenv("APP_UPLOADS_DIR", BASE_DIR / "uploads" / "inbox"))
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="مرصد الإنجازات API", version="0.2.0")
+app = FastAPI(title="مرصد الإنجازات API", version="0.3.0")
 
 
 class CreateRequestPayload(BaseModel):
@@ -60,6 +60,23 @@ class TeacherPayload(BaseModel):
     phone: str = Field(default="", max_length=40)
 
 
+class TeacherProfilePayload(TeacherPayload):
+    employeeNumber: str = Field(default="", max_length=80)
+    schoolJoinYear: int | None = Field(default=None, ge=1950, le=2100)
+    grades: str = Field(default="", max_length=220)
+    responsibilities: str = Field(default="", max_length=2000)
+    professionalSummary: str = Field(default="", max_length=2500)
+
+
+class TeacherCvItemPayload(BaseModel):
+    itemType: Literal["qualification", "course", "achievement", "experience"]
+    title: str = Field(min_length=2, max_length=220)
+    organization: str = Field(default="", max_length=220)
+    startYear: int | None = Field(default=None, ge=1950, le=2100)
+    endYear: int | None = Field(default=None, ge=1950, le=2100)
+    description: str = Field(default="", max_length=2000)
+
+
 class EventPayload(BaseModel):
     title: str = Field(min_length=3, max_length=180)
     eventType: str = Field(min_length=2, max_length=80)
@@ -78,6 +95,93 @@ def _teacher_dict(row):
     item["experienceYears"] = item.pop("experience_years")
     item["cvCompletion"] = item.pop("cv_completion")
     return item
+
+
+def _cv_item_dict(row):
+    item = dict(row)
+    for source, target in [
+        ("teacher_id", "teacherId"),
+        ("item_type", "itemType"),
+        ("start_year", "startYear"),
+        ("end_year", "endYear"),
+        ("created_at", "createdAt"),
+        ("updated_at", "updatedAt"),
+    ]:
+        item[target] = item.pop(source)
+    return item
+
+
+def _profile_dict(row):
+    if row is None:
+        return {
+            "employeeNumber": "",
+            "schoolJoinYear": None,
+            "grades": "",
+            "responsibilities": "",
+            "professionalSummary": "",
+        }
+    item = dict(row)
+    item.pop("teacher_id", None)
+    item.pop("updated_at", None)
+    return {
+        "employeeNumber": item.get("employee_number") or "",
+        "schoolJoinYear": item.get("school_join_year"),
+        "grades": item.get("grades") or "",
+        "responsibilities": item.get("responsibilities") or "",
+        "professionalSummary": item.get("professional_summary") or "",
+    }
+
+
+def _teacher_profile_details(conn, teacher_id: int):
+    teacher_row = conn.execute("SELECT * FROM teachers WHERE id = ?", (teacher_id,)).fetchone()
+    if not teacher_row:
+        raise HTTPException(status_code=404, detail="المعلم غير موجود.")
+    profile_row = conn.execute("SELECT * FROM teacher_profiles WHERE teacher_id = ?", (teacher_id,)).fetchone()
+    cv_items = [
+        _cv_item_dict(row)
+        for row in conn.execute(
+            "SELECT * FROM teacher_cv_items WHERE teacher_id = ? ORDER BY COALESCE(end_year, start_year, 0) DESC, id DESC",
+            (teacher_id,),
+        ).fetchall()
+    ]
+    request_count = conn.execute("SELECT COUNT(*) FROM upload_requests WHERE teacher_id = ?", (teacher_id,)).fetchone()[0]
+    document_count = conn.execute("SELECT COUNT(*) FROM documents WHERE teacher_id = ?", (teacher_id,)).fetchone()[0]
+    approved_document_count = conn.execute(
+        "SELECT COUNT(*) FROM documents WHERE teacher_id = ? AND status = 'approved'",
+        (teacher_id,),
+    ).fetchone()[0]
+    return {
+        "teacher": _teacher_dict(teacher_row),
+        "profile": _profile_dict(profile_row),
+        "cvItems": cv_items,
+        "stats": {
+            "requestCount": request_count,
+            "documentCount": document_count,
+            "approvedDocumentCount": approved_document_count,
+        },
+    }
+
+
+def _raise_cv_completion_floor(conn, teacher_id: int) -> None:
+    teacher = conn.execute("SELECT * FROM teachers WHERE id = ?", (teacher_id,)).fetchone()
+    if not teacher:
+        return
+    profile = conn.execute("SELECT * FROM teacher_profiles WHERE teacher_id = ?", (teacher_id,)).fetchone()
+    item_count = conn.execute("SELECT COUNT(*) FROM teacher_cv_items WHERE teacher_id = ?", (teacher_id,)).fetchone()[0]
+    score = 20
+    score += 10 if (teacher["specialization"] or "").strip() else 0
+    score += 15 if (teacher["qualification"] or "").strip() else 0
+    score += 10 if (teacher["email"] or "").strip() else 0
+    score += 5 if (teacher["phone"] or "").strip() else 0
+    if profile:
+        score += 10 if (profile["professional_summary"] or "").strip() else 0
+        score += 10 if (profile["responsibilities"] or "").strip() else 0
+        score += 5 if (profile["grades"] or "").strip() else 0
+        score += 5 if (profile["employee_number"] or "").strip() else 0
+    score += 10 if item_count else 0
+    score = min(100, score)
+    if score > teacher["cv_completion"]:
+        conn.execute("UPDATE teachers SET cv_completion = ?, updated_at = ? WHERE id = ?", (score, utc_now(), teacher_id))
 
 
 def _request_dict(row, include_token: bool = False):
@@ -168,7 +272,7 @@ def _safe_filename(name: str) -> str:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "0.2.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
+    return {"ok": True, "version": "0.3.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
 
 
 @app.get("/api/bootstrap")
@@ -222,6 +326,93 @@ def create_teacher(payload: TeacherPayload):
             ("teacher", f"إضافة {payload.name}", payload.subject, "teacher", cursor.lastrowid, now),
         )
     return {"id": cursor.lastrowid}
+
+
+@app.get("/api/teachers/{teacher_id}/profile")
+def get_teacher_profile(teacher_id: int):
+    with connect() as conn:
+        return _teacher_profile_details(conn, teacher_id)
+
+
+@app.patch("/api/teachers/{teacher_id}/profile")
+def update_teacher_profile(teacher_id: int, payload: TeacherProfilePayload):
+    now = utc_now()
+    with connect() as conn:
+        current = conn.execute("SELECT id FROM teachers WHERE id = ?", (teacher_id,)).fetchone()
+        if not current:
+            raise HTTPException(status_code=404, detail="المعلم غير موجود.")
+        conn.execute(
+            """UPDATE teachers
+               SET name = ?, subject = ?, specialization = ?, qualification = ?, experience_years = ?, workload = ?, email = ?, phone = ?, updated_at = ?
+               WHERE id = ?""",
+            (
+                payload.name, payload.subject, payload.specialization, payload.qualification,
+                payload.experienceYears, payload.workload, payload.email, payload.phone, now, teacher_id,
+            ),
+        )
+        conn.execute(
+            """INSERT INTO teacher_profiles
+               (teacher_id, employee_number, school_join_year, grades, responsibilities, professional_summary, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(teacher_id) DO UPDATE SET
+                 employee_number = excluded.employee_number,
+                 school_join_year = excluded.school_join_year,
+                 grades = excluded.grades,
+                 responsibilities = excluded.responsibilities,
+                 professional_summary = excluded.professional_summary,
+                 updated_at = excluded.updated_at""",
+            (
+                teacher_id, payload.employeeNumber, payload.schoolJoinYear, payload.grades,
+                payload.responsibilities, payload.professionalSummary, now,
+            ),
+        )
+        _raise_cv_completion_floor(conn, teacher_id)
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("teacher", f"تحديث الملف المهني: {payload.name}", payload.subject, "teacher", teacher_id, now),
+        )
+        return _teacher_profile_details(conn, teacher_id)
+
+
+@app.post("/api/teachers/{teacher_id}/cv-items", status_code=201)
+def create_teacher_cv_item(teacher_id: int, payload: TeacherCvItemPayload):
+    if payload.startYear and payload.endYear and payload.endYear < payload.startYear:
+        raise HTTPException(status_code=422, detail="سنة النهاية لا يمكن أن تسبق سنة البداية.")
+    now = utc_now()
+    with connect() as conn:
+        teacher = conn.execute("SELECT id, name FROM teachers WHERE id = ?", (teacher_id,)).fetchone()
+        if not teacher:
+            raise HTTPException(status_code=404, detail="المعلم غير موجود.")
+        cursor = conn.execute(
+            """INSERT INTO teacher_cv_items
+               (teacher_id, item_type, title, organization, start_year, end_year, description, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (teacher_id, payload.itemType, payload.title, payload.organization, payload.startYear, payload.endYear, payload.description, now, now),
+        )
+        _raise_cv_completion_floor(conn, teacher_id)
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("teacher", f"إضافة بند إلى سيرة {teacher['name']}", payload.title, "teacher_cv_item", cursor.lastrowid, now),
+        )
+    return {"id": cursor.lastrowid}
+
+
+@app.delete("/api/teachers/{teacher_id}/cv-items/{item_id}")
+def delete_teacher_cv_item(teacher_id: int, item_id: int):
+    now = utc_now()
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT id, title FROM teacher_cv_items WHERE id = ? AND teacher_id = ?",
+            (item_id, teacher_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="بند السيرة غير موجود.")
+        conn.execute("DELETE FROM teacher_cv_items WHERE id = ?", (item_id,))
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("teacher", "حذف بند من السيرة المهنية", row["title"], "teacher", teacher_id, now),
+        )
+    return {"ok": True}
 
 
 @app.post("/api/events", status_code=201)

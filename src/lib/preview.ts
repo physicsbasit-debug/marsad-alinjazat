@@ -1,4 +1,4 @@
-import type { BootstrapData } from '../types';
+import type { BootstrapData, TeacherCvItem, TeacherProfileDetails } from '../types';
 
 export const previewBootstrap: BootstrapData = {
   academicYear: '2026/2027',
@@ -50,3 +50,37 @@ export const previewBootstrap: BootstrapData = {
     storageMode: 'local',
   },
 };
+
+
+const previewCvItems: Record<number, TeacherCvItem[]> = {
+  1: [
+    { id: 101, teacherId: 1, itemType: 'qualification', title: 'بكالوريوس تربية في الفيزياء', organization: 'جامعة السلطان قابوس', startYear: 2009, endYear: 2013, description: 'تخصص فيزياء وتربية علمية.', createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
+    { id: 102, teacherId: 1, itemType: 'course', title: 'التقويم من أجل التعلم', organization: 'برنامج تطوير مهني', startYear: 2025, endYear: 2025, description: 'تطبيق استراتيجيات التقويم التكويني وبناء التغذية الراجعة.', createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
+    { id: 103, teacherId: 1, itemType: 'achievement', title: 'قيادة مبادرة تحسين التحصيل', organization: 'قسم العلوم', startYear: 2026, endYear: 2026, description: 'تنسيق تدخل تربوي مبني على تحليل النتائج ومتابعة الأثر.', createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
+  ],
+  2: [
+    { id: 201, teacherId: 2, itemType: 'course', title: 'استراتيجيات تدريس العلوم', organization: 'تدريب مهني', startYear: 2025, endYear: 2025, description: 'ممارسات صفية نشطة في تدريس الكيمياء.', createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
+  ],
+};
+
+export function getPreviewTeacherProfile(teacherId: number): TeacherProfileDetails {
+  const teacher = previewBootstrap.teachers.find((item) => item.id === teacherId);
+  if (!teacher) throw new Error('المعلم غير موجود في بيانات المعاينة.');
+  const cvItems = previewCvItems[teacherId] || [];
+  return {
+    teacher,
+    profile: {
+      employeeNumber: teacherId === 1 ? 'SCI-001' : '',
+      schoolJoinYear: teacherId === 1 ? 2018 : null,
+      grades: teacher.subject === 'العلوم' ? 'الثامن، التاسع' : 'العاشر',
+      responsibilities: teacherId === 1 ? 'تنسيق الفيزياء، متابعة الاختبارات الموحدة، دعم أعضاء القسم.' : '',
+      professionalSummary: `معلم ${teacher.subject} بخبرة ${teacher.experienceYears} سنوات، يركز على جودة التعلم والتقويم وتحسين الممارسات الصفية.`,
+    },
+    cvItems,
+    stats: {
+      requestCount: previewBootstrap.requests.filter((item) => item.teacherId === teacherId).length,
+      documentCount: previewBootstrap.documents.filter((item) => item.teacherId === teacherId).length,
+      approvedDocumentCount: previewBootstrap.documents.filter((item) => item.teacherId === teacherId && item.status === 'approved').length,
+    },
+  };
+}
