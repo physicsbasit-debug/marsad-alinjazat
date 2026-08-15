@@ -33,7 +33,7 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 EVENT_UPLOADS_DIR = Path(os.getenv("APP_EVENT_UPLOADS_DIR", BASE_DIR / "uploads" / "events"))
 EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="مرصد الإنجازات API", version="0.5.0")
+app = FastAPI(title="مرصد الإنجازات API", version="0.6.0")
 
 
 class CreateRequestPayload(BaseModel):
@@ -123,6 +123,30 @@ class MeetingDecisionPayload(BaseModel):
     dueDate: str | None = None
     status: Literal["new", "in_progress", "completed", "cancelled"] = "new"
     notes: str = Field(default="", max_length=2000)
+
+
+class CurriculumPlanPayload(BaseModel):
+    title: str = Field(min_length=3, max_length=180)
+    subject: str = Field(min_length=2, max_length=80)
+    grade: str = Field(min_length=1, max_length=40)
+    term: str = Field(min_length=2, max_length=80)
+    ownerTeacherId: int | None = None
+    startDate: str | None = None
+    endDate: str | None = None
+    notes: str = Field(default="", max_length=3000)
+    status: Literal["active", "completed", "archived"] = "active"
+
+
+class CurriculumUnitPayload(BaseModel):
+    title: str = Field(min_length=2, max_length=220)
+    sequence: int = Field(default=0, ge=0, le=1000)
+    plannedStart: str | None = None
+    plannedEnd: str | None = None
+    progressPercent: int = Field(default=0, ge=0, le=100)
+    status: Literal["not_started", "in_progress", "completed"] = "not_started"
+    delayReason: str = Field(default="", max_length=1500)
+    notes: str = Field(default="", max_length=2500)
+    responsibleTeacherId: int | None = None
 
 
 def _teacher_dict(row):
@@ -476,6 +500,132 @@ def _decision_attention(conn, limit: int = 6):
     return [_decision_dict(row) for row in rows]
 
 
+def _plan_unit_dict(row):
+    item = dict(row)
+    for source, target in [
+        ("plan_id", "planId"),
+        ("planned_start", "plannedStart"),
+        ("planned_end", "plannedEnd"),
+        ("progress_percent", "progressPercent"),
+        ("delay_reason", "delayReason"),
+        ("responsible_teacher_id", "responsibleTeacherId"),
+        ("responsible_name", "responsibleName"),
+        ("plan_title", "planTitle"),
+        ("plan_subject", "planSubject"),
+        ("plan_grade", "planGrade"),
+        ("created_at", "createdAt"),
+        ("updated_at", "updatedAt"),
+    ]:
+        if source in item:
+            item[target] = item.pop(source)
+    status = item.get("status", "not_started")
+    end_date = item.get("plannedEnd")
+    if status != "completed" and item.get("progressPercent", 0) < 100 and end_date and end_date < _oman_today_iso():
+        item["effectiveStatus"] = "overdue"
+    else:
+        item["effectiveStatus"] = status
+    return item
+
+
+def _plan_dict(row):
+    item = dict(row)
+    for source, target in [
+        ("academic_year", "academicYear"),
+        ("owner_teacher_id", "ownerTeacherId"),
+        ("owner_name", "ownerName"),
+        ("start_date", "startDate"),
+        ("end_date", "endDate"),
+        ("unit_count", "unitCount"),
+        ("completed_unit_count", "completedUnitCount"),
+        ("overdue_unit_count", "overdueUnitCount"),
+        ("progress_percent", "progressPercent"),
+        ("created_at", "createdAt"),
+        ("updated_at", "updatedAt"),
+    ]:
+        if source in item:
+            item[target] = item.pop(source)
+    item["progressPercent"] = int(round(float(item.get("progressPercent") or 0)))
+    return item
+
+
+def _plan_summary_rows(conn, plan_id: int | None = None):
+    where = "WHERE p.id = ?" if plan_id is not None else ""
+    params: tuple = (plan_id,) if plan_id is not None else ()
+    today = _oman_today_iso()
+    return conn.execute(
+        f"""SELECT p.*, t.name AS owner_name,
+               (SELECT COUNT(*) FROM curriculum_units u WHERE u.plan_id = p.id) AS unit_count,
+               (SELECT COUNT(*) FROM curriculum_units u WHERE u.plan_id = p.id AND (u.status = 'completed' OR u.progress_percent = 100)) AS completed_unit_count,
+               (SELECT COUNT(*) FROM curriculum_units u WHERE u.plan_id = p.id AND u.status != 'completed' AND u.progress_percent < 100 AND u.planned_end IS NOT NULL AND u.planned_end < ?) AS overdue_unit_count,
+               COALESCE((SELECT AVG(u.progress_percent) FROM curriculum_units u WHERE u.plan_id = p.id), 0) AS progress_percent
+           FROM curriculum_plans p
+           LEFT JOIN teachers t ON t.id = p.owner_teacher_id
+           {where}
+           ORDER BY CASE p.status WHEN 'active' THEN 0 WHEN 'completed' THEN 1 ELSE 2 END, p.subject, p.grade, p.id DESC""",
+        (today, *params),
+    ).fetchall()
+
+
+def _plan_detail(plan_id: int):
+    with connect() as conn:
+        rows = _plan_summary_rows(conn, plan_id)
+        if not rows:
+            return None
+        plan = _plan_dict(rows[0])
+        unit_rows = conn.execute(
+            """SELECT u.*, t.name AS responsible_name
+               FROM curriculum_units u
+               LEFT JOIN teachers t ON t.id = u.responsible_teacher_id
+               WHERE u.plan_id = ? ORDER BY u.sequence, u.id""",
+            (plan_id,),
+        ).fetchall()
+        timeline_rows = conn.execute(
+            """SELECT id, activity_type, title, detail, created_at
+               FROM activities WHERE entity_type = 'curriculum_plan' AND entity_id = ?
+               ORDER BY created_at DESC, id DESC LIMIT 40""",
+            (plan_id,),
+        ).fetchall()
+    plan["units"] = [_plan_unit_dict(row) for row in unit_rows]
+    plan["timeline"] = [dict(row) for row in timeline_rows]
+    return plan
+
+
+def _planning_attention(conn, limit: int = 6):
+    rows = conn.execute(
+        """SELECT u.*, t.name AS responsible_name, p.title AS plan_title, p.subject AS plan_subject, p.grade AS plan_grade
+           FROM curriculum_units u
+           JOIN curriculum_plans p ON p.id = u.plan_id
+           LEFT JOIN teachers t ON t.id = u.responsible_teacher_id
+           WHERE p.status = 'active' AND u.status != 'completed' AND u.progress_percent < 100
+             AND u.planned_end IS NOT NULL AND u.planned_end < ?
+           ORDER BY u.planned_end, u.sequence, u.id LIMIT ?""",
+        (_oman_today_iso(), limit),
+    ).fetchall()
+    return [_plan_unit_dict(row) for row in rows]
+
+
+def _normalize_plan_dates(start_date: str | None, end_date: str | None) -> tuple[str | None, str | None]:
+    start = _validate_iso_date(start_date, "تاريخ بداية الخطة") if start_date else None
+    end = _validate_iso_date(end_date, "تاريخ نهاية الخطة") if end_date else None
+    if start and end and end < start:
+        raise HTTPException(status_code=422, detail="تاريخ نهاية الخطة يجب ألا يسبق تاريخ البداية.")
+    return start, end
+
+
+def _normalize_unit_payload(payload: CurriculumUnitPayload) -> tuple[str | None, str | None, int, str]:
+    start = _validate_iso_date(payload.plannedStart, "بداية الوحدة") if payload.plannedStart else None
+    end = _validate_iso_date(payload.plannedEnd, "نهاية الوحدة") if payload.plannedEnd else None
+    if start and end and end < start:
+        raise HTTPException(status_code=422, detail="نهاية الوحدة يجب ألا تسبق بدايتها.")
+    progress = payload.progressPercent
+    status = payload.status
+    if status == "completed" or progress == 100:
+        progress, status = 100, "completed"
+    elif progress > 0 and status == "not_started":
+        status = "in_progress"
+    return start, end, progress, status
+
+
 def _get_request_rows():
     with connect() as conn:
         return conn.execute(
@@ -526,7 +676,7 @@ def _resolve_event_local_path(storage_path: str) -> Path:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "0.5.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
+    return {"ok": True, "version": "0.6.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
 
 
 @app.get("/api/bootstrap")
@@ -547,6 +697,8 @@ def bootstrap():
             event["coverMediaUrl"] = f"/api/events/{event['id']}/media/{cover_id}/content" if cover_id else None
         meetings = [_meeting_dict(r) for r in _meeting_summary_rows(conn)]
         decision_attention = _decision_attention(conn)
+        plans = [_plan_dict(r) for r in _plan_summary_rows(conn)]
+        planning_attention = _planning_attention(conn)
         documents = [_document_dict(r) for r in conn.execute("SELECT * FROM documents ORDER BY uploaded_at DESC LIMIT 30").fetchall()]
         activities = [dict(r) for r in conn.execute("SELECT * FROM activities ORDER BY created_at DESC LIMIT 8").fetchall()]
 
@@ -558,7 +710,7 @@ def bootstrap():
         "lateRequests": counts.get("late", 0),
         "openDecisions": sum(item["openDecisionCount"] for item in meetings),
         "upcomingVisits": 2,
-        "planProgress": 82,
+        "planProgress": int(round(sum(item["progressPercent"] for item in plans if item["status"] == "active") / sum(1 for item in plans if item["status"] == "active"))) if any(item["status"] == "active" for item in plans) else 0,
         "visitProgress": 70,
         "requestCompletion": 91,
     }
@@ -571,6 +723,8 @@ def bootstrap():
         "events": events,
         "meetings": meetings,
         "decisionAttention": decision_attention,
+        "plans": plans,
+        "planningAttention": planning_attention,
         "documents": documents,
         "activities": activities,
         "drive": drive.status(),
@@ -1051,6 +1205,117 @@ def update_meeting(meeting_id: int, payload: MeetingPayload):
             ("meeting", f"تحديث الاجتماع: {payload.title.strip()}", f"الحضور: {len(attendee_ids)}", "meeting", meeting_id, now),
         )
     return _meeting_detail(meeting_id)
+
+
+@app.post("/api/plans", status_code=201)
+def create_curriculum_plan(payload: CurriculumPlanPayload):
+    start_date, end_date = _normalize_plan_dates(payload.startDate, payload.endDate)
+    now = utc_now()
+    with connect() as conn:
+        if payload.ownerTeacherId is not None:
+            _validate_teacher_ids(conn, [payload.ownerTeacherId], "المعلم المسؤول عن الخطة غير موجود.")
+        cursor = conn.execute(
+            """INSERT INTO curriculum_plans
+               (title, subject, grade, term, academic_year, owner_teacher_id, start_date, end_date, notes, status, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (payload.title, payload.subject, payload.grade, payload.term, ACADEMIC_YEAR, payload.ownerTeacherId, start_date, end_date, payload.notes, payload.status, now, now),
+        )
+        plan_id = cursor.lastrowid
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("planning", f"إنشاء خطة: {payload.title}", f"{payload.subject} • {payload.grade} • {payload.term}", "curriculum_plan", plan_id, now),
+        )
+    return {"id": plan_id}
+
+
+@app.get("/api/plans/{plan_id}")
+def get_curriculum_plan(plan_id: int):
+    detail = _plan_detail(plan_id)
+    if not detail:
+        raise HTTPException(status_code=404, detail="الخطة غير موجودة.")
+    return detail
+
+
+@app.patch("/api/plans/{plan_id}")
+def update_curriculum_plan(plan_id: int, payload: CurriculumPlanPayload):
+    start_date, end_date = _normalize_plan_dates(payload.startDate, payload.endDate)
+    now = utc_now()
+    with connect() as conn:
+        if not conn.execute("SELECT id FROM curriculum_plans WHERE id = ?", (plan_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="الخطة غير موجودة.")
+        if payload.ownerTeacherId is not None:
+            _validate_teacher_ids(conn, [payload.ownerTeacherId], "المعلم المسؤول عن الخطة غير موجود.")
+        conn.execute(
+            """UPDATE curriculum_plans SET title=?, subject=?, grade=?, term=?, owner_teacher_id=?, start_date=?, end_date=?, notes=?, status=?, updated_at=? WHERE id=?""",
+            (payload.title, payload.subject, payload.grade, payload.term, payload.ownerTeacherId, start_date, end_date, payload.notes, payload.status, now, plan_id),
+        )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("planning", f"تحديث خطة: {payload.title}", f"{payload.subject} • {payload.grade}", "curriculum_plan", plan_id, now),
+        )
+    return _plan_detail(plan_id)
+
+
+@app.post("/api/plans/{plan_id}/units", status_code=201)
+def create_curriculum_unit(plan_id: int, payload: CurriculumUnitPayload):
+    planned_start, planned_end, progress, status = _normalize_unit_payload(payload)
+    now = utc_now()
+    with connect() as conn:
+        plan = conn.execute("SELECT id, title FROM curriculum_plans WHERE id = ?", (plan_id,)).fetchone()
+        if not plan:
+            raise HTTPException(status_code=404, detail="الخطة غير موجودة.")
+        if payload.responsibleTeacherId is not None:
+            _validate_teacher_ids(conn, [payload.responsibleTeacherId], "المعلم المسؤول عن الوحدة غير موجود.")
+        cursor = conn.execute(
+            """INSERT INTO curriculum_units
+               (plan_id, title, sequence, planned_start, planned_end, progress_percent, status, delay_reason, notes, responsible_teacher_id, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (plan_id, payload.title, payload.sequence, planned_start, planned_end, progress, status, payload.delayReason, payload.notes, payload.responsibleTeacherId, now, now),
+        )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("planning", f"إضافة وحدة: {payload.title}", f"{progress}% • {status}", "curriculum_plan", plan_id, now),
+        )
+        unit_id = cursor.lastrowid
+    detail = _plan_detail(plan_id)
+    return next(unit for unit in detail["units"] if unit["id"] == unit_id)
+
+
+@app.patch("/api/plans/{plan_id}/units/{unit_id}")
+def update_curriculum_unit(plan_id: int, unit_id: int, payload: CurriculumUnitPayload):
+    planned_start, planned_end, progress, status = _normalize_unit_payload(payload)
+    now = utc_now()
+    with connect() as conn:
+        row = conn.execute("SELECT id FROM curriculum_units WHERE id = ? AND plan_id = ?", (unit_id, plan_id)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="الوحدة غير موجودة.")
+        if payload.responsibleTeacherId is not None:
+            _validate_teacher_ids(conn, [payload.responsibleTeacherId], "المعلم المسؤول عن الوحدة غير موجود.")
+        conn.execute(
+            """UPDATE curriculum_units SET title=?, sequence=?, planned_start=?, planned_end=?, progress_percent=?, status=?, delay_reason=?, notes=?, responsible_teacher_id=?, updated_at=? WHERE id=? AND plan_id=?""",
+            (payload.title, payload.sequence, planned_start, planned_end, progress, status, payload.delayReason, payload.notes, payload.responsibleTeacherId, now, unit_id, plan_id),
+        )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("planning", f"تحديث وحدة: {payload.title}", f"التقدم {progress}%", "curriculum_plan", plan_id, now),
+        )
+    detail = _plan_detail(plan_id)
+    return next(unit for unit in detail["units"] if unit["id"] == unit_id)
+
+
+@app.delete("/api/plans/{plan_id}/units/{unit_id}")
+def delete_curriculum_unit(plan_id: int, unit_id: int):
+    now = utc_now()
+    with connect() as conn:
+        row = conn.execute("SELECT title FROM curriculum_units WHERE id = ? AND plan_id = ?", (unit_id, plan_id)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="الوحدة غير موجودة.")
+        conn.execute("DELETE FROM curriculum_units WHERE id = ? AND plan_id = ?", (unit_id, plan_id))
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("planning", f"حذف وحدة: {row['title']}", "حذف من توزيع المنهج", "curriculum_plan", plan_id, now),
+        )
+    return {"ok": True}
 
 
 @app.post("/api/meetings/{meeting_id}/decisions", status_code=201)

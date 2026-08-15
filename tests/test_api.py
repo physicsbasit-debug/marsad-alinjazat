@@ -401,6 +401,99 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         self.assertEqual(missing_meeting.status_code, 404)
         self.assertEqual(self.client.delete(f"/api/meetings/{meeting_id}/decisions/999999").status_code, 404)
 
+    def test_curriculum_planning_lifecycle_and_dashboard_progress(self):
+        today = datetime.now(timezone.utc).date()
+        yesterday = (today - timedelta(days=1)).isoformat()
+        tomorrow = (today + timedelta(days=1)).isoformat()
+        created = self.client.post("/api/plans", json={
+            "title": "خطة فيزياء اختبارية", "subject": "الفيزياء", "grade": "العاشر",
+            "term": "الفصل الأول", "ownerTeacherId": 1, "startDate": yesterday, "endDate": tomorrow,
+            "notes": "خطة لاختبار دورة التخطيط", "status": "active"
+        })
+        self.assertEqual(created.status_code, 201)
+        plan_id = created.json()["id"]
+        edited = self.client.patch(f"/api/plans/{plan_id}", json={
+            "title": "خطة فيزياء اختبارية محدثة", "subject": "الفيزياء", "grade": "العاشر",
+            "term": "الفصل الأول", "ownerTeacherId": 1, "startDate": yesterday, "endDate": tomorrow,
+            "notes": "تم تحديث وصف الخطة", "status": "active"
+        })
+        self.assertEqual(edited.status_code, 200)
+        self.assertEqual(edited.json()["title"], "خطة فيزياء اختبارية محدثة")
+
+        unit = self.client.post(f"/api/plans/{plan_id}/units", json={
+            "title": "الحركة والقوى", "sequence": 1, "plannedStart": yesterday, "plannedEnd": yesterday,
+            "progressPercent": 40, "status": "in_progress", "delayReason": "تأخر نشاط عملي",
+            "notes": "", "responsibleTeacherId": 1
+        })
+        self.assertEqual(unit.status_code, 201)
+        unit_data = unit.json()
+        self.assertEqual(unit_data["effectiveStatus"], "overdue")
+        unit_id = unit_data["id"]
+
+        detail = self.client.get(f"/api/plans/{plan_id}")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json()["unitCount"], 1)
+        self.assertEqual(detail.json()["overdueUnitCount"], 1)
+        self.assertEqual(detail.json()["progressPercent"], 40)
+        self.assertTrue(any("إضافة وحدة" in item["title"] for item in detail.json()["timeline"]))
+
+        boot = self.client.get("/api/bootstrap").json()
+        self.assertTrue(any(item["id"] == plan_id for item in boot["plans"]))
+        self.assertTrue(any(item["id"] == unit_id for item in boot["planningAttention"]))
+        self.assertGreaterEqual(boot["dashboard"]["planProgress"], 0)
+
+        updated = self.client.patch(f"/api/plans/{plan_id}/units/{unit_id}", json={
+            "title": "الحركة والقوى", "sequence": 1, "plannedStart": yesterday, "plannedEnd": yesterday,
+            "progressPercent": 70, "status": "completed", "delayReason": "تمت المعالجة",
+            "notes": "اكتملت الوحدة", "responsibleTeacherId": 1
+        })
+        self.assertEqual(updated.status_code, 200)
+        self.assertEqual(updated.json()["status"], "completed")
+        self.assertEqual(updated.json()["progressPercent"], 100)
+        self.assertEqual(updated.json()["effectiveStatus"], "completed")
+
+        boot2 = self.client.get("/api/bootstrap").json()
+        self.assertFalse(any(item["id"] == unit_id for item in boot2["planningAttention"]))
+        summary = next(item for item in boot2["plans"] if item["id"] == plan_id)
+        self.assertEqual(summary["completedUnitCount"], 1)
+        self.assertEqual(summary["overdueUnitCount"], 0)
+        self.assertEqual(summary["progressPercent"], 100)
+
+        removed = self.client.delete(f"/api/plans/{plan_id}/units/{unit_id}")
+        self.assertEqual(removed.status_code, 200)
+        self.assertEqual(self.client.get(f"/api/plans/{plan_id}").json()["units"], [])
+
+    def test_curriculum_planning_validation_guards(self):
+        invalid_dates = self.client.post("/api/plans", json={
+            "title": "خطة بتاريخ خاطئ", "subject": "العلوم", "grade": "الثامن", "term": "الفصل الأول",
+            "ownerTeacherId": 1, "startDate": "2026-09-10", "endDate": "2026-09-01", "notes": "", "status": "active"
+        })
+        self.assertEqual(invalid_dates.status_code, 422)
+        invalid_teacher = self.client.post("/api/plans", json={
+            "title": "خطة بمسؤول مفقود", "subject": "العلوم", "grade": "الثامن", "term": "الفصل الأول",
+            "ownerTeacherId": 999999, "startDate": None, "endDate": None, "notes": "", "status": "active"
+        })
+        self.assertEqual(invalid_teacher.status_code, 422)
+        self.assertEqual(self.client.get("/api/plans/999999").status_code, 404)
+
+        plan = self.client.post("/api/plans", json={
+            "title": "خطة حراس الوحدات", "subject": "العلوم", "grade": "الثامن", "term": "الفصل الأول",
+            "ownerTeacherId": 1, "startDate": None, "endDate": None, "notes": "", "status": "active"
+        })
+        self.assertEqual(plan.status_code, 201)
+        plan_id = plan.json()["id"]
+        invalid_unit_dates = self.client.post(f"/api/plans/{plan_id}/units", json={
+            "title": "وحدة غير صالحة", "sequence": 1, "plannedStart": "2026-10-10", "plannedEnd": "2026-10-01",
+            "progressPercent": 0, "status": "not_started", "delayReason": "", "notes": "", "responsibleTeacherId": 1
+        })
+        self.assertEqual(invalid_unit_dates.status_code, 422)
+        invalid_unit_teacher = self.client.post(f"/api/plans/{plan_id}/units", json={
+            "title": "وحدة بمسؤول مفقود", "sequence": 1, "plannedStart": None, "plannedEnd": None,
+            "progressPercent": 0, "status": "not_started", "delayReason": "", "notes": "", "responsibleTeacherId": 999999
+        })
+        self.assertEqual(invalid_unit_teacher.status_code, 422)
+        self.assertEqual(self.client.delete(f"/api/plans/{plan_id}/units/999999").status_code, 404)
+
     def test_invalid_extension_is_rejected(self):
         created = self.client.post("/api/requests", json={
             "teacherId": 1,

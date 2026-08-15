@@ -16,8 +16,12 @@ import type {
   MeetingDecisionInput,
   MeetingDecision,
   MeetingDetails,
+  CurriculumPlanInput,
+  CurriculumPlanDetails,
+  CurriculumUnitInput,
+  CurriculumUnit,
 } from '../types';
-import { getPreviewEventDetails, getPreviewMeetingDetails, getPreviewTeacherProfile, previewBootstrap } from './preview';
+import { getPreviewEventDetails, getPreviewMeetingDetails, getPreviewPlanDetails, getPreviewTeacherProfile, previewBootstrap } from './preview';
 
 const PREVIEW_MODE = import.meta.env.VITE_PREVIEW_MODE === 'true';
 const PREVIEW_MESSAGE = 'هذه معاينة GitHub Pages فقط. الحفظ والرفع الفعليان يعملان عند تشغيل خادم مرصد الإنجازات.';
@@ -254,3 +258,56 @@ export async function deleteMeetingDecision(meetingId: number, decisionId: numbe
   await parseResponse(await fetch(`/api/meetings/${meetingId}/decisions/${decisionId}`, { method: 'DELETE' }));
 }
 
+export async function createCurriculumPlan(input: CurriculumPlanInput): Promise<{ id: number }> {
+  requireBackend();
+  return parseResponse(
+    await fetch('/api/plans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function getCurriculumPlan(id: number): Promise<CurriculumPlanDetails> {
+  if (PREVIEW_MODE) return getPreviewPlanDetails(id);
+  return parseResponse(await fetch(`/api/plans/${id}`));
+}
+
+export async function updateCurriculumPlan(id: number, input: CurriculumPlanInput): Promise<CurriculumPlanDetails> {
+  requireBackend();
+  return parseResponse(
+    await fetch(`/api/plans/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function createCurriculumUnit(planId: number, input: CurriculumUnitInput): Promise<CurriculumUnit> {
+  requireBackend();
+  return parseResponse(
+    await fetch(`/api/plans/${planId}/units`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function updateCurriculumUnit(planId: number, unitId: number, input: CurriculumUnitInput): Promise<CurriculumUnit> {
+  requireBackend();
+  return parseResponse(
+    await fetch(`/api/plans/${planId}/units/${unitId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    }),
+  );
+}
+
+export async function deleteCurriculumUnit(planId: number, unitId: number): Promise<void> {
+  requireBackend();
+  await parseResponse(await fetch(`/api/plans/${planId}/units/${unitId}`, { method: 'DELETE' }));
+}

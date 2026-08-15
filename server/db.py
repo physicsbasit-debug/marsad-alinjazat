@@ -219,6 +219,38 @@ def init_db() -> None:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS curriculum_plans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                subject TEXT NOT NULL,
+                grade TEXT NOT NULL,
+                term TEXT NOT NULL,
+                academic_year TEXT NOT NULL,
+                owner_teacher_id INTEGER REFERENCES teachers(id) ON DELETE SET NULL,
+                start_date TEXT,
+                end_date TEXT,
+                notes TEXT,
+                status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'archived')),
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS curriculum_units (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                plan_id INTEGER NOT NULL REFERENCES curriculum_plans(id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                sequence INTEGER NOT NULL DEFAULT 0 CHECK (sequence >= 0),
+                planned_start TEXT,
+                planned_end TEXT,
+                progress_percent INTEGER NOT NULL DEFAULT 0 CHECK (progress_percent BETWEEN 0 AND 100),
+                status TEXT NOT NULL DEFAULT 'not_started' CHECK (status IN ('not_started', 'in_progress', 'completed')),
+                delay_reason TEXT,
+                notes TEXT,
+                responsible_teacher_id INTEGER REFERENCES teachers(id) ON DELETE SET NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
             CREATE INDEX IF NOT EXISTS idx_requests_status ON upload_requests(status);
             CREATE INDEX IF NOT EXISTS idx_documents_request ON documents(request_id);
             CREATE INDEX IF NOT EXISTS idx_activities_created ON activities(created_at DESC);
@@ -230,6 +262,9 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_meeting_attendees_meeting ON meeting_attendees(meeting_id, teacher_id);
             CREATE INDEX IF NOT EXISTS idx_meeting_decisions_meeting ON meeting_decisions(meeting_id, status, due_date);
             CREATE INDEX IF NOT EXISTS idx_meeting_decisions_open ON meeting_decisions(status, due_date);
+            CREATE INDEX IF NOT EXISTS idx_curriculum_plans_scope ON curriculum_plans(academic_year, term, subject, grade, status);
+            CREATE INDEX IF NOT EXISTS idx_curriculum_units_plan ON curriculum_units(plan_id, sequence, id);
+            CREATE INDEX IF NOT EXISTS idx_curriculum_units_due ON curriculum_units(status, planned_end, progress_percent);
             """
         )
         _backfill_event_media_meta(conn)

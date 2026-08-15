@@ -196,6 +196,81 @@ export type MeetingDecisionInput = {
   notes: string;
 };
 
+export type CurriculumPlanStatus = 'active' | 'completed' | 'archived';
+export type CurriculumUnitBaseStatus = 'not_started' | 'in_progress' | 'completed';
+export type CurriculumUnitEffectiveStatus = CurriculumUnitBaseStatus | 'overdue';
+
+export type CurriculumPlanRecord = {
+  id: number;
+  title: string;
+  subject: string;
+  grade: string;
+  term: string;
+  academicYear: string;
+  ownerTeacherId?: number | null;
+  ownerName?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  notes?: string | null;
+  status: CurriculumPlanStatus;
+  unitCount: number;
+  completedUnitCount: number;
+  overdueUnitCount: number;
+  progressPercent: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CurriculumUnit = {
+  id: number;
+  planId: number;
+  planTitle?: string;
+  planSubject?: string;
+  planGrade?: string;
+  title: string;
+  sequence: number;
+  plannedStart?: string | null;
+  plannedEnd?: string | null;
+  progressPercent: number;
+  status: CurriculumUnitBaseStatus;
+  effectiveStatus: CurriculumUnitEffectiveStatus;
+  delayReason?: string | null;
+  notes?: string | null;
+  responsibleTeacherId?: number | null;
+  responsibleName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CurriculumPlanDetails = CurriculumPlanRecord & {
+  units: CurriculumUnit[];
+  timeline: Activity[];
+};
+
+export type CurriculumPlanInput = {
+  title: string;
+  subject: string;
+  grade: string;
+  term: string;
+  ownerTeacherId?: number | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  notes: string;
+  status: CurriculumPlanStatus;
+};
+
+export type CurriculumUnitInput = {
+  title: string;
+  sequence: number;
+  plannedStart?: string | null;
+  plannedEnd?: string | null;
+  progressPercent: number;
+  status: CurriculumUnitBaseStatus;
+  delayReason: string;
+  notes: string;
+  responsibleTeacherId?: number | null;
+};
+
 export type Activity = {
   id: number;
   activity_type: string;
@@ -225,6 +300,8 @@ export type BootstrapData = {
   events: EventRecord[];
   meetings: MeetingRecord[];
   decisionAttention: MeetingDecision[];
+  plans: CurriculumPlanRecord[];
+  planningAttention: CurriculumUnit[];
   documents: DocumentRecord[];
   activities: Activity[];
   drive: DriveStatus;

@@ -1,4 +1,4 @@
-import type { BootstrapData, EventDetails, EventMediaRecord, MeetingDetails, TeacherCvItem, TeacherProfileDetails } from '../types';
+import type { BootstrapData, CurriculumPlanDetails, EventDetails, EventMediaRecord, MeetingDetails, TeacherCvItem, TeacherProfileDetails } from '../types';
 
 function eventVisual(title: string, accent: string, secondary: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="800" viewBox="0 0 1400 800"><defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop stop-color="${accent}"/><stop offset="1" stop-color="${secondary}"/></linearGradient><radialGradient id="r"><stop stop-color="#fff" stop-opacity=".34"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs><rect width="1400" height="800" fill="url(#g)"/><circle cx="1100" cy="170" r="270" fill="url(#r)"/><circle cx="240" cy="650" r="330" fill="url(#r)"/><g fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="10"><circle cx="700" cy="400" r="150"/><path d="M430 400h540M700 130v540M520 220l360 360M880 220L520 580"/></g><text x="700" y="410" text-anchor="middle" direction="rtl" fill="#fff" font-size="72" font-family="Arial" font-weight="700">${title}</text><text x="700" y="475" text-anchor="middle" direction="rtl" fill="#fff" fill-opacity=".78" font-size="30" font-family="Arial">مرصد الإنجازات • التوثيق المهني</text></svg>`;
@@ -22,7 +22,7 @@ export const previewBootstrap: BootstrapData = {
     lateRequests: 1,
     openDecisions: 4,
     upcomingVisits: 2,
-    planProgress: 82,
+    planProgress: 69,
     visitProgress: 70,
     requestCompletion: 91,
   },
@@ -56,6 +56,15 @@ export const previewBootstrap: BootstrapData = {
     { id: 102, meetingId: 1, meetingTitle: 'اجتماع قسم العلوم الأول', title: 'تجهيز خطة الزيارات الصفية', responsibleTeacherId: 3, responsibleName: 'محمد المعمري', dueDate: '2026-09-17', status: 'new', baseStatus: 'new', notes: '', createdAt: '2026-08-15T06:31:00+00:00', updatedAt: '2026-08-15T06:31:00+00:00' },
     { id: 201, meetingId: 2, meetingTitle: 'مراجعة نتائج الاختبار القصير', title: 'تحديد الطلبة المستهدفين بالتدخل', responsibleTeacherId: 4, responsibleName: 'سالم الرواحي', dueDate: '2026-09-28', status: 'new', baseStatus: 'new', notes: '', createdAt: '2026-08-15T06:32:00+00:00', updatedAt: '2026-08-15T06:32:00+00:00' },
   ],
+  plans: [
+    { id: 1, title: 'خطة الفيزياء للفصل الأول', subject: 'الفيزياء', grade: 'العاشر', term: 'الفصل الأول', academicYear: '2026/2027', ownerTeacherId: 1, ownerName: 'أحمد السالمي', startDate: '2026-08-23', endDate: '2026-12-17', notes: 'تركيز على الربط بين المفاهيم والتطبيقات العملية.', status: 'active', unitCount: 3, completedUnitCount: 1, overdueUnitCount: 1, progressPercent: 62, createdAt: '2026-08-15T07:50:00+00:00', updatedAt: '2026-08-15T08:00:00+00:00' },
+    { id: 2, title: 'خطة الكيمياء للفصل الأول', subject: 'الكيمياء', grade: 'العاشر', term: 'الفصل الأول', academicYear: '2026/2027', ownerTeacherId: 2, ownerName: 'خالد الهنائي', startDate: '2026-08-23', endDate: '2026-12-17', notes: 'متابعة أسبوعية لمعدل إنجاز الوحدات.', status: 'active', unitCount: 3, completedUnitCount: 1, overdueUnitCount: 0, progressPercent: 60, createdAt: '2026-08-15T07:52:00+00:00', updatedAt: '2026-08-15T08:02:00+00:00' },
+    { id: 3, title: 'خطة العلوم للصف التاسع', subject: 'العلوم', grade: 'التاسع', term: 'الفصل الأول', academicYear: '2026/2027', ownerTeacherId: 3, ownerName: 'محمد المعمري', startDate: '2026-08-23', endDate: '2026-12-17', notes: '', status: 'active', unitCount: 3, completedUnitCount: 2, overdueUnitCount: 1, progressPercent: 85, createdAt: '2026-08-15T07:54:00+00:00', updatedAt: '2026-08-15T08:04:00+00:00' },
+  ],
+  planningAttention: [
+    { id: 12, planId: 1, planTitle: 'خطة الفيزياء للفصل الأول', planSubject: 'الفيزياء', planGrade: 'العاشر', title: 'الحركة والقوى', sequence: 2, plannedStart: '2026-08-05', plannedEnd: '2026-08-13', progressPercent: 65, status: 'in_progress', effectiveStatus: 'overdue', delayReason: 'احتاجت الوحدة إلى حصص دعم إضافية قبل الانتقال للمحتوى التالي.', notes: '', responsibleTeacherId: 1, responsibleName: 'أحمد السالمي', createdAt: '2026-08-15T07:50:00+00:00', updatedAt: '2026-08-15T08:00:00+00:00' },
+    { id: 32, planId: 3, planTitle: 'خطة العلوم للصف التاسع', planSubject: 'العلوم', planGrade: 'التاسع', title: 'الوراثة والتنوع', sequence: 3, plannedStart: '2026-08-08', plannedEnd: '2026-08-14', progressPercent: 55, status: 'in_progress', effectiveStatus: 'overdue', delayReason: 'تأخر النشاط العملي المرتبط بالوحدة.', notes: '', responsibleTeacherId: 3, responsibleName: 'محمد المعمري', createdAt: '2026-08-15T07:54:00+00:00', updatedAt: '2026-08-15T08:04:00+00:00' },
+  ],
   documents: [
     { id: 1, requestId: 2, teacherId: 2, title: 'الخطة الفصلية', category: 'خطة فصلية', subject: 'الكيمياء', grade: 'العاشر', academicYear: '2026/2027', originalName: 'خطة_الكيمياء_الفصل_الأول.pdf', mimeType: 'application/pdf', sizeBytes: 735000, storageProvider: 'preview', status: 'inbox', uploadedAt: '2026-08-15T05:00:00+00:00' },
     { id: 2, requestId: 4, teacherId: 4, title: 'تحليل النتائج', category: 'تحليل نتائج', subject: 'الأحياء', grade: 'التاسع', academicYear: '2026/2027', originalName: 'تحليل_نتائج_الأحياء.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', sizeBytes: 184000, storageProvider: 'preview', status: 'approved', uploadedAt: '2026-08-14T05:00:00+00:00', approvedAt: '2026-08-15T05:00:00+00:00' },
@@ -64,7 +73,8 @@ export const previewBootstrap: BootstrapData = {
     { id: 1, activity_type: 'document', title: 'خالد رفع الخطة الفصلية', detail: 'الكيمياء • الصف العاشر', created_at: '2026-08-15T05:00:00+00:00' },
     { id: 2, activity_type: 'request', title: 'طلب اختبار جديد', detail: 'الفيزياء • الصف العاشر', created_at: '2026-08-15T04:00:00+00:00' },
     { id: 3, activity_type: 'event', title: 'توثيق مبادرة اقرأ علمًا', detail: '31 مشاركًا', created_at: '2026-08-14T05:00:00+00:00' },
-    { id: 4, activity_type: 'meeting', title: 'تحديث قرار: توزيع أعمال القسم', detail: 'قيد التنفيذ', created_at: '2026-08-14T04:30:00+00:00' },
+    { id: 4, activity_type: 'planning', title: 'تحديث وحدة الحركة والقوى', detail: 'الفيزياء • التقدم 65%', created_at: '2026-08-15T08:00:00+00:00' },
+    { id: 5, activity_type: 'meeting', title: 'تحديث قرار: توزيع أعمال القسم', detail: 'قيد التنفيذ', created_at: '2026-08-14T04:30:00+00:00' },
   ],
   drive: {
     configured: false,
@@ -75,6 +85,45 @@ export const previewBootstrap: BootstrapData = {
   },
 };
 
+
+const previewPlanDetails: Record<number, CurriculumPlanDetails> = {
+  1: {
+    ...previewBootstrap.plans[0],
+    units: [
+      { id: 11, planId: 1, title: 'القياس والكميات الفيزيائية', sequence: 1, plannedStart: '2026-07-27', plannedEnd: '2026-08-04', progressPercent: 100, status: 'completed', effectiveStatus: 'completed', delayReason: '', notes: 'اكتملت وفق الخطة.', responsibleTeacherId: 1, responsibleName: 'أحمد السالمي', createdAt: '2026-08-15T07:50:00+00:00', updatedAt: '2026-08-15T07:58:00+00:00' },
+      { ...previewBootstrap.planningAttention[0] },
+      { id: 13, planId: 1, title: 'الطاقة والشغل', sequence: 3, plannedStart: '2026-08-14', plannedEnd: '2026-08-28', progressPercent: 20, status: 'in_progress', effectiveStatus: 'in_progress', delayReason: '', notes: '', responsibleTeacherId: 6, responsibleName: 'ناصر الحوسني', createdAt: '2026-08-15T07:50:00+00:00', updatedAt: '2026-08-15T08:00:00+00:00' },
+    ],
+    timeline: [
+      { id: 6102, activity_type: 'planning', title: 'تحديث وحدة: الحركة والقوى', detail: 'التقدم 65%', created_at: '2026-08-15T08:00:00+00:00' },
+      { id: 6101, activity_type: 'planning', title: 'إنشاء خطة: خطة الفيزياء للفصل الأول', detail: 'الفيزياء • العاشر • الفصل الأول', created_at: '2026-08-15T07:50:00+00:00' },
+    ],
+  },
+  2: {
+    ...previewBootstrap.plans[1],
+    units: [
+      { id: 21, planId: 2, title: 'بنية الذرة', sequence: 1, plannedStart: '2026-08-23', plannedEnd: '2026-09-03', progressPercent: 100, status: 'completed', effectiveStatus: 'completed', delayReason: '', notes: '', responsibleTeacherId: 2, responsibleName: 'خالد الهنائي', createdAt: '2026-08-15T07:52:00+00:00', updatedAt: '2026-08-15T08:02:00+00:00' },
+      { id: 22, planId: 2, title: 'الترابط الكيميائي', sequence: 2, plannedStart: '2026-09-04', plannedEnd: '2026-09-17', progressPercent: 80, status: 'in_progress', effectiveStatus: 'in_progress', delayReason: '', notes: '', responsibleTeacherId: 2, responsibleName: 'خالد الهنائي', createdAt: '2026-08-15T07:52:00+00:00', updatedAt: '2026-08-15T08:02:00+00:00' },
+      { id: 23, planId: 2, title: 'التفاعلات والحسابات', sequence: 3, plannedStart: '2026-09-18', plannedEnd: '2026-10-08', progressPercent: 0, status: 'not_started', effectiveStatus: 'not_started', delayReason: '', notes: '', responsibleTeacherId: 2, responsibleName: 'خالد الهنائي', createdAt: '2026-08-15T07:52:00+00:00', updatedAt: '2026-08-15T08:02:00+00:00' },
+    ],
+    timeline: [{ id: 6201, activity_type: 'planning', title: 'إنشاء خطة: خطة الكيمياء للفصل الأول', detail: 'الكيمياء • العاشر • الفصل الأول', created_at: '2026-08-15T07:52:00+00:00' }],
+  },
+  3: {
+    ...previewBootstrap.plans[2],
+    units: [
+      { id: 31, planId: 3, title: 'الخلايا والأنظمة الحيوية', sequence: 1, plannedStart: '2026-07-27', plannedEnd: '2026-08-06', progressPercent: 100, status: 'completed', effectiveStatus: 'completed', delayReason: '', notes: '', responsibleTeacherId: 3, responsibleName: 'محمد المعمري', createdAt: '2026-08-15T07:54:00+00:00', updatedAt: '2026-08-15T08:04:00+00:00' },
+      { id: 33, planId: 3, title: 'التكاثر والنمو', sequence: 2, plannedStart: '2026-08-07', plannedEnd: '2026-08-12', progressPercent: 100, status: 'completed', effectiveStatus: 'completed', delayReason: '', notes: '', responsibleTeacherId: 3, responsibleName: 'محمد المعمري', createdAt: '2026-08-15T07:54:00+00:00', updatedAt: '2026-08-15T08:04:00+00:00' },
+      { ...previewBootstrap.planningAttention[1] },
+    ],
+    timeline: [{ id: 6301, activity_type: 'planning', title: 'تحديث وحدة: الوراثة والتنوع', detail: 'التقدم 55%', created_at: '2026-08-15T08:04:00+00:00' }],
+  },
+};
+
+export function getPreviewPlanDetails(planId: number): CurriculumPlanDetails {
+  const detail = previewPlanDetails[planId];
+  if (!detail) throw new Error('الخطة غير موجودة في بيانات المعاينة.');
+  return detail;
+}
 
 const previewMeetingDetails: Record<number, MeetingDetails> = {
   1: {

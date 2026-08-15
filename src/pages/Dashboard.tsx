@@ -3,8 +3,9 @@ import type { BootstrapData } from '../types';
 
 export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuickAction: (action: string) => void }) {
   const d = data.dashboard;
-  const decisionAttention = data.decisionAttention.slice(0, 2);
-  const requestAttention = data.requests.filter((item) => ['late', 'review', 'waiting_upload', 'received'].includes(item.status)).slice(0, Math.max(0, 4 - decisionAttention.length));
+  const planningAttention = data.planningAttention.slice(0, 2);
+  const decisionAttention = data.decisionAttention.slice(0, Math.max(0, 2 - planningAttention.length));
+  const requestAttention = data.requests.filter((item) => ['late', 'review', 'waiting_upload', 'received'].includes(item.status)).slice(0, Math.max(0, 4 - planningAttention.length - decisionAttention.length));
   const [weekStart, weekEnd] = currentWeekBounds();
   const scheduleMeetings = data.meetings.filter((item) => item.status !== 'cancelled' && item.meetingDate >= weekStart && item.meetingDate <= weekEnd).sort((a, b) => `${a.meetingDate} ${a.meetingTime || ''}`.localeCompare(`${b.meetingDate} ${b.meetingTime || ''}`)).slice(0, 3);
   return (
@@ -32,8 +33,9 @@ export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuic
 
       <section className="dashboard-grid">
         <article className="panel attention-panel">
-          <div className="panel-heading"><div><span className="eyebrow danger">يحتاج انتباهك</span><h2>الأولوية الآن</h2></div><span className="counter">{d.openRequests + d.openDecisions}</span></div>
+          <div className="panel-heading"><div><span className="eyebrow danger">يحتاج انتباهك</span><h2>الأولوية الآن</h2></div><span className="counter">{d.openRequests + d.openDecisions + data.planningAttention.length}</span></div>
           <div className="attention-list">
+            {planningAttention.map((item) => <div className="attention-item" key={`planning-${item.id}`}><span className="attention-dot late"></span><div><strong>{item.title}</strong><small>{item.planSubject} • {item.planGrade} • {item.responsibleName || 'دون مسؤول'}{item.plannedEnd ? ` • انتهت ${formatShortDate(item.plannedEnd)}` : ''}</small></div><Icon name="planning" size={18}/></div>)}
             {decisionAttention.map((item) => <div className="attention-item" key={`decision-${item.id}`}><span className={`attention-dot ${item.status === 'overdue' ? 'late' : 'received'}`}></span><div><strong>{item.title}</strong><small>{item.meetingTitle || 'قرار اجتماع'} • {item.responsibleName || 'دون مسؤول'}{item.dueDate ? ` • حتى ${formatShortDate(item.dueDate)}` : ''}</small></div><Icon name="meeting" size={18}/></div>)}
             {requestAttention.map((item) => (
               <div className="attention-item" key={`request-${item.id}`}>
@@ -63,7 +65,7 @@ export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuic
         <article className="panel activity-panel">
           <div className="panel-heading"><div><span className="eyebrow">آخر النشاطات</span><h2>ما حدث مؤخرًا</h2></div></div>
           <div className="activity-list">
-            {data.activities.slice(0, 4).map((item) => <div className="activity-row" key={item.id}><span className="activity-icon"><Icon name={item.activity_type === 'event' ? 'spark' : item.activity_type === 'meeting' ? 'meeting' : item.activity_type === 'document' ? 'document' : 'upload'} size={18} /></span><div><strong>{item.title}</strong><small>{item.detail}</small></div></div>)}
+            {data.activities.slice(0, 4).map((item) => <div className="activity-row" key={item.id}><span className="activity-icon"><Icon name={item.activity_type === 'event' ? 'spark' : item.activity_type === 'meeting' ? 'meeting' : item.activity_type === 'planning' ? 'planning' : item.activity_type === 'document' ? 'document' : 'upload'} size={18} /></span><div><strong>{item.title}</strong><small>{item.detail}</small></div></div>)}
           </div>
         </article>
       </section>
