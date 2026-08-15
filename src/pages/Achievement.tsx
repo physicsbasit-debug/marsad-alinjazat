@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import {
@@ -29,6 +29,8 @@ export function Achievement({
   term,
   onAddAssessment,
   onRefresh,
+  initialOpenId = null,
+  onInitialOpened,
 }: {
   assessments: AchievementAssessmentRecord[];
   achievementAttention: AchievementAssessmentRecord[];
@@ -37,6 +39,8 @@ export function Achievement({
   term: string;
   onAddAssessment: () => void;
   onRefresh: () => Promise<void>;
+  initialOpenId?: number | null;
+  onInitialOpened?: () => void;
 }) {
   const [subject, setSubject] = useState('الكل');
   const [status, setStatus] = useState('الكل');
@@ -57,6 +61,12 @@ export function Achievement({
     try { setSelected(await getAchievementAssessment(id)); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'تعذر فتح سجل التحصيل.'); }
   }
+
+  useEffect(() => {
+    if (!initialOpenId) return;
+    void openAssessment(initialOpenId);
+    onInitialOpened?.();
+  }, [initialOpenId]);
 
   return (
     <div className="page achievement-page">

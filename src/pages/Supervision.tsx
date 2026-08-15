@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import {
@@ -26,12 +26,16 @@ export function Supervision({
   teachers,
   onAddVisit,
   onRefresh,
+  initialOpenId = null,
+  onInitialOpened,
 }: {
   visits: SupervisionVisitRecord[];
   supervisionAttention: SupervisionVisitRecord[];
   teachers: Teacher[];
   onAddVisit: () => void;
   onRefresh: () => Promise<void>;
+  initialOpenId?: number | null;
+  onInitialOpened?: () => void;
 }) {
   const [subject, setSubject] = useState('الكل');
   const [status, setStatus] = useState('الكل');
@@ -53,6 +57,12 @@ export function Supervision({
       setMessage(error instanceof Error ? error.message : 'تعذر فتح الزيارة.');
     }
   }
+
+  useEffect(() => {
+    if (!initialOpenId) return;
+    void openVisit(initialOpenId);
+    onInitialOpened?.();
+  }, [initialOpenId]);
 
   const executed = visits.filter((visit) => visit.status !== 'planned').length;
   const overdue = visits.filter((visit) => visit.effectiveStatus === 'overdue').length;

@@ -32,7 +32,7 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         self.assertIn("supervisionAttention", boot.json())
         self.assertIn("assessments", boot.json())
         self.assertIn("achievementAttention", boot.json())
-        self.assertEqual(health.json()["version"], "0.10.0")
+        self.assertEqual(health.json()["version"], "0.11.0")
 
     def test_create_teacher_and_event(self):
         teacher = self.client.post("/api/teachers", json={
@@ -935,3 +935,93 @@ def _marsad_v010_archive_contract_test(self):
 
 
 MarsadAlInjazatApiTests.test_historical_archive_contract_and_year_discovery = _marsad_v010_archive_contract_test
+
+
+
+def _marsad_v011_global_search_contract_test(self):
+    short = self.client.get("/api/search", params={"q": "ا"})
+    self.assertEqual(short.status_code, 200)
+    self.assertEqual(short.json()["total"], 0)
+    self.assertEqual(short.json()["results"], [])
+
+    teacher = self.client.get("/api/search", params={"q": "أَحْمَــد", "section": "teachers"})
+    self.assertEqual(teacher.status_code, 200)
+    teacher_body = teacher.json()
+    self.assertGreaterEqual(teacher_body["total"], 1)
+    self.assertEqual(teacher_body["normalizedQuery"], "احمد")
+    self.assertTrue(any(item["entityType"] == "teacher" and item["title"] == "أحمد السالمي" for item in teacher_body["results"]))
+    self.assertTrue(all(item["section"] == "teachers" for item in teacher_body["results"]))
+
+    plan = self.client.post("/api/plans", json={
+        "title": "خطة الموجات للبحث الشامل", "subject": "الفيزياء", "grade": "العاشر",
+        "term": "الفصل الأول", "ownerTeacherId": 1, "startDate": "2026-09-01", "endDate": "2026-12-20",
+        "notes": "خطة خاصة بعقد البحث", "status": "active",
+    })
+    self.assertEqual(plan.status_code, 201)
+    plan_id = plan.json()["id"]
+    unit = self.client.post(f"/api/plans/{plan_id}/units", json={
+        "title": "الحركة الموجية الخاصة", "sequence": 1, "plannedStart": "2026-09-01", "plannedEnd": "2026-09-30",
+        "progressPercent": 10, "status": "in_progress", "delayReason": "", "notes": "اختبار نتيجة فرعية",
+        "responsibleTeacherId": 1,
+    })
+    self.assertEqual(unit.status_code, 201)
+    planning = self.client.get("/api/search", params={"q": "الحركة الموجية", "section": "planning", "academicYear": "2026/2027"})
+    self.assertEqual(planning.status_code, 200)
+    planning_body = planning.json()
+    self.assertGreaterEqual(planning_body["total"], 1)
+    self.assertTrue(any(item["entityType"] == "curriculum_unit" and item["targetView"] == "planning" and item["targetId"] == plan_id for item in planning_body["results"]))
+    self.assertTrue(all(item["section"] == "planning" and item["academicYear"] == "2026/2027" for item in planning_body["results"]))
+
+    meeting = self.client.post("/api/meetings", json={
+        "title": "اجتماع بحث شامل", "meetingType": "اجتماع قسم", "meetingDate": "2026-09-05",
+        "meetingTime": "10:00", "location": "قاعة العلوم", "agenda": "مراجعة التخطيط",
+        "discussionSummary": "مناقشة نموذج التخطيط", "notes": "", "status": "held", "attendeeIds": [1, 2],
+    })
+    self.assertEqual(meeting.status_code, 201)
+    meeting_id = meeting.json()["id"]
+    created_decision = self.client.post(f"/api/meetings/{meeting_id}/decisions", json={
+        "title": "توحيد نموذج التخطيط الأسبوعي", "responsibleTeacherId": 2, "responsibleName": "",
+        "dueDate": "2026-09-12", "status": "in_progress", "notes": "اعتماد النموذج الموحد",
+    })
+    self.assertEqual(created_decision.status_code, 201)
+    decision = self.client.get("/api/search", params={"q": "توحيد نموذج التخطيط", "section": "meetings"})
+    self.assertEqual(decision.status_code, 200)
+    self.assertTrue(any(item["entityType"] == "decision" and item["targetView"] == "meetings" and item["targetId"] == meeting_id for item in decision.json()["results"]))
+
+    historical = self.client.post("/api/events", json={
+        "title": "معرض نيوتن التاريخي",
+        "eventType": "معرض",
+        "eventDate": "2025-10-12",
+        "location": "المدرسة",
+        "audience": "طلبة الصف العاشر",
+        "participantCount": 8,
+        "goals": "توثيق تاريخي للبحث",
+        "summary": "فعالية خاصة باختبار البحث الشامل",
+        "outcomes": "نتيجة موثقة",
+        "recommendations": "لا توجد",
+        "teacherIds": [1],
+    })
+    self.assertEqual(historical.status_code, 201)
+    filtered = self.client.get("/api/search", params={"q": "نيوتن", "academicYear": "2025/2026"})
+    self.assertEqual(filtered.status_code, 200)
+    filtered_body = filtered.json()
+    self.assertTrue(any(item["section"] == "events" and item["title"] == "معرض نيوتن التاريخي" for item in filtered_body["results"]))
+    self.assertTrue(all(item.get("academicYear") in {"2025/2026", None} for item in filtered_body["results"]))
+
+    wrong_year = self.client.get("/api/search", params={"q": "نيوتن", "academicYear": "2026/2027"})
+    self.assertEqual(wrong_year.status_code, 200)
+    self.assertFalse(any(item["title"] == "معرض نيوتن التاريخي" for item in wrong_year.json()["results"]))
+
+    limited = self.client.get("/api/search", params={"q": "ال", "limit": 2})
+    self.assertEqual(limited.status_code, 200)
+    self.assertLessEqual(len(limited.json()["results"]), 2)
+
+    bad_section = self.client.get("/api/search", params={"q": "العلوم", "section": "imaginary"})
+    self.assertEqual(bad_section.status_code, 422)
+    bad_year = self.client.get("/api/search", params={"q": "العلوم", "academicYear": "2026-2027"})
+    self.assertEqual(bad_year.status_code, 422)
+    read_only = self.client.post("/api/search", params={"q": "العلوم"})
+    self.assertEqual(read_only.status_code, 405)
+
+
+MarsadAlInjazatApiTests.test_global_search_contract_normalization_filters_and_navigation = _marsad_v011_global_search_contract_test

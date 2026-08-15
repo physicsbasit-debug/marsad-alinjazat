@@ -5,7 +5,7 @@ import { deleteEventMedia, getEventDetails, reorderEventMedia, updateEvent, upda
 import type { EventDetails, EventMediaRecord, EventRecord, Teacher } from '../types';
 import { PageHeader } from './Teachers';
 
-export function Events({ events, teachers, onAddEvent, onRefresh }: { events: EventRecord[]; teachers: Teacher[]; onAddEvent: () => void; onRefresh: () => Promise<void> }) {
+export function Events({ events, teachers, onAddEvent, onRefresh, initialOpenId = null, onInitialOpened }: { events: EventRecord[]; teachers: Teacher[]; onAddEvent: () => void; onRefresh: () => Promise<void>; initialOpenId?: number | null; onInitialOpened?: () => void }) {
   const [query, setQuery] = useState('');
   const [type, setType] = useState('الكل');
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -14,6 +14,12 @@ export function Events({ events, teachers, onAddEvent, onRefresh }: { events: Ev
   const [message, setMessage] = useState('');
 
   const types = ['الكل', ...Array.from(new Set(events.map((event) => event.eventType)))];
+
+  useEffect(() => {
+    if (!initialOpenId) return;
+    setSelectedId(initialOpenId);
+    onInitialOpened?.();
+  }, [initialOpenId]);
   const visible = useMemo(() => events.filter((event) => {
     const q = query.trim();
     const matchType = type === 'الكل' || event.eventType === type;

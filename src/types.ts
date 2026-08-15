@@ -695,3 +695,45 @@ export type ArchiveYearDetail = ArchiveYearSummary & {
   teachers: ArchiveTeacherRecord[];
   sections: OfficialReportSection[];
 };
+
+export type SearchSection = 'all' | 'teachers' | 'planning' | 'achievement' | 'supervision' | 'requests' | 'meetings' | 'events' | 'documents';
+
+export type SearchTargetView = Exclude<SearchSection, 'all'>;
+
+export type SearchResult = {
+  key: string;
+  section: Exclude<SearchSection, 'all'>;
+  sectionLabel: string;
+  entityType: string;
+  entityId: number;
+  title: string;
+  subtitle: string;
+  excerpt: string;
+  academicYear?: string | null;
+  date?: string | null;
+  status?: string | null;
+  subject?: string | null;
+  grade?: string | null;
+  teacherName?: string | null;
+  targetView: SearchTargetView;
+  targetId?: number | null;
+};
+
+export type SearchQuery = {
+  q: string;
+  section?: SearchSection;
+  academicYear?: string;
+  limit?: number;
+};
+
+export type SearchResponse = {
+  query: string;
+  normalizedQuery: string;
+  section: SearchSection;
+  academicYear: string;
+  generatedAt: string;
+  total: number;
+  counts: Partial<Record<Exclude<SearchSection, 'all'>, number>>;
+  availableYears: string[];
+  results: SearchResult[];
+};

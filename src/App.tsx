@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from './components/Icon';
 import { Modal } from './components/Modal';
+import { GlobalSearch } from './components/GlobalSearch';
 import { createEvent, createTeacher, createUploadRequest, getBootstrap, getDriveAuthUrl, updateRequestStatus } from './lib/api';
 import { Dashboard } from './pages/Dashboard';
 import { Documents } from './pages/Documents';
@@ -14,7 +15,7 @@ import { Supervision, SupervisionVisitModal } from './pages/Supervision';
 import { PublicUpload } from './pages/PublicUpload';
 import { Requests } from './pages/Requests';
 import { Teachers } from './pages/Teachers';
-import type { BootstrapData, CreateEventInput, CreateRequestInput, CreateTeacherInput, RequestStatus } from './types';
+import type { BootstrapData, CreateEventInput, CreateRequestInput, CreateTeacherInput, RequestStatus, SearchResult } from './types';
 
 const nav = [
   ['dashboard','home','الرئيسية'],['teachers','teachers','المعلمون'],['planning','planning','التخطيط والمنهج'],['achievement','chart','التحصيل والنتائج'],['supervision','supervision','الإشراف والمتابعة'],['requests','upload','طلبات الملفات'],['meetings','meeting','الاجتماعات والقرارات'],['events','spark','الفعاليات والتوثيق'],['documents','document','الوثائق والمراجع'],['reports','report','التقارير'],['archive','archive','الأرشيف التاريخي'],
@@ -42,6 +43,7 @@ function AdminApp(){
   const [resultUrl,setResultUrl]=useState('');
   const [toast,setToast]=useState('');
   const [error,setError]=useState('');
+  const [searchTarget,setSearchTarget]=useState<{view: View; id: number} | null>(null);
 
   async function refresh(){try{setError('');setData(await getBootstrap());}catch(e){setError(e instanceof Error?e.message:'تعذر تحميل البيانات.');}}
   useEffect(()=>{void refresh();},[]);
@@ -51,6 +53,14 @@ function AdminApp(){
   async function changeStatus(id:number,status:RequestStatus){try{await updateRequestStatus(id,status);setToast('تم تحديث حالة الطلب');await refresh();}catch(e){setToast(e instanceof Error?e.message:'تعذر تحديث الطلب');}}
   function action(name:string){setQuick(false);if(name==='request'){setRequestModal(true);return;}if(name==='event'){setEventModal(true);return;}if(name==='meeting'){setMeetingModal(true);return;}if(name==='visit'){setVisitModal(true);return;}if(name==='assessment'){setAssessmentModal(true);return;}setToast('تم تثبيت هذا الإجراء في بنية التطبيق.');}
   async function connectDrive(){try{const url=await getDriveAuthUrl();window.location.href=url;}catch(e){setToast(e instanceof Error?e.message:'تعذر بدء ربط Drive');}}
+
+  function navigateFromSearch(result: SearchResult){
+    const nextView = result.targetView as View;
+    const canOpenDirect = ['teachers','planning','achievement','supervision','meetings','events'].includes(nextView);
+    setSearchTarget(canOpenDirect && result.targetId ? {view: nextView, id: result.targetId} : null);
+    setView(nextView);
+    setSidebar(false);
+  }
 
   if(!data&&!error) return <Loading/>;
   if(error&&!data) return <div className="fatal-state"><Icon name="alert" size={36}/><h1>تعذر تشغيل التطبيق</h1><p>{error}</p><button className="primary-button" onClick={()=>void refresh()}>إعادة المحاولة</button></div>;
@@ -64,8 +74,8 @@ function AdminApp(){
     </aside>
     {sidebar&&<button className="sidebar-scrim" onClick={()=>setSidebar(false)} aria-label="إغلاق القائمة"/>}
     <main className="main-area">
-      <header className="topbar"><button className="icon-button menu-button" onClick={()=>setSidebar(true)}><Icon name="menu"/></button><label className="global-search"><Icon name="search"/><input placeholder="ابحث في أعمال المادة..."/><kbd>⌘ K</kbd></label><div className="top-actions"><span className="term-chip">{data.term}<i>•</i>{data.academicYear}</span><button className="icon-button bell"><Icon name="bell"/><span></span></button><div className="quick-wrap"><button className="primary-button" onClick={()=>setQuick(!quick)}><Icon name="plus"/> إضافة</button>{quick&&<div className="quick-menu"><Quick icon="upload" title="طلب ملف" detail="إنشاء رابط رفع لمعلم" action={()=>action('request')}/><Quick icon="spark" title="توثيق فعالية" detail="أهداف وصور ونتائج" action={()=>action('event')}/><Quick icon="supervision" title="تسجيل زيارة" detail="متابعة فنية" action={()=>action('visit')}/><Quick icon="meeting" title="اجتماع جديد" detail="محاور وقرارات" action={()=>action('meeting')}/><Quick icon="chart" title="نتيجة وتقويم" detail="تسجيل مؤشرات التحصيل" action={()=>action('assessment')}/></div>}</div></div></header>
-      <section className="workspace">{view==='dashboard'?<Dashboard data={data} onQuickAction={action}/>:view==='teachers'?<Teachers teachers={data.teachers} requests={data.requests} documents={data.documents} visits={data.visits} onAddTeacher={()=>setTeacherModal(true)} onChanged={refresh}/>:view==='requests'?<Requests requests={data.requests} onNewRequest={()=>setRequestModal(true)} onStatus={changeStatus}/>:view==='planning'?<Planning plans={data.plans} planningAttention={data.planningAttention} teachers={data.teachers} onRefresh={refresh}/>:view==='achievement'?<Achievement assessments={data.assessments} achievementAttention={data.achievementAttention} teachers={data.teachers} academicYear={data.academicYear} term={data.term} onAddAssessment={()=>setAssessmentModal(true)} onRefresh={refresh}/>:view==='supervision'?<Supervision visits={data.visits} supervisionAttention={data.supervisionAttention} teachers={data.teachers} onAddVisit={()=>setVisitModal(true)} onRefresh={refresh}/>:view==='meetings'?<Meetings meetings={data.meetings} teachers={data.teachers} onAddMeeting={()=>setMeetingModal(true)} onRefresh={refresh}/>:view==='events'?<Events events={data.events} teachers={data.teachers} onAddEvent={()=>setEventModal(true)} onRefresh={refresh}/>:view==='documents'?<Documents documents={data.documents}/>:view==='reports'?<Reports teachers={data.teachers} academicYear={data.academicYear} term={data.term}/>:view==='archive'?<Archive currentAcademicYear={data.academicYear}/>:<Placeholder view={view}/>}</section>
+      <header className="topbar"><button className="icon-button menu-button" onClick={()=>setSidebar(true)}><Icon name="menu"/></button><GlobalSearch currentAcademicYear={data.academicYear} onNavigate={navigateFromSearch}/><div className="top-actions"><span className="term-chip">{data.term}<i>•</i>{data.academicYear}</span><button className="icon-button bell"><Icon name="bell"/><span></span></button><div className="quick-wrap"><button className="primary-button" onClick={()=>setQuick(!quick)}><Icon name="plus"/> إضافة</button>{quick&&<div className="quick-menu"><Quick icon="upload" title="طلب ملف" detail="إنشاء رابط رفع لمعلم" action={()=>action('request')}/><Quick icon="spark" title="توثيق فعالية" detail="أهداف وصور ونتائج" action={()=>action('event')}/><Quick icon="supervision" title="تسجيل زيارة" detail="متابعة فنية" action={()=>action('visit')}/><Quick icon="meeting" title="اجتماع جديد" detail="محاور وقرارات" action={()=>action('meeting')}/><Quick icon="chart" title="نتيجة وتقويم" detail="تسجيل مؤشرات التحصيل" action={()=>action('assessment')}/></div>}</div></div></header>
+      <section className="workspace">{view==='dashboard'?<Dashboard data={data} onQuickAction={action}/>:view==='teachers'?<Teachers teachers={data.teachers} requests={data.requests} documents={data.documents} visits={data.visits} onAddTeacher={()=>setTeacherModal(true)} onChanged={refresh} initialOpenId={searchTarget?.view==='teachers'?searchTarget.id:null} onInitialOpened={()=>setSearchTarget(null)}/>:view==='requests'?<Requests requests={data.requests} onNewRequest={()=>setRequestModal(true)} onStatus={changeStatus}/>:view==='planning'?<Planning plans={data.plans} planningAttention={data.planningAttention} teachers={data.teachers} onRefresh={refresh} initialOpenId={searchTarget?.view==='planning'?searchTarget.id:null} onInitialOpened={()=>setSearchTarget(null)}/>:view==='achievement'?<Achievement assessments={data.assessments} achievementAttention={data.achievementAttention} teachers={data.teachers} academicYear={data.academicYear} term={data.term} onAddAssessment={()=>setAssessmentModal(true)} onRefresh={refresh} initialOpenId={searchTarget?.view==='achievement'?searchTarget.id:null} onInitialOpened={()=>setSearchTarget(null)}/>:view==='supervision'?<Supervision visits={data.visits} supervisionAttention={data.supervisionAttention} teachers={data.teachers} onAddVisit={()=>setVisitModal(true)} onRefresh={refresh} initialOpenId={searchTarget?.view==='supervision'?searchTarget.id:null} onInitialOpened={()=>setSearchTarget(null)}/>:view==='meetings'?<Meetings meetings={data.meetings} teachers={data.teachers} onAddMeeting={()=>setMeetingModal(true)} onRefresh={refresh} initialOpenId={searchTarget?.view==='meetings'?searchTarget.id:null} onInitialOpened={()=>setSearchTarget(null)}/>:view==='events'?<Events events={data.events} teachers={data.teachers} onAddEvent={()=>setEventModal(true)} onRefresh={refresh} initialOpenId={searchTarget?.view==='events'?searchTarget.id:null} onInitialOpened={()=>setSearchTarget(null)}/>:view==='documents'?<Documents documents={data.documents}/>:view==='reports'?<Reports teachers={data.teachers} academicYear={data.academicYear} term={data.term}/>:view==='archive'?<Archive currentAcademicYear={data.academicYear}/>:<Placeholder view={view}/>}</section>
     </main>
     <RequestModal open={requestModal} teachers={data.teachers} onClose={()=>setRequestModal(false)} onCreated={async(url)=>{setRequestModal(false);setResultUrl(url);await refresh();}}/>
     <TeacherModal open={teacherModal} onClose={()=>setTeacherModal(false)} onCreated={async()=>{setTeacherModal(false);setToast('تمت إضافة المعلم');await refresh();}}/>

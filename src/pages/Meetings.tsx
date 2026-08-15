@@ -21,7 +21,7 @@ import type {
 } from '../types';
 import { PageHeader } from './Teachers';
 
-export function Meetings({ meetings, teachers, onAddMeeting, onRefresh }: { meetings: MeetingRecord[]; teachers: Teacher[]; onAddMeeting: () => void; onRefresh: () => Promise<void> }) {
+export function Meetings({ meetings, teachers, onAddMeeting, onRefresh, initialOpenId = null, onInitialOpened }: { meetings: MeetingRecord[]; teachers: Teacher[]; onAddMeeting: () => void; onRefresh: () => Promise<void>; initialOpenId?: number | null; onInitialOpened?: () => void }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'open' | 'overdue' | 'completed'>('all');
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -35,6 +35,12 @@ export function Meetings({ meetings, teachers, onAddMeeting, onRefresh }: { meet
     overdue: meetings.reduce((sum, item) => sum + item.overdueDecisionCount, 0),
     completed: meetings.reduce((sum, item) => sum + item.completedDecisionCount, 0),
   }), [meetings]);
+
+  useEffect(() => {
+    if (!initialOpenId) return;
+    setSelectedId(initialOpenId);
+    onInitialOpened?.();
+  }, [initialOpenId]);
 
   const visible = useMemo(() => meetings.filter((meeting) => {
     const q = query.trim();

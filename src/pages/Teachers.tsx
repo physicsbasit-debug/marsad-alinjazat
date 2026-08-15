@@ -26,6 +26,8 @@ export function Teachers({
   visits,
   onAddTeacher,
   onChanged,
+  initialOpenId = null,
+  onInitialOpened,
 }: {
   teachers: Teacher[];
   requests: UploadRequest[];
@@ -33,11 +35,20 @@ export function Teachers({
   visits: SupervisionVisitRecord[];
   onAddTeacher: () => void;
   onChanged: () => Promise<void>;
+  initialOpenId?: number | null;
+  onInitialOpened?: () => void;
 }) {
   const [query, setQuery] = useState('');
   const [subject, setSubject] = useState('الكل');
   const [selected, setSelected] = useState<Teacher | null>(null);
   const subjects = ['الكل', ...Array.from(new Set(teachers.map((teacher) => teacher.subject)))];
+  useEffect(() => {
+    if (!initialOpenId) return;
+    const target = teachers.find((teacher) => teacher.id === initialOpenId);
+    if (target) setSelected(target);
+    onInitialOpened?.();
+  }, [initialOpenId, teachers]);
+
   const visible = useMemo(
     () =>
       teachers.filter((teacher) => {

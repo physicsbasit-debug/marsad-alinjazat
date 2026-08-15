@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
 import {
@@ -23,11 +23,15 @@ export function Planning({
   planningAttention,
   teachers,
   onRefresh,
+  initialOpenId = null,
+  onInitialOpened,
 }: {
   plans: CurriculumPlanRecord[];
   planningAttention: CurriculumUnit[];
   teachers: Teacher[];
   onRefresh: () => Promise<void>;
+  initialOpenId?: number | null;
+  onInitialOpened?: () => void;
 }) {
   const [subject, setSubject] = useState('الكل');
   const [grade, setGrade] = useState('الكل');
@@ -49,6 +53,12 @@ export function Planning({
       setMessage(error instanceof Error ? error.message : 'تعذر فتح الخطة.');
     }
   }
+
+  useEffect(() => {
+    if (!initialOpenId) return;
+    void openPlan(initialOpenId);
+    onInitialOpened?.();
+  }, [initialOpenId]);
 
   const activePlans = plans.filter((plan) => plan.status === 'active');
   const average = activePlans.length ? Math.round(activePlans.reduce((sum, plan) => sum + plan.progressPercent, 0) / activePlans.length) : 0;

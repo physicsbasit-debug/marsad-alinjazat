@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from . import drive
 from .db import BASE_DIR, connect, init_db, row_to_dict, utc_now
+from .search import run_search
 
 load_dotenv(BASE_DIR / ".env")
 init_db()
@@ -33,7 +34,7 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 EVENT_UPLOADS_DIR = Path(os.getenv("APP_EVENT_UPLOADS_DIR", BASE_DIR / "uploads" / "events"))
 EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="مرصد الإنجازات API", version="0.10.0")
+app = FastAPI(title="مرصد الإنجازات API", version="0.11.0")
 
 
 class CreateRequestPayload(BaseModel):
@@ -1521,7 +1522,7 @@ def _resolve_event_local_path(storage_path: str) -> Path:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "0.10.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
+    return {"ok": True, "version": "0.11.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
 
 
 @app.get("/api/bootstrap")
@@ -1609,6 +1610,12 @@ def archive_year(academicYear: str = ACADEMIC_YEAR):
         if academicYear not in years:
             raise HTTPException(status_code=404, detail="العام الدراسي غير موجود في الأرشيف.")
         return _archive_scope(conn, academicYear)
+
+
+@app.get("/api/search")
+def global_search(q: str = "", section: str = "all", academicYear: str = "all", limit: int = 40):
+    with connect() as conn:
+        return run_search(conn, q=q, section=section, academic_year=academicYear, limit=limit)
 
 
 @app.post("/api/teachers", status_code=201)
