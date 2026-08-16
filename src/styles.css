@@ -1182,3 +1182,29 @@ a { color: inherit; text-decoration: none; }
   .search-result-meta { min-width: 58px; }
   .search-result-copy em { display: none; }
 }
+
+/* v0.13 — الإدخال التاريخي والاستمرارية الطولية */
+.academic-year-control { display:flex; align-items:end; gap:7px; flex:0 0 auto; }
+.academic-year-control label { display:grid; gap:3px; }
+.academic-year-control label > span { padding-inline:2px; color:#7b8a92; font-size:9px; font-weight:800; }
+.academic-year-control input { width:118px; height:40px; border:1px solid #e2e8ea; background:rgba(255,255,255,.88); border-radius:12px; padding:0 10px; color:#455a64; font:inherit; font-size:11px; font-weight:800; text-align:center; outline:none; direction:ltr; }
+.academic-year-control input:focus { border-color:#9fc9c6; box-shadow:0 0 0 3px rgba(22,124,118,.07); }
+.academic-year-control > button { height:40px; border:1px solid #dce6e7; background:#fff; color:var(--teal); border-radius:11px; padding:0 10px; font:inherit; font-size:10px; font-weight:900; cursor:pointer; }
+.academic-year-control.historical input { border-color:#d9bf87; background:#fffaf0; color:#76571b; }
+.historical-context-banner { max-width:1436px; margin:18px auto -8px; padding:12px 16px; display:flex; align-items:center; gap:11px; border:1px solid #ead7aa; background:#fffaf0; color:#795d23; border-radius:15px; }
+.historical-context-banner > svg { flex:0 0 auto; }
+.historical-context-banner > div { min-width:0; flex:1; display:grid; gap:2px; }
+.historical-context-banner strong { color:#684d17; font-size:12px; }
+.historical-context-banner span { color:#8a7445; font-size:10.5px; line-height:1.7; }
+.historical-context-banner .ghost-button { min-height:34px; flex:0 0 auto; background:#fff; }
+
+@media (max-width: 960px) {
+  .academic-year-control label > span { display:none; }
+  .academic-year-control > button { display:none; }
+  .historical-context-banner { margin:14px 18px -5px; }
+}
+@media (max-width: 690px) {
+  .academic-year-control input { width:100px; height:36px; font-size:10px; }
+  .historical-context-banner { margin:10px 10px -4px; align-items:flex-start; flex-wrap:wrap; padding:10px 12px; }
+  .historical-context-banner .ghost-button { width:100%; }
+}

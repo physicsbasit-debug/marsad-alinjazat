@@ -36,8 +36,10 @@ import type {
   ArchiveYearDetail,
   SearchQuery,
   SearchResponse,
+  DirectDocumentInput,
+  DocumentRecord,
 } from '../types';
-import { getPreviewArchiveYear, getPreviewArchiveYears, getPreviewAssessmentDetails, getPreviewEventDetails, getPreviewMeetingDetails, getPreviewOfficialReport, getPreviewPlanDetails, getPreviewSupervisionVisit, getPreviewTeacherProfile, previewBootstrap } from './preview';
+import { getPreviewArchiveYear, getPreviewArchiveYears, getPreviewAssessmentDetails, getPreviewEventDetails, getPreviewMeetingDetails, getPreviewOfficialReport, getPreviewPlanDetails, getPreviewSupervisionVisit, getPreviewTeacherProfile, getPreviewBootstrap } from './preview';
 import { getPreviewGlobalSearch } from './previewSearch';
 
 const PREVIEW_MODE = import.meta.env.VITE_PREVIEW_MODE === 'true';
@@ -59,9 +61,10 @@ function requireBackend(): void {
   if (PREVIEW_MODE) throw new Error(PREVIEW_MESSAGE);
 }
 
-export async function getBootstrap(): Promise<BootstrapData> {
-  if (PREVIEW_MODE) return previewBootstrap;
-  return parseResponse(await fetch('/api/bootstrap'));
+export async function getBootstrap(academicYear?: string): Promise<BootstrapData> {
+  if (PREVIEW_MODE) return getPreviewBootstrap(academicYear);
+  const params = academicYear ? `?${new URLSearchParams({ academicYear }).toString()}` : '';
+  return parseResponse(await fetch(`/api/bootstrap${params}`));
 }
 
 
@@ -150,6 +153,20 @@ export async function createTeacher(input: CreateTeacherInput): Promise<{ id: nu
     }),
   );
 }
+
+export async function uploadDirectDocument(input: DirectDocumentInput, file: File): Promise<DocumentRecord> {
+  requireBackend();
+  const form = new FormData();
+  form.append('file', file);
+  form.append('title', input.title);
+  form.append('category', input.category);
+  form.append('academicYear', input.academicYear);
+  if (input.teacherId) form.append('teacherId', String(input.teacherId));
+  form.append('subject', input.subject);
+  form.append('grade', input.grade);
+  return parseResponse(await fetch('/api/documents', { method: 'POST', body: form }));
+}
+
 
 export async function createEvent(input: CreateEventInput): Promise<{ id: number }> {
   requireBackend();

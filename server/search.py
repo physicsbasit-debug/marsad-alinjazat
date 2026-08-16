@@ -184,9 +184,11 @@ def _add(results: list[dict], item: dict | None) -> None:
 
 
 def _linked_teacher_ids_for_year(conn, academic_year: str) -> set[int]:
-    linked: set[int] = set()
-    for row in conn.execute("SELECT teacher_id, created_at FROM upload_requests").fetchall():
-        if academic_year_from_date(row["created_at"]) == academic_year:
+    linked: set[int] = {row["teacher_id"] for row in conn.execute("SELECT teacher_id FROM teacher_record_years WHERE academic_year = ?", (academic_year,)).fetchall()}
+    for row in conn.execute("""SELECT r.teacher_id, r.created_at, ry.academic_year
+                               FROM upload_requests r LEFT JOIN request_record_years ry ON ry.request_id=r.id""").fetchall():
+        year = row["academic_year"] or academic_year_from_date(row["created_at"])
+        if year == academic_year:
             linked.add(row["teacher_id"])
     for row in conn.execute("SELECT teacher_id, academic_year, uploaded_at FROM documents WHERE teacher_id IS NOT NULL").fetchall():
         year = row["academic_year"] or academic_year_from_date(row["uploaded_at"])
@@ -204,14 +206,16 @@ def _linked_teacher_ids_for_year(conn, academic_year: str) -> set[int]:
     ]:
         linked.update(row["teacher_id"] for row in conn.execute(query, (academic_year,)).fetchall())
     event_rows = conn.execute(
-        "SELECT l.teacher_id, e.event_date FROM event_teacher_links l JOIN events e ON e.id = l.event_id"
+        """SELECT l.teacher_id, e.event_date, ey.academic_year FROM event_teacher_links l
+           JOIN events e ON e.id = l.event_id LEFT JOIN event_record_years ey ON ey.event_id=e.id"""
     ).fetchall()
-    linked.update(row["teacher_id"] for row in event_rows if academic_year_from_date(row["event_date"]) == academic_year)
+    linked.update(row["teacher_id"] for row in event_rows if (row["academic_year"] or academic_year_from_date(row["event_date"])) == academic_year)
     return linked
 
 
 def _available_years(conn) -> list[str]:
     years: set[str] = set()
+    years.update(row[0] for row in conn.execute("SELECT DISTINCT academic_year FROM teacher_record_years WHERE academic_year IS NOT NULL AND academic_year != ''").fetchall() if row[0])
     for table in ["curriculum_plans", "supervision_visits", "achievement_assessments", "meetings"]:
         years.update(
             row[0]
@@ -222,11 +226,16 @@ def _available_years(conn) -> list[str]:
         year = row["academic_year"] or academic_year_from_date(row["uploaded_at"])
         if year:
             years.add(year)
-    for table, column in [("events", "event_date"), ("upload_requests", "created_at")]:
-        for row in conn.execute(f"SELECT {column} FROM {table}").fetchall():
-            year = academic_year_from_date(row[column])
-            if year:
-                years.add(year)
+    for row in conn.execute("""SELECT e.event_date, ey.academic_year FROM events e
+                              LEFT JOIN event_record_years ey ON ey.event_id=e.id""").fetchall():
+        year = row["academic_year"] or academic_year_from_date(row["event_date"])
+        if year:
+            years.add(year)
+    for row in conn.execute("""SELECT r.created_at, ry.academic_year FROM upload_requests r
+                              LEFT JOIN request_record_years ry ON ry.request_id=r.id""").fetchall():
+        year = row["academic_year"] or academic_year_from_date(row["created_at"])
+        if year:
+            years.add(year)
     return sorted(years, key=lambda value: int(value[:4]), reverse=True)
 
 
@@ -389,11 +398,12 @@ def run_search(conn, *, q: str, section: str = "all", academic_year: str = "all"
 
     if enabled("requests"):
         rows = conn.execute(
-            """SELECT r.*, t.name AS teacher_name FROM upload_requests r
-               JOIN teachers t ON t.id = r.teacher_id ORDER BY r.updated_at DESC"""
+            """SELECT r.*, ry.academic_year, t.name AS teacher_name FROM upload_requests r
+               JOIN teachers t ON t.id = r.teacher_id
+               LEFT JOIN request_record_years ry ON ry.request_id=r.id ORDER BY r.updated_at DESC"""
         ).fetchall()
         for row in rows:
-            year = academic_year_from_date(row["created_at"])
+            year = row["academic_year"] or academic_year_from_date(row["created_at"])
             if academic_year != "all" and year != academic_year:
                 continue
             status = _effective_status(row["status"], row["deadline"]) if row["status"] not in {"approved", "cancelled"} else row["status"]
@@ -437,9 +447,10 @@ def run_search(conn, *, q: str, section: str = "all", academic_year: str = "all"
             ))
 
     if enabled("events"):
-        rows = conn.execute("SELECT e.* FROM events e ORDER BY e.event_date DESC").fetchall()
+        rows = conn.execute("""SELECT e.*, ey.academic_year FROM events e
+                              LEFT JOIN event_record_years ey ON ey.event_id=e.id ORDER BY e.event_date DESC""").fetchall()
         for row in rows:
-            year = academic_year_from_date(row["event_date"])
+            year = row["academic_year"] or academic_year_from_date(row["event_date"])
             if academic_year != "all" and year != academic_year:
                 continue
             teacher_names = " ".join(

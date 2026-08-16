@@ -359,6 +359,28 @@ def init_db() -> None:
                 updated_at TEXT NOT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS request_record_years (
+                request_id INTEGER PRIMARY KEY REFERENCES upload_requests(id) ON DELETE CASCADE,
+                academic_year TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS event_record_years (
+                event_id INTEGER PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
+                academic_year TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS teacher_record_years (
+                teacher_id INTEGER NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+                academic_year TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (teacher_id, academic_year)
+            );
+
             CREATE INDEX IF NOT EXISTS idx_requests_status ON upload_requests(status);
             CREATE INDEX IF NOT EXISTS idx_documents_request ON documents(request_id);
             CREATE INDEX IF NOT EXISTS idx_activities_created ON activities(created_at DESC);
@@ -383,6 +405,9 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_achievement_actions_assessment ON achievement_actions(assessment_id, status, due_date);
             CREATE INDEX IF NOT EXISTS idx_achievement_actions_open ON achievement_actions(status, due_date);
             CREATE INDEX IF NOT EXISTS idx_achievement_action_metrics_status ON achievement_action_metrics(direction, outcome_value);
+            CREATE INDEX IF NOT EXISTS idx_request_record_years_year ON request_record_years(academic_year, request_id);
+            CREATE INDEX IF NOT EXISTS idx_event_record_years_year ON event_record_years(academic_year, event_id);
+            CREATE INDEX IF NOT EXISTS idx_teacher_record_years_year ON teacher_record_years(academic_year, teacher_id);
             """
         )
         _backfill_event_media_meta(conn)
@@ -435,6 +460,17 @@ def _seed(conn: sqlite3.Connection) -> None:
             [(*teacher, now, now) for teacher in teachers],
         )
 
+    # Before v0.13 the teachers table represented the current professional roster.
+    # Preserve that fact by linking every pre-existing teacher to the current operating year.
+    # Historical years are never inferred here; they are added explicitly or by a real year-scoped record.
+    current_teacher_year = os.getenv("ACADEMIC_YEAR", "2026/2027")
+    teacher_year_now = utc_now()
+    for row in conn.execute("SELECT id FROM teachers ORDER BY id").fetchall():
+        conn.execute(
+            "INSERT OR IGNORE INTO teacher_record_years (teacher_id, academic_year, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            (row["id"], current_teacher_year, teacher_year_now, teacher_year_now),
+        )
+
     request_count = conn.execute("SELECT COUNT(*) FROM upload_requests").fetchone()[0]
     if request_count == 0:
         now = utc_now()
@@ -447,13 +483,17 @@ def _seed(conn: sqlite3.Connection) -> None:
         ]
         for teacher_id, request_type, subject, grade, title, deadline, notes, allowed, status in seed_requests:
             token_hash = hashlib.sha256(secrets.token_urlsafe(24).encode()).hexdigest()
-            conn.execute(
+            cursor = conn.execute(
                 """
                 INSERT INTO upload_requests
                 (teacher_id, request_type, subject, grade, title, deadline, notes, allowed_files, token_hash, status, expires_at, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (teacher_id, request_type, subject, grade, title, deadline, notes, allowed, token_hash, status, expires, now, now),
+            )
+            conn.execute(
+                "INSERT INTO request_record_years (request_id, academic_year, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                (cursor.lastrowid, os.getenv("ACADEMIC_YEAR", "2026/2027"), now, now),
             )
 
     event_count = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
@@ -472,6 +512,12 @@ def _seed(conn: sqlite3.Connection) -> None:
             """,
             [(*event, now, now) for event in events],
         )
+        current_year = os.getenv("ACADEMIC_YEAR", "2026/2027")
+        for row in conn.execute("SELECT id FROM events ORDER BY id").fetchall():
+            conn.execute(
+                "INSERT OR IGNORE INTO event_record_years (event_id, academic_year, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                (row["id"], current_year, now, now),
+            )
 
     activity_count = conn.execute("SELECT COUNT(*) FROM activities").fetchone()[0]
     if activity_count == 0:

@@ -31,6 +31,7 @@ export type UploadRequest = {
   notes?: string | null;
   allowedFiles: string;
   status: RequestStatus;
+  academicYear?: string | null;
   expiresAt: string;
   createdAt: string;
   updatedAt: string;
@@ -66,11 +67,21 @@ export type DocumentRecord = {
   approvedAt?: string | null;
 };
 
+export type DirectDocumentInput = {
+  title: string;
+  category: string;
+  academicYear: string;
+  teacherId?: number | null;
+  subject: string;
+  grade: string;
+};
+
 export type EventRecord = {
   id: number;
   title: string;
   eventType: string;
   eventDate: string;
+  academicYear?: string | null;
   location?: string | null;
   audience?: string | null;
   participantCount: number;
@@ -178,6 +189,7 @@ export type CreateMeetingInput = {
   title: string;
   meetingType: string;
   meetingDate: string;
+  academicYear: string;
   meetingTime: string;
   location: string;
   agenda: string;
@@ -252,6 +264,7 @@ export type CurriculumPlanInput = {
   subject: string;
   grade: string;
   term: string;
+  academicYear: string;
   ownerTeacherId?: number | null;
   startDate?: string | null;
   endDate?: string | null;
@@ -329,6 +342,7 @@ export type SupervisionVisitInput = {
   teacherId: number;
   visitType: string;
   visitDate: string;
+  academicYear: string;
   periodLabel: string;
   grade: string;
   lessonTitle: string;
@@ -518,11 +532,14 @@ export type DashboardStats = {
   visitProgress: number;
   requestCompletion: number;
   achievementMastery: number;
+  achievementMasteryComparable: boolean;
   openAchievementActions: number;
 };
 
 export type BootstrapData = {
   academicYear: string;
+  currentAcademicYear: string;
+  availableAcademicYears: string[];
   term: string;
   dashboard: DashboardStats;
   teachers: Teacher[];
@@ -627,6 +644,7 @@ export type CreateTeacherCvItemInput = {
 };
 
 export type CreateTeacherInput = {
+  academicYear: string;
   name: string;
   subject: string;
   specialization: string;
@@ -641,6 +659,7 @@ export type CreateEventInput = {
   title: string;
   eventType: string;
   eventDate: string;
+  academicYear: string;
   location: string;
   audience: string;
   participantCount: number;

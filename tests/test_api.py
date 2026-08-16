@@ -33,7 +33,7 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         self.assertIn("supervisionAttention", boot.json())
         self.assertIn("assessments", boot.json())
         self.assertIn("achievementAttention", boot.json())
-        self.assertEqual(health.json()["version"], "0.12.0")
+        self.assertEqual(health.json()["version"], "0.13.0")
 
     def test_create_teacher_and_event(self):
         teacher = self.client.post("/api/teachers", json={
@@ -1127,3 +1127,200 @@ def _marsad_v011_global_search_contract_test(self):
 
 
 MarsadAlInjazatApiTests.test_global_search_contract_normalization_filters_and_navigation = _marsad_v011_global_search_contract_test
+
+
+def _marsad_v013_historical_entry_and_longitudinal_scope_test(self):
+    current_before = self.client.get('/api/bootstrap', params={'academicYear': '2026/2027'})
+    self.assertEqual(current_before.status_code, 200)
+    before = current_before.json()
+    historical_year = '2024/2025'
+
+    historical_teacher = self.client.post('/api/teachers', json={
+        'academicYear': historical_year, 'name': 'معلم تاريخي فقط v013', 'subject': 'العلوم',
+        'specialization': 'علوم عامة', 'qualification': 'بكالوريوس تربية', 'experienceYears': 9,
+        'workload': 18, 'email': 'historical-only-v013@example.edu', 'phone': '',
+    })
+    self.assertEqual(historical_teacher.status_code, 201)
+    historical_teacher_id = historical_teacher.json()['id']
+    self.assertFalse(historical_teacher.json()['linkedExisting'])
+
+    # Reusing an existing professional identity for a historical year must link it, not duplicate it.
+    existing_teacher_link = self.client.post('/api/teachers', json={
+        'academicYear': historical_year, 'name': 'أحمد السالمي', 'subject': 'الفيزياء',
+        'specialization': 'فيزياء', 'qualification': 'بكالوريوس تربية', 'experienceYears': 12,
+        'workload': 18, 'email': 'ahmed@example.edu', 'phone': '',
+    })
+    self.assertEqual(existing_teacher_link.status_code, 201)
+    self.assertTrue(existing_teacher_link.json()['linkedExisting'])
+    self.assertEqual(existing_teacher_link.json()['id'], 1)
+
+    event = self.client.post('/api/events', json={
+        'title': 'فعالية تاريخية صريحة v013', 'eventType': 'مبادرة', 'eventDate': '2024-10-12',
+        'academicYear': historical_year, 'location': 'المدرسة', 'audience': 'طلبة المدرسة',
+        'participantCount': 18, 'goals': 'توثيق سجل سابق', 'summary': 'إدخال تاريخي صريح',
+        'outcomes': 'سجل تشغيلي محفوظ', 'recommendations': '', 'teacherIds': [1],
+    })
+    self.assertEqual(event.status_code, 201)
+    event_id = event.json()['id']
+
+    meeting = self.client.post('/api/meetings', json={
+        'title': 'اجتماع تاريخي صريح v013', 'meetingType': 'اجتماع قسم',
+        'meetingDate': '2025-02-10', 'meetingTime': '10:00', 'location': 'قاعة العلوم',
+        'agenda': 'توثيق قرار سابق', 'discussionSummary': 'سجل تاريخي', 'notes': '',
+        'academicYear': historical_year, 'status': 'held', 'attendeeIds': [1, 2],
+    })
+    self.assertEqual(meeting.status_code, 201)
+    meeting_id = meeting.json()['id']
+
+    plan = self.client.post('/api/plans', json={
+        'title': 'خطة تاريخية صريحة v013', 'subject': 'الفيزياء', 'grade': 'العاشر',
+        'term': 'الفصل الأول', 'academicYear': historical_year, 'ownerTeacherId': 1,
+        'startDate': '2024-09-01', 'endDate': '2025-01-30', 'notes': 'خطة سنة سابقة', 'status': 'completed',
+    })
+    self.assertEqual(plan.status_code, 201)
+    plan_id = plan.json()['id']
+
+    visit = self.client.post('/api/supervision/visits', json={
+        'teacherId': 1, 'visitType': 'زيارة صفية', 'visitDate': '2024-11-06',
+        'academicYear': historical_year, 'periodLabel': 'الحصة الثالثة', 'grade': 'العاشر',
+        'lessonTitle': 'درس تاريخي', 'objectives': 'هدف موثق', 'strengths': 'قوة موثقة',
+        'developmentAreas': 'جانب تطوير', 'recommendations': 'توصية محفوظة',
+        'followupDate': '2024-11-20', 'followupNotes': 'متابعة تاريخية', 'status': 'closed',
+    })
+    self.assertEqual(visit.status_code, 201)
+    visit_id = visit.json()['id']
+
+    assessment = self.client.post('/api/achievement/assessments', json={
+        'title': 'تقويم تاريخي صريح v013', 'assessmentType': 'اختبار قصير',
+        'subject': 'الفيزياء', 'grade': 'العاشر', 'assessmentDate': '2024-12-05',
+        'term': 'الفصل الأول', 'academicYear': historical_year, 'teacherId': 1,
+        'maxScore': 40, 'studentCount': 20, 'averageScore': 26, 'highestScore': 38, 'lowestScore': 12,
+        'masteryThresholdPct': 60,
+        'masteryReferenceSource': 'مرجع مدخل للاختبار البنيوي فقط — لا يمثل معيارًا وزاريًا',
+        'masteredCount': 12, 'nearMasteryCount': 5, 'interventionCount': 3,
+        'notes': 'اختبار فصل السنوات فقط', 'status': 'reviewed',
+    })
+    self.assertEqual(assessment.status_code, 201)
+    assessment_id = assessment.json()['id']
+
+    document = self.client.post(
+        '/api/documents',
+        data={
+            'title': 'وثيقة تاريخية صريحة v013', 'category': 'تحليل نتائج',
+            'academicYear': historical_year, 'teacherId': '1', 'subject': 'الفيزياء', 'grade': 'العاشر',
+        },
+        files={'file': ('historical-analysis.pdf', b'%PDF-1.4\nhistorical\n', 'application/pdf')},
+    )
+    self.assertEqual(document.status_code, 201)
+    document_id = document.json()['id']
+    self.assertEqual(document.json()['academicYear'], historical_year)
+    self.assertEqual(document.json()['status'], 'approved')
+
+    # The current operating year must remain clean after historical backfill.
+    current_after = self.client.get('/api/bootstrap', params={'academicYear': '2026/2027'})
+    self.assertEqual(current_after.status_code, 200)
+    current = current_after.json()
+    self.assertEqual(current['currentAcademicYear'], '2026/2027')
+    self.assertEqual(current['academicYear'], '2026/2027')
+    self.assertFalse(any(item['id'] == event_id for item in current['events']))
+    self.assertFalse(any(item['id'] == meeting_id for item in current['meetings']))
+    self.assertFalse(any(item['id'] == plan_id for item in current['plans']))
+    self.assertFalse(any(item['id'] == visit_id for item in current['visits']))
+    self.assertFalse(any(item['id'] == assessment_id for item in current['assessments']))
+    self.assertFalse(any(item['id'] == document_id for item in current['documents']))
+    self.assertFalse(any(item['id'] == historical_teacher_id for item in current['teachers']))
+    self.assertEqual(current['dashboard']['teacherCount'], before['dashboard']['teacherCount'])
+    self.assertFalse(any('تاريخي صريح v013' in item.get('title', '') for item in current['activities']))
+    # Historical insertion cannot change current-year operational dashboard counts for these scopes.
+    for key in ('openDecisions', 'upcomingVisits', 'planProgress', 'visitProgress', 'achievementMastery', 'openAchievementActions'):
+        self.assertEqual(current['dashboard'][key], before['dashboard'][key], key)
+
+    historical = self.client.get('/api/bootstrap', params={'academicYear': historical_year})
+    self.assertEqual(historical.status_code, 200)
+    old = historical.json()
+    self.assertEqual(old['academicYear'], historical_year)
+    self.assertEqual(old['currentAcademicYear'], '2026/2027')
+    self.assertIn(historical_year, old['availableAcademicYears'])
+    self.assertTrue(any(item['id'] == event_id for item in old['events']))
+    self.assertTrue(any(item['id'] == meeting_id for item in old['meetings']))
+    self.assertTrue(any(item['id'] == plan_id for item in old['plans']))
+    self.assertTrue(any(item['id'] == visit_id for item in old['visits']))
+    self.assertTrue(any(item['id'] == assessment_id for item in old['assessments']))
+    self.assertTrue(any(item['id'] == document_id for item in old['documents']))
+    self.assertTrue(any(item['id'] == historical_teacher_id for item in old['teachers']))
+    self.assertGreaterEqual(old['dashboard']['teacherCount'], 1)
+    self.assertTrue(any('تاريخي صريح v013' in item.get('title', '') for item in old['activities']))
+
+    # Search and archive use the same explicit year instead of a parallel archive copy.
+    search = self.client.get('/api/search', params={'q': 'صريح v013', 'academicYear': historical_year})
+    self.assertEqual(search.status_code, 200)
+    self.assertGreaterEqual(search.json()['total'], 4)
+    self.assertTrue(all(item.get('academicYear') in {historical_year, None} for item in search.json()['results']))
+    archive = self.client.get('/api/archive/year', params={'academicYear': historical_year})
+    self.assertEqual(archive.status_code, 200)
+    self.assertGreaterEqual(archive.json()['sourceCounts']['events'], 1)
+    self.assertGreaterEqual(archive.json()['sourceCounts']['plans'], 1)
+    self.assertGreaterEqual(archive.json()['sourceCounts']['assessments'], 1)
+
+    # Explicit record year is editable: moving the event changes its working-year scope.
+    moved = self.client.patch(f'/api/events/{event_id}', json={
+        'title': 'فعالية تاريخية صريحة v013', 'eventType': 'مبادرة', 'eventDate': '2025-10-12',
+        'academicYear': '2025/2026', 'location': 'المدرسة', 'audience': 'طلبة المدرسة',
+        'participantCount': 18, 'goals': 'توثيق سجل سابق', 'summary': 'نقل سنة السجل',
+        'outcomes': 'سجل تشغيلي محفوظ', 'recommendations': '', 'teacherIds': [1],
+    })
+    self.assertEqual(moved.status_code, 200)
+    self.assertEqual(moved.json()['academicYear'], '2025/2026')
+    old_after_move = self.client.get('/api/bootstrap', params={'academicYear': historical_year}).json()
+    self.assertFalse(any(item['id'] == event_id for item in old_after_move['events']))
+    next_year = self.client.get('/api/bootstrap', params={'academicYear': '2025/2026'}).json()
+    self.assertTrue(any(item['id'] == event_id for item in next_year['events']))
+
+    # Validation is structural only: no invented Omani term boundaries, but obvious year/date mismatch is rejected.
+    bad_year = self.client.get('/api/bootstrap', params={'academicYear': '2024-2025'})
+    self.assertEqual(bad_year.status_code, 422)
+    mismatch = self.client.post('/api/events', json={
+        'title': 'سجل بسنة غير منسجمة', 'eventType': 'فعالية', 'eventDate': '2026-10-12',
+        'academicYear': historical_year, 'location': '', 'audience': '', 'participantCount': 0,
+        'goals': '', 'summary': '', 'outcomes': '', 'recommendations': '', 'teacherIds': [],
+    })
+    self.assertEqual(mismatch.status_code, 422)
+
+
+MarsadAlInjazatApiTests.test_historical_entry_longitudinal_scope_and_current_year_isolation = _marsad_v013_historical_entry_and_longitudinal_scope_test
+
+
+def _marsad_v013_mixed_mastery_standards_guard_test(self):
+    base = {
+        'assessmentType': 'اختبار قصير', 'subject': 'العلوم', 'grade': 'العاشر',
+        'assessmentDate': '2026-10-20', 'term': 'الفصل الأول', 'academicYear': '2026/2027',
+        'teacherId': 1, 'maxScore': 40, 'studentCount': 10, 'averageScore': 25,
+        'highestScore': 38, 'lowestScore': 10, 'masteredCount': 6, 'nearMasteryCount': 2,
+        'interventionCount': 2, 'notes': 'اختبار حارس عدم التجميع', 'status': 'recorded',
+        'masteryReferenceNote': 'اختبار تقني فقط ولا يمثل معيارًا تربويًا.',
+    }
+    first = self.client.post('/api/achievement/assessments', json={
+        **base, 'title': 'حارس مرجع مختلف أ', 'masteryThresholdPct': 60,
+        'masteryReferenceSource': 'مرجع اختباري أ — ليس معيارًا وزاريًا', 'masteryReferenceYear': 'test-a',
+    })
+    self.assertEqual(first.status_code, 201)
+    second = self.client.post('/api/achievement/assessments', json={
+        **base, 'title': 'حارس مرجع مختلف ب', 'assessmentDate': '2026-10-21', 'masteryThresholdPct': 70,
+        'masteryReferenceSource': 'مرجع اختباري ب — ليس معيارًا وزاريًا', 'masteryReferenceYear': 'test-b',
+    })
+    self.assertEqual(second.status_code, 201)
+
+    boot = self.client.get('/api/bootstrap', params={'academicYear': '2026/2027'}).json()
+    self.assertFalse(boot['dashboard']['achievementMasteryComparable'])
+    self.assertEqual(boot['dashboard']['achievementMastery'], 0)
+
+    report = self.client.get('/api/reports/official', params={
+        'reportType': 'achievement', 'academicYear': '2026/2027', 'term': 'الفصل الأول',
+    })
+    self.assertEqual(report.status_code, 200)
+    metric = next(item for item in report.json()['metrics'] if item['label'] == 'الفئة المحققة للحد عبر التقويمات')
+    self.assertEqual(metric['value'], 'غير مجمعة')
+    self.assertIn('تختلف', metric.get('detail', ''))
+
+
+MarsadAlInjazatApiTests.test_zz_mixed_mastery_standards_are_not_aggregated = _marsad_v013_mixed_mastery_standards_guard_test

@@ -38,6 +38,33 @@ class MarsadDriveEventTests(unittest.TestCase):
         self.assertEqual(put.call_args.args[0], "https://upload-session.example")
         path.unlink(missing_ok=True)
 
+    def test_direct_document_upload_uses_year_documents_folder(self):
+        path = Path(tempfile.mkstemp(suffix=".pdf")[1])
+        path.write_bytes(b"test")
+        init_response = Mock()
+        init_response.headers = {"Location": "https://upload-session.example"}
+        init_response.raise_for_status = Mock()
+        upload_response = Mock()
+        upload_response.raise_for_status = Mock()
+        upload_response.json.return_value = {"id": "doc-1", "webViewLink": "https://drive.example/doc-1"}
+
+        with patch.object(drive, "get_access_token", return_value="token"), \
+             patch.object(drive, "ensure_root_folder", return_value="root"), \
+             patch.object(drive, "ensure_child_folder", side_effect=["year", "documents"]) as ensure_folder, \
+             patch.object(drive.requests, "post", return_value=init_response) as post, \
+             patch.object(drive.requests, "put", return_value=upload_response):
+            result = drive.upload_document_file(path, "archive.pdf", "application/pdf", "2024/2025", "تحليل نتائج قديم")
+
+        self.assertEqual(result["id"], "doc-1")
+        self.assertEqual(
+            [call.args[:2] for call in ensure_folder.call_args_list],
+            [("2024/2025", "root"), ("02 - الوثائق والمراجع", "year")],
+        )
+        metadata = post.call_args.kwargs["data"].decode("utf-8")
+        self.assertIn('"marsadAcademicYear": "2024/2025"', metadata)
+        self.assertIn('"parents": ["documents"]', metadata)
+        path.unlink(missing_ok=True)
+
     def test_drive_download_and_delete_use_file_id(self):
         meta = Mock()
         meta.raise_for_status = Mock()

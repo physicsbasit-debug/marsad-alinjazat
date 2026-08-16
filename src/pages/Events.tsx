@@ -96,6 +96,7 @@ function EventDetail({ detail, allTeachers, onReload, onClose, onMessage }: { de
         title: detail.title,
         eventType: detail.eventType,
         eventDate: detail.eventDate,
+        academicYear: detail.academicYear || '',
         location: detail.location || '',
         audience: detail.audience || '',
         participantCount: detail.participantCount,
@@ -145,7 +146,7 @@ function EventDetail({ detail, allTeachers, onReload, onClose, onMessage }: { de
 
   return <div className="event-detail-shell">
     <div className={`event-detail-hero ${detail.coverTone}`} style={cover?.contentUrl ? { backgroundImage: `linear-gradient(180deg, rgba(7,25,35,.18), rgba(7,25,35,.68)), url(${cover.contentUrl})` } : undefined}>
-      <div className="event-detail-hero-copy"><span className="event-type floating">{detail.eventType}</span><h2>{detail.title}</h2><div className="event-detail-meta"><span><Icon name="calendar" size={16}/>{formatDate(detail.eventDate)}</span><span><Icon name="teachers" size={16}/>{detail.participantCount} مشاركًا</span><span><Icon name="image" size={16}/>{detail.media.length} دليلًا</span></div></div>
+      <div className="event-detail-hero-copy"><span className="event-type floating">{detail.eventType}</span><h2>{detail.title}</h2><div className="event-detail-meta"><span><Icon name="calendar" size={16}/>{detail.academicYear ? `${detail.academicYear} • ` : ''}{formatDate(detail.eventDate)}</span><span><Icon name="teachers" size={16}/>{detail.participantCount} مشاركًا</span><span><Icon name="image" size={16}/>{detail.media.length} دليلًا</span></div></div>
       <div className="event-detail-hero-actions"><div className={`report-readiness ${reportReady ? 'ready' : ''}`}><Icon name={reportReady ? 'check' : 'clock'} size={17}/><div><strong>{reportReady ? 'جاهز لبناء تقرير فعالية' : 'التوثيق يحتاج استكمالًا'}</strong><small>{reportReady ? 'البيانات والأدلة الأساسية متوفرة' : 'أكمل المخرجات وأضف دليلًا واحدًا على الأقل'}</small></div></div><button className="event-edit-button" onClick={() => { setTab('overview'); setEditing((value) => !value); }}><Icon name={editing ? 'close' : 'planning'} size={16}/>{editing ? 'إلغاء التحرير' : 'تحرير البيانات'}</button></div>
     </div>
 
@@ -179,6 +180,7 @@ function EventEditForm({ detail, onCancel, onSaved, onMessage }: { detail: Event
         title: String(form.get('title') || ''),
         eventType: String(form.get('eventType') || ''),
         eventDate: String(form.get('eventDate') || ''),
+        academicYear: String(form.get('academicYear') || detail.academicYear || ''),
         location: String(form.get('location') || ''),
         audience: String(form.get('audience') || ''),
         participantCount: Number(form.get('participantCount') || 0),
@@ -203,6 +205,7 @@ function EventEditForm({ detail, onCancel, onSaved, onMessage }: { detail: Event
       <label className="full">عنوان الفعالية<input name="title" required defaultValue={detail.title}/></label>
       <label>نوع الفعالية<select name="eventType" defaultValue={detail.eventType}><option>فعالية</option><option>مسابقة</option><option>مبادرة</option><option>زيارة علمية</option><option>برنامج طلابي</option><option>مشاركة مجتمعية</option></select></label>
       <label>التاريخ<input type="date" name="eventDate" required defaultValue={detail.eventDate}/></label>
+      <label>العام الدراسي للسجل<input name="academicYear" required defaultValue={detail.academicYear || ''} placeholder="2025/2026"/></label>
       <label>المكان<input name="location" defaultValue={detail.location || ''}/></label>
       <label>عدد المشاركين<input type="number" name="participantCount" min="0" max="100000" defaultValue={detail.participantCount}/></label>
       <label className="full">الفئة المستهدفة<input name="audience" defaultValue={detail.audience || ''}/></label>

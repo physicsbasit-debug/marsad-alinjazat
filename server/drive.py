@@ -218,6 +218,49 @@ def upload_file(path: Path, filename: str, mime_type: str, academic_year: str, r
     return upload.json()
 
 
+def upload_document_file(path: Path, filename: str, mime_type: str, academic_year: str, title: str) -> dict[str, Any]:
+    token = get_access_token()
+    root = ensure_root_folder()
+    year_folder = ensure_child_folder(academic_year, root)
+    documents_folder = ensure_child_folder("02 - الوثائق والمراجع", year_folder)
+
+    metadata = {
+        "name": filename,
+        "parents": [documents_folder],
+        "appProperties": {
+            "marsadRecordType": "document",
+            "marsadAcademicYear": academic_year,
+            "marsadDocumentTitle": title[:120],
+        },
+    }
+    init = requests.post(
+        f"{DRIVE_UPLOAD_API}/files",
+        timeout=30,
+        headers={
+            **_headers(token),
+            "Content-Type": "application/json; charset=UTF-8",
+            "X-Upload-Content-Type": mime_type or "application/octet-stream",
+            "X-Upload-Content-Length": str(path.stat().st_size),
+        },
+        params={"uploadType": "resumable", "supportsAllDrives": "true", "fields": "id,name,webViewLink,size,mimeType"},
+        data=json.dumps(metadata, ensure_ascii=False).encode("utf-8"),
+    )
+    init.raise_for_status()
+    session_uri = init.headers.get("Location")
+    if not session_uri:
+        raise RuntimeError("لم يعِد Google جلسة رفع قابلة للاستئناف.")
+
+    with path.open("rb") as handle:
+        upload = requests.put(
+            session_uri,
+            timeout=120,
+            headers={"Content-Type": mime_type or "application/octet-stream"},
+            data=handle,
+        )
+    upload.raise_for_status()
+    return upload.json()
+
+
 def upload_event_file(path: Path, filename: str, mime_type: str, academic_year: str, event_id: int, event_title: str) -> dict[str, Any]:
     token = get_access_token()
     root = ensure_root_folder()

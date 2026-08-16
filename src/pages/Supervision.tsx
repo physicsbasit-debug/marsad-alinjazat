@@ -204,7 +204,7 @@ function VisitDetails({ visit, teachers, onReload }: { visit: SupervisionVisitDe
     <div className="supervision-detail">
       <div className="supervision-detail-hero">
         <div className="avatar hero-avatar">{visit.teacherName[0]}</div>
-        <div><span className="eyebrow">{visit.visitType}</span><h2>{visit.teacherName}</h2><p>{visit.teacherSubject} • {visit.grade || 'دون صف'} • {formatDate(visit.visitDate)}</p></div>
+        <div><span className="eyebrow">{visit.visitType}</span><h2>{visit.teacherName}</h2><p>{visit.teacherSubject} • {visit.grade || 'دون صف'} • {visit.academicYear} • {formatDate(visit.visitDate)}</p></div>
         <div className="supervision-detail-side"><VisitStatus visit={visit}/><span className={`report-readiness ${visit.reportReady ? 'ready' : ''}`}><Icon name={visit.reportReady ? 'check' : 'clock'} size={14}/>{visit.reportReady ? 'جاهزة للتقرير' : 'التوثيق غير مكتمل'}</span></div>
       </div>
 
@@ -254,7 +254,7 @@ function VisitDetails({ visit, teachers, onReload }: { visit: SupervisionVisitDe
   );
 }
 
-export function SupervisionVisitModal({ open, teachers, onClose, onCreated }: { open: boolean; teachers: Teacher[]; onClose: () => void; onCreated: () => Promise<void> }) {
+export function SupervisionVisitModal({ open, teachers, academicYear, onClose, onCreated }: { open: boolean; teachers: Teacher[]; academicYear: string; onClose: () => void; onCreated: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -265,10 +265,10 @@ export function SupervisionVisitModal({ open, teachers, onClose, onCreated }: { 
     catch (error) { setMessage(error instanceof Error ? error.message : 'تعذر إنشاء الزيارة.'); }
     finally { setBusy(false); }
   }
-  return <Modal open={open} onClose={onClose}>{<div className="supervision-create"><div className="modal-heading"><span className="eyebrow">الإشراف الفني</span><h2>تسجيل زيارة</h2><p>يمكن إنشاؤها كزيارة مخططة ثم استكمال التوثيق بعد التنفيذ.</p></div>{message && <div className="inline-error"><Icon name="alert" size={17}/>{message}</div>}<VisitForm teachers={teachers} busy={busy} onSubmit={submit} submitLabel="حفظ الزيارة" /></div>}</Modal>;
+  return <Modal open={open} onClose={onClose}>{<div className="supervision-create"><div className="modal-heading"><span className="eyebrow">الإشراف الفني</span><h2>تسجيل زيارة</h2><p>يمكن إنشاؤها كزيارة مخططة ثم استكمال التوثيق بعد التنفيذ.</p></div>{message && <div className="inline-error"><Icon name="alert" size={17}/>{message}</div>}<VisitForm teachers={teachers} academicYear={academicYear} busy={busy} onSubmit={submit} submitLabel="حفظ الزيارة" /></div>}</Modal>;
 }
 
-function VisitForm({ teachers, visit, busy, onSubmit, submitLabel }: { teachers: Teacher[]; visit?: SupervisionVisitRecord; busy: boolean; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; submitLabel: string }) {
+function VisitForm({ teachers, visit, academicYear, busy, onSubmit, submitLabel }: { teachers: Teacher[]; visit?: SupervisionVisitRecord; academicYear?: string; busy: boolean; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void; submitLabel: string }) {
   return (
     <form className="supervision-form" onSubmit={onSubmit}>
       <div className="form-grid">
@@ -276,6 +276,7 @@ function VisitForm({ teachers, visit, busy, onSubmit, submitLabel }: { teachers:
         <label>نوع الزيارة<select name="visitType" defaultValue={visit?.visitType || 'زيارة صفية'}><option>زيارة صفية</option><option>زيارة تطويرية</option><option>زيارة متابعة</option><option>تبادل مهني</option></select></label>
         <label>الحالة<select name="status" defaultValue={visit?.status || 'planned'}><option value="planned">مخططة</option><option value="completed">منفذة</option><option value="needs_followup">تحتاج متابعة</option><option value="closed">مغلقة</option></select></label>
         <label>تاريخ الزيارة<input name="visitDate" type="date" required defaultValue={visit?.visitDate || ''}/></label>
+        <label>العام الدراسي للسجل<input name="academicYear" required defaultValue={visit?.academicYear || academicYear || ''} placeholder="2025/2026"/></label>
         <label>موعد المتابعة<input name="followupDate" type="date" defaultValue={visit?.followupDate || ''}/></label>
         <label>الصف<input name="grade" defaultValue={visit?.grade || ''} placeholder="العاشر"/></label>
         <label>الحصة<input name="periodLabel" defaultValue={visit?.periodLabel || ''} placeholder="الحصة الثالثة"/></label>
@@ -313,6 +314,7 @@ function visitPayloadFromForm(form: FormData): SupervisionVisitInput {
     teacherId: Number(form.get('teacherId')),
     visitType: String(form.get('visitType') || 'زيارة صفية'),
     visitDate: String(form.get('visitDate') || ''),
+    academicYear: String(form.get('academicYear') || ''),
     periodLabel: String(form.get('periodLabel') || ''),
     grade: String(form.get('grade') || ''),
     lessonTitle: String(form.get('lessonTitle') || ''),

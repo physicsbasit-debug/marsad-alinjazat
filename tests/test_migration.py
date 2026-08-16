@@ -346,7 +346,7 @@ class MarsadMigrationTests(unittest.TestCase):
 
         self.assertEqual(
             set(new_tables) - expected_old_names,
-            {"meetings", "meeting_attendees", "meeting_decisions", "curriculum_plans", "curriculum_units", "supervision_visits", "supervision_actions", "achievement_assessments", "achievement_actions", "achievement_assessment_standards", "achievement_action_metrics"},
+            {"meetings", "meeting_attendees", "meeting_decisions", "curriculum_plans", "curriculum_units", "supervision_visits", "supervision_actions", "achievement_assessments", "achievement_actions", "achievement_assessment_standards", "achievement_action_metrics", "request_record_years", "event_record_years", "teacher_record_years"},
         )
         self.assertTrue({"idx_meetings_date", "idx_meeting_attendees_meeting", "idx_meeting_decisions_meeting", "idx_meeting_decisions_open"}.issubset(new_indexes))
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM meetings").fetchone()[0], 0)
@@ -616,7 +616,7 @@ CREATE INDEX idx_teacher_cv_items_teacher ON teacher_cv_items(teacher_id, item_t
             self.assertEqual(new_indexes[name], sql, f"old index definition changed: {name}")
         for name, rows in old_data.items():
             self.assertEqual(conn.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall(), rows, f"old data changed: {name}")
-        self.assertEqual(set(new_tables) - expected_old_names, {"curriculum_plans", "curriculum_units", "supervision_visits", "supervision_actions", "achievement_assessments", "achievement_actions", "achievement_assessment_standards", "achievement_action_metrics"})
+        self.assertEqual(set(new_tables) - expected_old_names, {"curriculum_plans", "curriculum_units", "supervision_visits", "supervision_actions", "achievement_assessments", "achievement_actions", "achievement_assessment_standards", "achievement_action_metrics", "request_record_years", "event_record_years", "teacher_record_years"})
         self.assertTrue({"idx_curriculum_plans_scope", "idx_curriculum_units_plan", "idx_curriculum_units_due"}.issubset(new_indexes))
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM curriculum_plans").fetchone()[0], 0)
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM curriculum_units").fetchone()[0], 0)
@@ -645,6 +645,9 @@ CREATE INDEX idx_teacher_cv_items_teacher ON teacher_cv_items(teacher_id, item_t
         conn.execute("PRAGMA foreign_keys = OFF")
         # Remove every schema object introduced after v0.6 before capturing the baseline.
         # This keeps the historical migration contract exact as later releases add tables.
+        conn.execute("DROP TABLE IF EXISTS request_record_years")
+        conn.execute("DROP TABLE IF EXISTS event_record_years")
+        conn.execute("DROP TABLE IF EXISTS teacher_record_years")
         conn.execute("DROP TABLE IF EXISTS achievement_action_metrics")
         conn.execute("DROP TABLE IF EXISTS achievement_assessment_standards")
         conn.execute("DROP TABLE IF EXISTS achievement_actions")
@@ -735,7 +738,7 @@ CREATE INDEX idx_teacher_cv_items_teacher ON teacher_cv_items(teacher_id, item_t
                 f"v0.6 data changed: {name}",
             )
 
-        self.assertEqual(set(new_tables) - expected_v06_tables, {"supervision_visits", "supervision_actions", "achievement_assessments", "achievement_actions", "achievement_assessment_standards", "achievement_action_metrics"})
+        self.assertEqual(set(new_tables) - expected_v06_tables, {"supervision_visits", "supervision_actions", "achievement_assessments", "achievement_actions", "achievement_assessment_standards", "achievement_action_metrics", "request_record_years", "event_record_years", "teacher_record_years"})
         expected_new_indexes = {
             "idx_supervision_visits_scope",
             "idx_supervision_visits_teacher",
@@ -769,6 +772,9 @@ CREATE INDEX idx_teacher_cv_items_teacher ON teacher_cv_items(teacher_id, item_t
         )
         conn = sqlite3.connect(db_path)
         conn.execute("PRAGMA foreign_keys = OFF")
+        conn.execute("DROP TABLE IF EXISTS request_record_years")
+        conn.execute("DROP TABLE IF EXISTS event_record_years")
+        conn.execute("DROP TABLE IF EXISTS teacher_record_years")
         conn.execute("DROP TABLE IF EXISTS achievement_action_metrics")
         conn.execute("DROP TABLE IF EXISTS achievement_assessment_standards")
         conn.execute("DROP TABLE IF EXISTS achievement_actions")
@@ -853,7 +859,7 @@ CREATE INDEX idx_teacher_cv_items_teacher ON teacher_cv_items(teacher_id, item_t
                 f"v0.7 data changed: {name}",
             )
 
-        self.assertEqual(set(new_tables) - expected_v07_tables, {"achievement_assessments", "achievement_actions", "achievement_assessment_standards", "achievement_action_metrics"})
+        self.assertEqual(set(new_tables) - expected_v07_tables, {"achievement_assessments", "achievement_actions", "achievement_assessment_standards", "achievement_action_metrics", "request_record_years", "event_record_years", "teacher_record_years"})
         expected_new_indexes = {
             "idx_achievement_assessments_scope", "idx_achievement_assessments_teacher",
             "idx_achievement_actions_assessment", "idx_achievement_actions_open",
@@ -886,6 +892,9 @@ CREATE INDEX idx_teacher_cv_items_teacher ON teacher_cv_items(teacher_id, item_t
         )
         conn = sqlite3.connect(db_path)
         conn.execute("PRAGMA foreign_keys = OFF")
+        conn.execute("DROP TABLE IF EXISTS request_record_years")
+        conn.execute("DROP TABLE IF EXISTS event_record_years")
+        conn.execute("DROP TABLE IF EXISTS teacher_record_years")
         conn.execute("DROP TABLE IF EXISTS achievement_action_metrics")
         conn.execute("DROP TABLE IF EXISTS achievement_assessment_standards")
         conn.execute("PRAGMA foreign_keys = ON")
@@ -938,6 +947,99 @@ CREATE INDEX idx_teacher_cv_items_teacher ON teacher_cv_items(teacher_id, item_t
         self.assertIn("idx_achievement_assessment_standards_source", indexes)
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM achievement_action_metrics").fetchone()[0], 0)
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM achievement_assessment_standards").fetchone()[0], 0)
+        self.assertEqual(conn.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+        self.assertEqual(conn.execute("PRAGMA foreign_key_check").fetchall(), [])
+        conn.close()
+
+
+    def test_v012_schema_and_data_survive_v013_record_year_extension_atomically(self):
+        data_dir = Path(tempfile.mkdtemp(prefix="marsad-v012-to-v013-record-year-"))
+        db_path = data_dir / "marsad_alinjazat.sqlite3"
+        repo_root = Path(__file__).resolve().parents[1]
+        env = os.environ.copy()
+        env["APP_DATA_DIR"] = str(data_dir)
+        env["APP_UPLOADS_DIR"] = str(data_dir / "inbox")
+        env["APP_EVENT_UPLOADS_DIR"] = str(data_dir / "events")
+        env["STORAGE_MODE"] = "local"
+
+        # Build the current schema, then remove only v0.13-owned extension objects.
+        # The remaining database is the exact additive contract inherited from v0.12.
+        subprocess.run(
+            [sys.executable, "-c", "from server.db import init_db; init_db()"],
+            cwd=repo_root, env=env, capture_output=True, text=True, check=True,
+        )
+        conn = sqlite3.connect(db_path)
+        conn.execute("PRAGMA foreign_keys = OFF")
+        conn.execute("DROP TABLE IF EXISTS request_record_years")
+        conn.execute("DROP TABLE IF EXISTS event_record_years")
+        conn.execute("DROP TABLE IF EXISTS teacher_record_years")
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.commit()
+
+        old_tables = {
+            row[0]: row[1] for row in conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            )
+        }
+        old_indexes = {
+            row[0]: row[1] for row in conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY name"
+            )
+        }
+        old_data = {
+            name: conn.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall()
+            for name in sorted(old_tables)
+        }
+        self.assertNotIn("request_record_years", old_tables)
+        self.assertNotIn("event_record_years", old_tables)
+        self.assertNotIn("teacher_record_years", old_tables)
+        conn.close()
+
+        code = (
+            "from server.db import init_db; init_db(); import sqlite3, os, json; "
+            "db=os.path.join(os.environ['APP_DATA_DIR'],'marsad_alinjazat.sqlite3'); c=sqlite3.connect(db); "
+            "print(json.dumps({'integrity':c.execute('pragma integrity_check').fetchone()[0],"
+            "'fk':c.execute('pragma foreign_key_check').fetchall()}))"
+        )
+        completed = subprocess.run(
+            [sys.executable, "-c", code], cwd=repo_root, env=env,
+            capture_output=True, text=True, check=True,
+        )
+        status = json.loads(completed.stdout.strip().splitlines()[-1])
+        self.assertEqual(status["integrity"], "ok")
+        self.assertEqual(status["fk"], [])
+
+        conn = sqlite3.connect(db_path)
+        new_tables = {
+            row[0]: row[1] for row in conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            )
+        }
+        new_indexes = {
+            row[0]: row[1] for row in conn.execute(
+                "SELECT name, sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY name"
+            )
+        }
+        for name, sql in old_tables.items():
+            self.assertEqual(new_tables[name], sql, f"v0.12 table definition changed: {name}")
+        for name, sql in old_indexes.items():
+            self.assertEqual(new_indexes[name], sql, f"v0.12 index definition changed: {name}")
+        for name, rows in old_data.items():
+            self.assertEqual(
+                conn.execute(f'SELECT * FROM "{name}" ORDER BY rowid').fetchall(), rows,
+                f"v0.12 data changed: {name}",
+            )
+
+        self.assertEqual(set(new_tables) - set(old_tables), {"request_record_years", "event_record_years", "teacher_record_years"})
+        self.assertTrue({"idx_request_record_years_year", "idx_event_record_years_year", "idx_teacher_record_years_year"}.issubset(new_indexes))
+        # Event/request legacy rows are not assigned an invented historical year during migration.
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM request_record_years").fetchone()[0], 0)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM event_record_years").fetchone()[0], 0)
+        # In v0.12 the teachers table explicitly represented the current roster, so preserving
+        # that current-year association is a migration of known state, not an invented historical claim.
+        teacher_count = conn.execute("SELECT COUNT(*) FROM teachers").fetchone()[0]
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM teacher_record_years").fetchone()[0], teacher_count)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM teacher_record_years WHERE academic_year='2026/2027'").fetchone()[0], teacher_count)
         self.assertEqual(conn.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertEqual(conn.execute("PRAGMA foreign_key_check").fetchall(), [])
         conn.close()

@@ -3,7 +3,7 @@ import { Icon } from '../components/Icon';
 import { getArchiveYear, getArchiveYears } from '../lib/api';
 import type { ArchiveYearDetail, ArchiveYearSummary } from '../types';
 
-export function Archive({ currentAcademicYear }: { currentAcademicYear: string }) {
+export function Archive({ currentAcademicYear, onOpenYear }: { currentAcademicYear: string; onOpenYear?: (academicYear: string) => void }) {
   const [years, setYears] = useState<ArchiveYearSummary[]>([]);
   const [selectedYear, setSelectedYear] = useState(currentAcademicYear);
   const [detail, setDetail] = useState<ArchiveYearDetail | null>(null);
@@ -90,8 +90,9 @@ export function Archive({ currentAcademicYear }: { currentAcademicYear: string }
           <Icon name="archive" size={18} />
           <div>
             <strong>{selectedSummary.isCurrent ? 'عرض العام الجاري' : 'عرض تاريخي للقراءة'}</strong>
-            <span>{selectedSummary.isCurrent ? 'يتحدث هذا العرض تلقائيًا مع السجلات الحالية.' : 'لا توجد أدوات تعديل داخل الأرشيف؛ التغييرات تتم من الوحدات الأصلية فقط.'}</span>
+            <span>{selectedSummary.isCurrent ? 'يتحدث هذا العرض تلقائيًا مع السجلات الحالية.' : 'الأرشيف نفسه للقراءة، ويمكن فتح العام في مساحة العمل لإضافة أو استكمال سجلاته من الوحدات الأصلية.'}</span>
           </div>
+          {onOpenYear && <button className="ghost-button" onClick={() => onOpenYear(selectedYear)}>فتح هذا العام في مساحة العمل</button>}
         </section>
       )}
 

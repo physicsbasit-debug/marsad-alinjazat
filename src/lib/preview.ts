@@ -14,6 +14,8 @@ const eventVisuals = {
 
 export const previewBootstrap: BootstrapData = {
   academicYear: '2026/2027',
+  currentAcademicYear: '2026/2027',
+  availableAcademicYears: ['2026/2027'],
   term: 'الفصل الأول',
   dashboard: {
     teacherCount: 6,
@@ -24,8 +26,9 @@ export const previewBootstrap: BootstrapData = {
     upcomingVisits: 1,
     planProgress: 69,
     visitProgress: 80,
-    requestCompletion: 91,
+    requestCompletion: 25,
     achievementMastery: 60,
+    achievementMasteryComparable: true,
     openAchievementActions: 2,
   },
   teachers: [
@@ -37,15 +40,15 @@ export const previewBootstrap: BootstrapData = {
     { id: 6, name: 'ناصر الحوسني', subject: 'الفيزياء', specialization: 'فيزياء', qualification: 'ماجستير مناهج', experienceYears: 13, workload: 17, cvCompletion: 95, email: 'nasser@example.edu' },
   ],
   requests: [
-    { id: 1, teacherId: 1, teacherName: 'أحمد السالمي', requestType: 'اختبار', subject: 'الفيزياء', grade: 'العاشر', title: 'الاختبار القصير الأول', deadline: '2026-08-18', notes: '', allowedFiles: 'PDF / Word / Excel', status: 'review', expiresAt: '2026-09-18T00:00:00+00:00', createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
-    { id: 2, teacherId: 2, teacherName: 'خالد الهنائي', requestType: 'خطة فصلية', subject: 'الكيمياء', grade: 'العاشر', title: 'الخطة الفصلية', deadline: '2026-08-19', notes: '', allowedFiles: 'PDF / Word / Excel', status: 'received', expiresAt: '2026-09-19T00:00:00+00:00', createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
-    { id: 3, teacherId: 3, teacherName: 'محمد المعمري', requestType: 'نشاط', subject: 'العلوم', grade: 'الثامن', title: 'نموذج نشاط علمي', deadline: '2026-08-13', notes: '', allowedFiles: 'PDF / Word / Excel', status: 'late', expiresAt: '2026-09-13T00:00:00+00:00', createdAt: '2026-08-10T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
-    { id: 4, teacherId: 4, teacherName: 'سالم الرواحي', requestType: 'تحليل نتائج', subject: 'الأحياء', grade: 'التاسع', title: 'تحليل النتائج', deadline: '2026-08-20', notes: '', allowedFiles: 'PDF / Word / Excel', status: 'approved', expiresAt: '2026-09-20T00:00:00+00:00', createdAt: '2026-08-12T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
+    { id: 1, teacherId: 1, teacherName: 'أحمد السالمي', requestType: 'اختبار', subject: 'الفيزياء', grade: 'العاشر', title: 'الاختبار القصير الأول', deadline: '2026-08-18', notes: '', allowedFiles: 'PDF / Word / Excel', status: 'review', academicYear: '2026/2027', expiresAt: '2026-09-18T00:00:00+00:00', createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
+    { id: 2, teacherId: 2, teacherName: 'خالد الهنائي', requestType: 'خطة فصلية', subject: 'الكيمياء', grade: 'العاشر', title: 'الخطة الفصلية', deadline: '2026-08-19', notes: '', allowedFiles: 'PDF / Word / Excel', status: 'received', academicYear: '2026/2027', expiresAt: '2026-09-19T00:00:00+00:00', createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
+    { id: 3, teacherId: 3, teacherName: 'محمد المعمري', requestType: 'نشاط', subject: 'العلوم', grade: 'الثامن', title: 'نموذج نشاط علمي', deadline: '2026-08-13', notes: '', allowedFiles: 'PDF / Word / Excel', status: 'late', academicYear: '2026/2027', expiresAt: '2026-09-13T00:00:00+00:00', createdAt: '2026-08-10T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
+    { id: 4, teacherId: 4, teacherName: 'سالم الرواحي', requestType: 'تحليل نتائج', subject: 'الأحياء', grade: 'التاسع', title: 'تحليل النتائج', deadline: '2026-08-20', notes: '', allowedFiles: 'PDF / Word / Excel', status: 'approved', academicYear: '2026/2027', expiresAt: '2026-09-20T00:00:00+00:00', createdAt: '2026-08-12T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
   ],
   events: [
-    { id: 1, title: 'أسبوع العلوم', eventType: 'فعالية', eventDate: '2026-10-12', location: 'المدرسة', audience: 'طلبة الصفوف 8-10', participantCount: 42, goals: 'تعزيز الثقافة العلمية', summary: 'فعاليات وتجارب تعليمية ومسابقات', outcomes: 'مشاركة واسعة', recommendations: 'توسيع مشاركة الطلبة', coverTone: 'teal', mediaCount: 3, coverMediaId: 1001, coverMediaUrl: eventVisuals.science, createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
-    { id: 2, title: 'مسابقة الفيزياء', eventType: 'مسابقة', eventDate: '2026-11-27', location: 'قاعة متعددة الأغراض', audience: 'الصف العاشر', participantCount: 18, goals: 'تنمية حل المشكلات', summary: 'مسابقة تطبيقية', outcomes: 'تحسن التفاعل', recommendations: 'تكرارها فصليًا', coverTone: 'navy', mediaCount: 2, coverMediaId: 2001, coverMediaUrl: eventVisuals.physics, createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
-    { id: 3, title: 'مبادرة اقرأ علمًا', eventType: 'مبادرة', eventDate: '2026-09-30', location: 'مركز مصادر التعلم', audience: 'الصف التاسع', participantCount: 31, goals: 'تعزيز القراءة العلمية', summary: 'قراءات قصيرة ونقاشات', outcomes: 'منتجات طلابية', recommendations: 'ربطها بالمنهج', coverTone: 'gold', mediaCount: 2, coverMediaId: 3001, coverMediaUrl: eventVisuals.reading, createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
+    { id: 1, title: 'أسبوع العلوم', eventType: 'فعالية', eventDate: '2026-10-12', academicYear: '2026/2027', location: 'المدرسة', audience: 'طلبة الصفوف 8-10', participantCount: 42, goals: 'تعزيز الثقافة العلمية', summary: 'فعاليات وتجارب تعليمية ومسابقات', outcomes: 'مشاركة واسعة', recommendations: 'توسيع مشاركة الطلبة', coverTone: 'teal', mediaCount: 3, coverMediaId: 1001, coverMediaUrl: eventVisuals.science, createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
+    { id: 2, title: 'مسابقة الفيزياء', eventType: 'مسابقة', eventDate: '2026-11-27', academicYear: '2026/2027', location: 'قاعة متعددة الأغراض', audience: 'الصف العاشر', participantCount: 18, goals: 'تنمية حل المشكلات', summary: 'مسابقة تطبيقية', outcomes: 'تحسن التفاعل', recommendations: 'تكرارها فصليًا', coverTone: 'navy', mediaCount: 2, coverMediaId: 2001, coverMediaUrl: eventVisuals.physics, createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
+    { id: 3, title: 'مبادرة اقرأ علمًا', eventType: 'مبادرة', eventDate: '2026-09-30', academicYear: '2026/2027', location: 'مركز مصادر التعلم', audience: 'الصف التاسع', participantCount: 31, goals: 'تعزيز القراءة العلمية', summary: 'قراءات قصيرة ونقاشات', outcomes: 'منتجات طلابية', recommendations: 'ربطها بالمنهج', coverTone: 'gold', mediaCount: 2, coverMediaId: 3001, coverMediaUrl: eventVisuals.reading, createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
   ],
   meetings: [
     { id: 1, title: 'اجتماع قسم العلوم الأول', meetingType: 'اجتماع قسم', meetingDate: '2026-09-03', meetingTime: '10:30', location: 'قاعة العلوم', academicYear: '2026/2027', status: 'planned', attendeeCount: 6, decisionCount: 3, openDecisionCount: 2, overdueDecisionCount: 0, completedDecisionCount: 1, createdAt: '2026-08-15T06:20:00+00:00', updatedAt: '2026-08-15T06:20:00+00:00' },
@@ -344,6 +347,21 @@ function previewPct(numerator: number, denominator: number): number {
   return denominator ? Math.round((100 * numerator) / denominator) : 0;
 }
 
+function previewAchievementAggregate(rows: BootstrapData['assessments']): { comparable: boolean; rate: number; detail: string } {
+  const eligible = rows.filter((item) => item.status !== 'draft' && item.studentCount > 0);
+  if (!eligible.length) return { comparable: false, rate: 0, detail: 'لا توجد تقويمات مكتملة قابلة للتجميع.' };
+  const signatures = new Set(eligible.map((item) => [item.masteryThresholdPct, item.masteryReferenceSource || '', item.masteryReferenceYear || ''].join('|')));
+  const documented = eligible.every((item) => Boolean((item.masteryReferenceSource || '').trim()));
+  if (!documented || signatures.size !== 1) {
+    return { comparable: false, rate: 0, detail: 'تختلف حدود أو مراجع التصنيف المسجلة، لذلك لا تُجمع النتائج في نسبة معيارية واحدة.' };
+  }
+  const students = eligible.reduce((sum, item) => sum + item.studentCount, 0);
+  const mastered = eligible.reduce((sum, item) => sum + item.masteredCount, 0);
+  const first = eligible[0];
+  const reference = `${first.masteryReferenceSource}${first.masteryReferenceYear ? ` • ${first.masteryReferenceYear}` : ''} • الحد ${first.masteryThresholdPct}%`;
+  return { comparable: true, rate: previewPct(mastered, students), detail: `تجميع حسابي لتقويمات تشترك في المرجع والحد المسجل: ${reference}.` };
+}
+
 export function getPreviewOfficialReport(input: OfficialReportQuery): OfficialReport {
   const { reportType, academicYear, term, teacherId } = input;
   const termFilter = term === 'العام كاملًا' ? '' : term;
@@ -396,12 +414,13 @@ export function getPreviewOfficialReport(input: OfficialReportQuery): OfficialRe
 
   if (reportType === 'achievement') {
     const rows = assessments.filter((item) => item.status !== 'draft');
-    const students = rows.reduce((s,x)=>s+x.studentCount,0); const mastered = rows.reduce((s,x)=>s+x.masteredCount,0);
+    const students = rows.reduce((s,x)=>s+x.studentCount,0);
+    const achievementAggregate = previewAchievementAggregate(rows);
     const actions = rows.flatMap((item) => getPreviewAssessmentDetails(item.id).actions.map((action) => ({ item, action })));
     const measured = actions.filter(({ action }) => action.metric?.outcomeValue !== null && action.metric?.outcomeValue !== undefined).length;
     const targetMet = actions.filter(({ action }) => action.metric?.impactStatus === 'target_met').length;
     const impactLabel = (value?: string | null) => ({pending:'لم يُقَس بعد',target_met:'حقق الهدف المسجل',improved_not_met:'تحسن ولم يبلغ الهدف المسجل',no_change:'لم يحدث تغير',regressed:'تراجع المؤشر'} as Record<string,string>)[value || ''] || '—';
-    return { ...base, title:'تقرير التحصيل والنتائج', subtitle:`${term} • ${academicYear}`, summary:'يجمع التقرير نتائج التقويمات والتدخلات وقياس أثرها كما سُجلت. لا يضع حدًا تربويًا من تلقاء نفسه ولا يحول الدرجة الكلية إلى تشخيص مهاري غير موجود في البيانات.', metrics:[{label:'التقويمات',value:rows.length},{label:'الطلبة',value:students},{label:'نسبة فئة الإتقان وفق الحدود المسجلة',value:`${previewPct(mastered,students)}%`},{label:'تدخلات مفتوحة',value:rows.reduce((s,x)=>s+x.openActionCount,0)},{label:'تدخلات مقاسة',value:measured},{label:'حققت الهدف المسجل',value:targetMet,detail:measured?`${previewPct(targetMet,measured)}% من التدخلات المقاسة`:'لا توجد قياسات نهائية'}], sections:[previewReportSection('assessments','التقويمات',[['title','التقويم'],['scope','النطاق'],['teacher','المعلم'],['average','المتوسط'],['mastery','فئة الإتقان وفق الحد المسجل']],rows.map((x)=>({title:x.title,scope:`${x.subject} • ${x.grade}`,teacher:x.teacherName||'—',average:`${x.averagePercent}%`,mastery:`${x.masteryPercent}%`}))),previewReportSection('interventions','التدخلات والمتابعات وقياس الأثر',[['title','التدخل'],['type','النوع'],['targetGroup','الفئة المستهدفة'],['metric','المؤشر'],['baseline','خط الأساس'],['target','الهدف المسجل'],['outcome','النتيجة'],['impact','الأثر الحسابي'],['reference','مصدر المعيار/الهدف']],actions.map(({action})=>({title:action.title,type:action.actionType==='remedial'?'علاجي':action.actionType==='enrichment'?'إثرائي':'متابعة',targetGroup:action.targetGroup||'—',metric:action.metric?.metricName||'—',baseline:action.metric?`${action.metric.baselineValue}${action.metric.unit?` ${action.metric.unit}`:''}`:'—',target:action.metric?`${action.metric.targetValue}${action.metric.unit?` ${action.metric.unit}`:''}`:'—',outcome:action.metric?.outcomeValue!==null&&action.metric?.outcomeValue!==undefined?`${action.metric.outcomeValue}${action.metric.unit?` ${action.metric.unit}`:''}`:'—',impact:action.metric?impactLabel(action.metric.impactStatus):'لم يُسجل مقياس',reference:action.metric?.referenceSource||'هدف برنامج داخلي غير منسوب لمرجع'})),'الحكم هنا حسابي بالنسبة للهدف المسجل فقط، ولا يعني اعتماد معيار تربوي ما لم يكن مصدره موثقًا.')], sourceCounts:{assessments:rows.length,interventions:actions.length,measuredInterventions:measured} };
+    return { ...base, title:'تقرير التحصيل والنتائج', subtitle:`${term} • ${academicYear}`, summary:'يجمع التقرير نتائج التقويمات والتدخلات وقياس أثرها كما سُجلت. لا يضع حدًا تربويًا من تلقاء نفسه ولا يحول الدرجة الكلية إلى تشخيص مهاري غير موجود في البيانات.', metrics:[{label:'التقويمات',value:rows.length},{label:'الطلبة',value:students},{label:'الفئة المحققة للحد عبر التقويمات',value:achievementAggregate.comparable?`${achievementAggregate.rate}%`:'غير مجمعة',detail:achievementAggregate.detail},{label:'تدخلات مفتوحة',value:rows.reduce((s,x)=>s+x.openActionCount,0)},{label:'تدخلات مقاسة',value:measured},{label:'حققت الهدف المسجل',value:targetMet,detail:measured?`${previewPct(targetMet,measured)}% من التدخلات المقاسة`:'لا توجد قياسات نهائية'}], sections:[previewReportSection('assessments','التقويمات',[['title','التقويم'],['scope','النطاق'],['teacher','المعلم'],['average','المتوسط'],['mastery','فئة الإتقان وفق الحد المسجل']],rows.map((x)=>({title:x.title,scope:`${x.subject} • ${x.grade}`,teacher:x.teacherName||'—',average:`${x.averagePercent}%`,mastery:`${x.masteryPercent}%`}))),previewReportSection('interventions','التدخلات والمتابعات وقياس الأثر',[['title','التدخل'],['type','النوع'],['targetGroup','الفئة المستهدفة'],['metric','المؤشر'],['baseline','خط الأساس'],['target','الهدف المسجل'],['outcome','النتيجة'],['impact','الأثر الحسابي'],['reference','مصدر المعيار/الهدف']],actions.map(({action})=>({title:action.title,type:action.actionType==='remedial'?'علاجي':action.actionType==='enrichment'?'إثرائي':'متابعة',targetGroup:action.targetGroup||'—',metric:action.metric?.metricName||'—',baseline:action.metric?`${action.metric.baselineValue}${action.metric.unit?` ${action.metric.unit}`:''}`:'—',target:action.metric?`${action.metric.targetValue}${action.metric.unit?` ${action.metric.unit}`:''}`:'—',outcome:action.metric?.outcomeValue!==null&&action.metric?.outcomeValue!==undefined?`${action.metric.outcomeValue}${action.metric.unit?` ${action.metric.unit}`:''}`:'—',impact:action.metric?impactLabel(action.metric.impactStatus):'لم يُسجل مقياس',reference:action.metric?.referenceSource||'هدف برنامج داخلي غير منسوب لمرجع'})),'الحكم هنا حسابي بالنسبة للهدف المسجل فقط، ولا يعني اعتماد معيار تربوي ما لم يكن مصدره موثقًا.')], sourceCounts:{assessments:rows.length,interventions:actions.length,measuredInterventions:measured} };
   }
 
 
@@ -414,8 +433,8 @@ export function getPreviewOfficialReport(input: OfficialReportQuery): OfficialRe
 
   if (reportType === 'events') return { ...base, title:'تقرير الفعاليات والتوثيق', subtitle:`العام الدراسي ${academicYear}`, summary:'يلخص التقرير الفعاليات والمبادرات والمشاركة والأدلة التوثيقية.', metrics:[{label:'الفعاليات',value:events.length},{label:'المشاركون',value:events.reduce((s,x)=>s+x.participantCount,0)},{label:'الأدلة',value:events.reduce((s,x)=>s+(x.mediaCount||0),0)}], sections:[previewReportSection('events','الفعاليات',[['title','الفعالية'],['date','التاريخ'],['type','النوع'],['participants','المشاركون'],['evidence','الأدلة']],events.map((x)=>({title:x.title,date:x.eventDate,type:x.eventType,participants:x.participantCount,evidence:x.mediaCount||0})))], sourceCounts:{events:events.length} };
 
-  const activePlans=plans.filter((x)=>x.status==='active'); const students=assessments.filter(x=>x.status!=='draft').reduce((s,x)=>s+x.studentCount,0); const mastered=assessments.filter(x=>x.status!=='draft').reduce((s,x)=>s+x.masteredCount,0); const decisions=meetings.reduce((s,x)=>s+x.decisionCount,0); const done=meetings.reduce((s,x)=>s+x.completedDecisionCount,0);
-  return { ...base, title:'التقرير الشامل لأعمال القسم', subtitle:`ملخص مؤسسي لأعمال القسم خلال ${term} من العام الدراسي ${academicYear}`, summary:'يجمع هذا التقرير مؤشرات المعلمين والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في وثيقة واحدة مرتبطة بسجلاتها الأصلية.', metrics:[{label:'المعلمون',value:previewBootstrap.teachers.length},{label:'تقدم الخطط',value:`${activePlans.length?Math.round(activePlans.reduce((s,x)=>s+x.progressPercent,0)/activePlans.length):0}%`},{label:'نسبة الفئة المحققة للحدود المسجلة',value:`${previewPct(mastered,students)}%`},{label:'إغلاق الزيارات',value:`${previewPct(visits.filter(x=>x.status==='closed').length,visits.length)}%`},{label:'تنفيذ القرارات',value:`${previewPct(done,decisions)}%`}], sections:[previewReportSection('teachers','المعلمون',[['name','المعلم'],['subject','المادة'],['workload','النصاب'],['cv','اكتمال الملف']],previewBootstrap.teachers.map(x=>({name:x.name,subject:x.subject,workload:x.workload,cv:`${x.cvCompletion}%`}))),previewReportSection('planning','التخطيط والمنهج',[['title','الخطة'],['scope','النطاق'],['progress','الإنجاز']],plans.map(x=>({title:x.title,scope:`${x.subject} • ${x.grade}`,progress:`${x.progressPercent}%`}))),previewReportSection('achievement','التحصيل',[['title','التقويم'],['mastery','وفق الحد المسجل'],['average','المتوسط']],assessments.filter(x=>x.status!=='draft').map(x=>({title:x.title,mastery:`${x.masteryPercent}%`,average:`${x.averagePercent}%`}))),previewReportSection('events','الفعاليات',[['title','الفعالية'],['date','التاريخ'],['participants','المشاركون']],events.map(x=>({title:x.title,date:x.eventDate,participants:x.participantCount})))], sourceCounts:{teachers:previewBootstrap.teachers.length,plans:plans.length,assessments:assessments.length,visits:visits.length,meetings:meetings.length,events:events.length} };
+  const activePlans=plans.filter((x)=>x.status==='active'); const achievementAggregate=previewAchievementAggregate(assessments); const decisions=meetings.reduce((s,x)=>s+x.decisionCount,0); const done=meetings.reduce((s,x)=>s+x.completedDecisionCount,0);
+  return { ...base, title:'التقرير الشامل لأعمال القسم', subtitle:`ملخص مؤسسي لأعمال القسم خلال ${term} من العام الدراسي ${academicYear}`, summary:'يجمع هذا التقرير مؤشرات المعلمين والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في وثيقة واحدة مرتبطة بسجلاتها الأصلية.', metrics:[{label:'المعلمون',value:previewBootstrap.teachers.length},{label:'تقدم الخطط',value:`${activePlans.length?Math.round(activePlans.reduce((s,x)=>s+x.progressPercent,0)/activePlans.length):0}%`},{label:'الفئة المحققة للحد عبر التقويمات',value:achievementAggregate.comparable?`${achievementAggregate.rate}%`:'غير مجمعة',detail:achievementAggregate.detail},{label:'إغلاق الزيارات',value:`${previewPct(visits.filter(x=>x.status==='closed').length,visits.length)}%`},{label:'تنفيذ القرارات',value:`${previewPct(done,decisions)}%`}], sections:[previewReportSection('teachers','المعلمون',[['name','المعلم'],['subject','المادة'],['workload','النصاب'],['cv','اكتمال الملف']],previewBootstrap.teachers.map(x=>({name:x.name,subject:x.subject,workload:x.workload,cv:`${x.cvCompletion}%`}))),previewReportSection('planning','التخطيط والمنهج',[['title','الخطة'],['scope','النطاق'],['progress','الإنجاز']],plans.map(x=>({title:x.title,scope:`${x.subject} • ${x.grade}`,progress:`${x.progressPercent}%`}))),previewReportSection('achievement','التحصيل',[['title','التقويم'],['mastery','وفق الحد المسجل'],['average','المتوسط']],assessments.filter(x=>x.status!=='draft').map(x=>({title:x.title,mastery:`${x.masteryPercent}%`,average:`${x.averagePercent}%`}))),previewReportSection('events','الفعاليات',[['title','الفعالية'],['date','التاريخ'],['participants','المشاركون']],events.map(x=>({title:x.title,date:x.eventDate,participants:x.participantCount})))], sourceCounts:{teachers:previewBootstrap.teachers.length,plans:plans.length,assessments:assessments.length,visits:visits.length,meetings:meetings.length,events:events.length} };
 }
 
 
@@ -428,14 +447,30 @@ function previewAcademicYearFromDate(value?: string | null): string | null {
   return `${first}/${first + 1}`;
 }
 
+export function getPreviewBootstrap(academicYear?: string): BootstrapData {
+  const year = (academicYear || previewBootstrap.currentAcademicYear).trim();
+  if (!/^\d{4}\/\d{4}$/.test(year) || Number(year.slice(5)) !== Number(year.slice(0, 4)) + 1) {
+    throw new Error('صيغة العام الدراسي يجب أن تكون مثل 2025/2026.');
+  }
+  if (year === previewBootstrap.academicYear) return previewBootstrap;
+  const availableAcademicYears = Array.from(new Set([...previewBootstrap.availableAcademicYears, year])).sort((a, b) => Number(b.slice(0,4)) - Number(a.slice(0,4)));
+  return {
+    ...previewBootstrap,
+    academicYear: year,
+    availableAcademicYears,
+    dashboard: { teacherCount: 0, openRequests: 0, needsReview: 0, lateRequests: 0, openDecisions: 0, upcomingVisits: 0, planProgress: 0, visitProgress: 0, requestCompletion: 0, achievementMastery: 0, achievementMasteryComparable: false, openAchievementActions: 0 },
+    teachers: [], requests: [], events: [], meetings: [], decisionAttention: [], plans: [], planningAttention: [], visits: [], supervisionAttention: [], assessments: [], achievementAttention: [], documents: [], activities: [],
+  };
+}
+
 function previewArchiveScope(academicYear: string): ArchiveYearDetail {
   const plans = previewBootstrap.plans.filter((item) => item.academicYear === academicYear);
   const assessments = previewBootstrap.assessments.filter((item) => item.academicYear === academicYear);
   const visits = previewBootstrap.visits.filter((item) => item.academicYear === academicYear);
   const meetings = previewBootstrap.meetings.filter((item) => item.academicYear === academicYear);
-  const events = previewBootstrap.events.filter((item) => previewAcademicYearFromDate(item.eventDate) === academicYear);
+  const events = previewBootstrap.events.filter((item) => (item.academicYear || previewAcademicYearFromDate(item.eventDate)) === academicYear);
   const documents = previewBootstrap.documents.filter((item) => (item.academicYear || previewAcademicYearFromDate(item.uploadedAt)) === academicYear);
-  const requests = previewBootstrap.requests.filter((item) => previewAcademicYearFromDate(item.createdAt) === academicYear);
+  const requests = previewBootstrap.requests.filter((item) => (item.academicYear || previewAcademicYearFromDate(item.createdAt)) === academicYear);
 
   const linked = new Map<number, number>();
   const addTeacher = (id?: number | null) => { if (id) linked.set(id, (linked.get(id) || 0) + 1); };
@@ -516,8 +551,8 @@ export function getPreviewArchiveYears(): ArchiveYearsIndex {
   previewBootstrap.visits.forEach((item) => years.add(item.academicYear));
   previewBootstrap.meetings.forEach((item) => years.add(item.academicYear));
   previewBootstrap.documents.forEach((item) => { const year = item.academicYear || previewAcademicYearFromDate(item.uploadedAt); if (year) years.add(year); });
-  previewBootstrap.events.forEach((item) => { const year = previewAcademicYearFromDate(item.eventDate); if (year) years.add(year); });
-  previewBootstrap.requests.forEach((item) => { const year = previewAcademicYearFromDate(item.createdAt); if (year) years.add(year); });
+  previewBootstrap.events.forEach((item) => { const year = item.academicYear || previewAcademicYearFromDate(item.eventDate); if (year) years.add(year); });
+  previewBootstrap.requests.forEach((item) => { const year = item.academicYear || previewAcademicYearFromDate(item.createdAt); if (year) years.add(year); });
   const ordered = [...years].sort((a, b) => Number(b.slice(0, 4)) - Number(a.slice(0, 4)));
   return {
     currentAcademicYear: previewBootstrap.academicYear,

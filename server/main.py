@@ -35,7 +35,7 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 EVENT_UPLOADS_DIR = Path(os.getenv("APP_EVENT_UPLOADS_DIR", BASE_DIR / "uploads" / "events"))
 EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="مرصد الإنجازات API", version="0.12.0")
+app = FastAPI(title="مرصد الإنجازات API", version="0.13.0")
 
 
 class CreateRequestPayload(BaseModel):
@@ -54,6 +54,7 @@ class RequestStatusPayload(BaseModel):
 
 
 class TeacherPayload(BaseModel):
+    academicYear: str = Field(default=ACADEMIC_YEAR, min_length=4, max_length=20)
     name: str = Field(min_length=3, max_length=120)
     subject: str = Field(min_length=2, max_length=80)
     specialization: str = Field(default="", max_length=120)
@@ -85,6 +86,7 @@ class EventPayload(BaseModel):
     title: str = Field(min_length=3, max_length=180)
     eventType: str = Field(min_length=2, max_length=80)
     eventDate: str
+    academicYear: str | None = Field(default=None, max_length=20)
     location: str = Field(default="", max_length=160)
     audience: str = Field(default="", max_length=180)
     participantCount: int = Field(default=0, ge=0, le=100000)
@@ -109,6 +111,7 @@ class MeetingPayload(BaseModel):
     title: str = Field(min_length=3, max_length=180)
     meetingType: str = Field(default="اجتماع قسم", min_length=2, max_length=80)
     meetingDate: str
+    academicYear: str = Field(default=ACADEMIC_YEAR, min_length=4, max_length=20)
     meetingTime: str = Field(default="", max_length=5)
     location: str = Field(default="", max_length=160)
     agenda: str = Field(default="", max_length=5000)
@@ -132,6 +135,7 @@ class CurriculumPlanPayload(BaseModel):
     subject: str = Field(min_length=2, max_length=80)
     grade: str = Field(min_length=1, max_length=40)
     term: str = Field(min_length=2, max_length=80)
+    academicYear: str = Field(default=ACADEMIC_YEAR, min_length=4, max_length=20)
     ownerTeacherId: int | None = None
     startDate: str | None = None
     endDate: str | None = None
@@ -154,6 +158,7 @@ class SupervisionVisitPayload(BaseModel):
     teacherId: int
     visitType: str = Field(default="زيارة صفية", min_length=2, max_length=100)
     visitDate: str
+    academicYear: str = Field(default=ACADEMIC_YEAR, min_length=4, max_length=20)
     periodLabel: str = Field(default="", max_length=80)
     grade: str = Field(default="", max_length=80)
     lessonTitle: str = Field(default="", max_length=240)
@@ -343,6 +348,8 @@ def _request_dict(row, include_token: bool = False):
     item["expiresAt"] = item.pop("expires_at")
     item["createdAt"] = item.pop("created_at")
     item["updatedAt"] = item.pop("updated_at")
+    explicit_year = item.pop("academic_year", None)
+    item["academicYear"] = explicit_year or _academic_year_from_date(item["createdAt"])
     if not include_token:
         item.pop("token_hash", None)
     return item
@@ -373,6 +380,7 @@ def _event_dict(row):
     for source, target in [
         ("event_type", "eventType"),
         ("event_date", "eventDate"),
+        ("academic_year", "academicYear"),
         ("participant_count", "participantCount"),
         ("cover_tone", "coverTone"),
         ("created_at", "createdAt"),
@@ -381,6 +389,7 @@ def _event_dict(row):
     ]:
         if source in item:
             item[target] = item.pop(source)
+    item["academicYear"] = item.get("academicYear") or _academic_year_from_date(item.get("eventDate"))
     return item
 
 
@@ -408,8 +417,9 @@ def _event_media_dict(row):
 def _event_detail(event_id: int):
     with connect() as conn:
         row = conn.execute(
-            """SELECT e.*, COUNT(m.id) AS media_count
+            """SELECT e.*, ey.academic_year, COUNT(m.id) AS media_count
                FROM events e LEFT JOIN event_media m ON m.event_id = e.id
+               LEFT JOIN event_record_years ey ON ey.event_id = e.id
                WHERE e.id = ? GROUP BY e.id""",
             (event_id,),
         ).fetchone()
@@ -450,6 +460,78 @@ def _validate_iso_date(value: str, label: str) -> str:
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=f"{label} غير صالح.") from exc
     return parsed.isoformat()
+
+
+def _validate_academic_year(value: str) -> str:
+    match = re.fullmatch(r"\s*(\d{4})\s*/\s*(\d{4})\s*", value or "")
+    if not match:
+        raise HTTPException(status_code=422, detail="صيغة العام الدراسي يجب أن تكون مثل 2025/2026.")
+    first, second = int(match.group(1)), int(match.group(2))
+    if second != first + 1:
+        raise HTTPException(status_code=422, detail="العام الدراسي يجب أن يتكون من عامين متتاليين.")
+    return f"{first:04d}/{second:04d}"
+
+
+def _ensure_teacher_year_links(conn, teacher_ids: list[int] | tuple[int, ...] | set[int], academic_year: str) -> None:
+    year = _validate_academic_year(academic_year)
+    ids = [int(value) for value in dict.fromkeys(teacher_ids) if value]
+    if not ids:
+        return
+    now = utc_now()
+    conn.executemany(
+        "INSERT OR IGNORE INTO teacher_record_years (teacher_id, academic_year, created_at, updated_at) VALUES (?, ?, ?, ?)",
+        [(teacher_id, year, now, now) for teacher_id in ids],
+    )
+
+
+def _teacher_ids_for_year(conn, academic_year: str) -> set[int]:
+    year = _validate_academic_year(academic_year)
+    ids = {row["teacher_id"] for row in conn.execute("SELECT teacher_id FROM teacher_record_years WHERE academic_year = ?", (year,)).fetchall()}
+    queries = [
+        ("SELECT teacher_id FROM documents WHERE academic_year = ? AND teacher_id IS NOT NULL",),
+        ("SELECT owner_teacher_id AS teacher_id FROM curriculum_plans WHERE academic_year = ? AND owner_teacher_id IS NOT NULL",),
+        ("SELECT u.responsible_teacher_id AS teacher_id FROM curriculum_units u JOIN curriculum_plans p ON p.id=u.plan_id WHERE p.academic_year=? AND u.responsible_teacher_id IS NOT NULL",),
+        ("SELECT teacher_id FROM supervision_visits WHERE academic_year = ?",),
+        ("SELECT a.responsible_teacher_id AS teacher_id FROM supervision_actions a JOIN supervision_visits v ON v.id=a.visit_id WHERE v.academic_year=? AND a.responsible_teacher_id IS NOT NULL",),
+        ("SELECT teacher_id FROM achievement_assessments WHERE academic_year = ? AND teacher_id IS NOT NULL",),
+        ("SELECT a.responsible_teacher_id AS teacher_id FROM achievement_actions a JOIN achievement_assessments x ON x.id=a.assessment_id WHERE x.academic_year=? AND a.responsible_teacher_id IS NOT NULL",),
+        ("SELECT ma.teacher_id FROM meeting_attendees ma JOIN meetings m ON m.id=ma.meeting_id WHERE m.academic_year=?",),
+        ("SELECT d.responsible_teacher_id AS teacher_id FROM meeting_decisions d JOIN meetings m ON m.id=d.meeting_id WHERE m.academic_year=? AND d.responsible_teacher_id IS NOT NULL",),
+    ]
+    for (query,) in queries:
+        ids.update(row["teacher_id"] for row in conn.execute(query, (year,)).fetchall())
+    ids.update(row["teacher_id"] for row in conn.execute(
+        """SELECT l.teacher_id FROM event_teacher_links l JOIN event_record_years ey ON ey.event_id=l.event_id WHERE ey.academic_year=?""",
+        (year,),
+    ).fetchall())
+    ids.update(row["teacher_id"] for row in conn.execute(
+        """SELECT r.teacher_id FROM upload_requests r JOIN request_record_years ry ON ry.request_id=r.id WHERE ry.academic_year=?""",
+        (year,),
+    ).fetchall())
+    return ids
+
+
+def _teachers_for_year(conn, academic_year: str) -> list[dict]:
+    ids = _teacher_ids_for_year(conn, academic_year)
+    if not ids:
+        return []
+    rows = conn.execute(
+        f"SELECT * FROM teachers WHERE id IN ({','.join('?' for _ in ids)}) ORDER BY name",
+        tuple(sorted(ids)),
+    ).fetchall()
+    return [_teacher_dict(row) for row in rows]
+
+
+def _validate_date_in_academic_year(value: str, academic_year: str, label: str) -> str:
+    normalized_year = _validate_academic_year(academic_year)
+    normalized_date = _validate_iso_date(value, label)
+    start_year, end_year = (int(part) for part in normalized_year.split("/"))
+    if int(normalized_date[:4]) not in {start_year, end_year}:
+        raise HTTPException(
+            status_code=422,
+            detail=f"{label} لا ينسجم مع العام الدراسي {normalized_year}. تحقق من سنة السجل أو التاريخ.",
+        )
+    return normalized_date
 
 
 def _validate_meeting_time(value: str) -> str:
@@ -578,15 +660,15 @@ def _meeting_detail(meeting_id: int):
     return meeting
 
 
-def _decision_attention(conn, limit: int = 6):
+def _decision_attention(conn, academic_year: str, limit: int = 6):
     rows = conn.execute(
         """SELECT d.*, m.title AS meeting_title
            FROM meeting_decisions d JOIN meetings m ON m.id = d.meeting_id
-           WHERE d.status NOT IN ('completed','cancelled')
+           WHERE m.academic_year = ? AND d.status NOT IN ('completed','cancelled')
            ORDER BY CASE WHEN d.due_date IS NOT NULL AND d.due_date < ? THEN 0 ELSE 1 END,
                     CASE WHEN d.due_date IS NULL THEN 1 ELSE 0 END,
                     d.due_date, d.id DESC LIMIT ?""",
-        (_oman_today_iso(), limit),
+        (academic_year, _oman_today_iso(), limit),
     ).fetchall()
     return [_decision_dict(row) for row in rows]
 
@@ -681,16 +763,16 @@ def _plan_detail(plan_id: int):
     return plan
 
 
-def _planning_attention(conn, limit: int = 6):
+def _planning_attention(conn, academic_year: str, limit: int = 6):
     rows = conn.execute(
         """SELECT u.*, t.name AS responsible_name, p.title AS plan_title, p.subject AS plan_subject, p.grade AS plan_grade
            FROM curriculum_units u
            JOIN curriculum_plans p ON p.id = u.plan_id
            LEFT JOIN teachers t ON t.id = u.responsible_teacher_id
-           WHERE p.status = 'active' AND u.status != 'completed' AND u.progress_percent < 100
+           WHERE p.academic_year = ? AND p.status = 'active' AND u.status != 'completed' AND u.progress_percent < 100
              AND u.planned_end IS NOT NULL AND u.planned_end < ?
            ORDER BY u.planned_end, u.sequence, u.id LIMIT ?""",
-        (_oman_today_iso(), limit),
+        (academic_year, _oman_today_iso(), limit),
     ).fetchall()
     return [_plan_unit_dict(row) for row in rows]
 
@@ -827,7 +909,7 @@ def _supervision_detail(visit_id: int):
     return visit
 
 
-def _supervision_attention(conn, limit: int = 6):
+def _supervision_attention(conn, academic_year: str, limit: int = 6):
     today = _oman_today_iso()
     rows = conn.execute(
         """SELECT v.*, t.name AS teacher_name, t.subject AS teacher_subject,
@@ -838,7 +920,7 @@ def _supervision_attention(conn, limit: int = 6):
                    WHERE a.visit_id = v.id AND a.status NOT IN ('completed','cancelled')
                      AND a.due_date IS NOT NULL AND a.due_date < ?) AS overdue_action_count
            FROM supervision_visits v JOIN teachers t ON t.id = v.teacher_id
-           WHERE v.status != 'closed'
+           WHERE v.academic_year = ? AND v.status != 'closed'
              AND (
                   (v.status = 'planned' AND v.visit_date < ?)
                   OR (v.status = 'needs_followup' AND v.followup_date IS NOT NULL AND v.followup_date < ?)
@@ -859,7 +941,7 @@ def _supervision_attention(conn, limit: int = 6):
                     CASE WHEN v.status = 'needs_followup' THEN COALESCE(v.followup_date, v.visit_date) ELSE v.visit_date END,
                     v.id
            LIMIT ?""",
-        (today, today, today, today, today, limit),
+        (today, academic_year, today, today, today, today, limit),
     ).fetchall()
     return [_supervision_visit_dict(row) for row in rows]
 
@@ -876,8 +958,9 @@ def _get_request_rows():
     with connect() as conn:
         return conn.execute(
             """
-            SELECT r.*, t.name AS teacher_name
+            SELECT r.*, ry.academic_year, t.name AS teacher_name
             FROM upload_requests r JOIN teachers t ON t.id = r.teacher_id
+            LEFT JOIN request_record_years ry ON ry.request_id = r.id
             ORDER BY r.created_at DESC, r.id DESC
             """
         ).fetchall()
@@ -895,8 +978,9 @@ def _request_from_token(token: str):
     with connect() as conn:
         return conn.execute(
             """
-            SELECT r.*, t.name AS teacher_name
+            SELECT r.*, ry.academic_year, t.name AS teacher_name
             FROM upload_requests r JOIN teachers t ON t.id = r.teacher_id
+            LEFT JOIN request_record_years ry ON ry.request_id = r.id
             WHERE r.token_hash = ?
             """,
             (digest,),
@@ -1084,27 +1168,28 @@ def _achievement_detail(assessment_id: int):
     return assessment
 
 
-def _achievement_attention(conn, limit: int = 6):
+def _achievement_attention(conn, academic_year: str, limit: int = 6):
     rows = _achievement_summary_rows(conn)
-    items = [_achievement_assessment_dict(row) for row in rows]
+    items = [_achievement_assessment_dict(row) for row in rows if row["academic_year"] == academic_year]
     needs = [
         item for item in items
         if item["status"] != "draft" and (
             item["overdueActionCount"] > 0
             or item.get("unmeasuredCompletedActionCount", 0) > 0
             or item.get("impactReviewActionCount", 0) > 0
-            or (item["studentCount"] > 0 and item["masteryPercent"] < item["masteryThresholdPct"])
+            or item.get("interventionCount", 0) > 0
         )
     ]
     needs.sort(key=lambda item: (
         0 if item["overdueActionCount"] else 1 if item.get("impactReviewActionCount", 0) else 2 if item.get("unmeasuredCompletedActionCount", 0) else 3,
-        item["masteryPercent"], item["assessmentDate"], item["id"]
+        -item.get("interventionCount", 0), item["assessmentDate"], item["id"]
     ))
     return needs[:limit]
 
 
 def _validate_achievement_payload(payload: AchievementAssessmentPayload) -> None:
-    _validate_iso_date(payload.assessmentDate, "تاريخ التقويم")
+    academic_year = _validate_academic_year(payload.academicYear)
+    _validate_date_in_academic_year(payload.assessmentDate, academic_year, "تاريخ التقويم")
     if not payload.masteryReferenceSource.strip():
         raise HTTPException(status_code=422, detail="وثّق مرجع حد الإتقان المستخدم. المرصد لا يعتمد حدًا تربويًا بلا مصدر عُماني معتمد.")
     if payload.teacherId is not None:
@@ -1184,21 +1269,31 @@ def _report_pct(numerator: float, denominator: float) -> int:
     return int(round(100 * numerator / denominator)) if denominator else 0
 
 
-def _academic_year_bounds(academic_year: str) -> tuple[str | None, str | None]:
-    match = re.fullmatch(r"\s*(\d{4})\s*/\s*(\d{4})\s*", academic_year or "")
-    if not match:
-        return None, None
-    first, second = int(match.group(1)), int(match.group(2))
-    if second != first + 1:
-        return None, None
-    return f"{first:04d}-08-01", f"{second:04d}-07-31"
-
-
-def _within_year(date_value: str | None, academic_year: str) -> bool:
-    if not date_value:
-        return False
-    start, end = _academic_year_bounds(academic_year)
-    return bool(start and end and start <= date_value[:10] <= end)
+def _achievement_standard_aggregate(rows: list[dict]) -> dict:
+    eligible = [row for row in rows if row.get("status") != "draft" and row.get("studentCount", 0) > 0]
+    if not eligible:
+        return {"comparable": False, "rate": 0, "students": 0, "mastered": 0, "detail": "لا توجد تقويمات مكتملة قابلة للحساب."}
+    signatures = {
+        (
+            round(float(row.get("masteryThresholdPct", 0)), 6),
+            str(row.get("masteryReferenceSource") or "").strip(),
+            str(row.get("masteryReferenceYear") or "").strip(),
+        )
+        for row in eligible
+    }
+    documented = all(signature[1] for signature in signatures)
+    students = sum(int(row.get("studentCount", 0)) for row in eligible)
+    mastered = sum(int(row.get("masteredCount", 0)) for row in eligible)
+    comparable = documented and len(signatures) == 1
+    if not comparable:
+        return {
+            "comparable": False, "rate": 0, "students": students, "mastered": mastered,
+            "detail": "تختلف حدود أو مراجع التصنيف بين التقويمات؛ لذلك لا تُجمع في نسبة معيارية واحدة.",
+        }
+    threshold, source, reference_year = next(iter(signatures))
+    rate = _report_pct(mastered, students)
+    ref = f"{source}{f' • {reference_year}' if reference_year else ''} • الحد {threshold:g}%"
+    return {"comparable": True, "rate": rate, "students": students, "mastered": mastered, "detail": ref}
 
 
 def _report_section(section_id: str, title: str, columns: list[tuple[str, str]], rows: list[dict], description: str = "") -> dict:
@@ -1220,17 +1315,17 @@ def _official_report(report_type: str, academic_year: str, term: str, teacher_id
         raise HTTPException(status_code=404, detail="نوع التقرير غير مدعوم.")
 
     with connect() as conn:
-        teachers = [_teacher_dict(r) for r in conn.execute("SELECT * FROM teachers ORDER BY name").fetchall()]
+        teachers = _teachers_for_year(conn, academic_year)
         teacher = next((item for item in teachers if item["id"] == teacher_id), None) if teacher_id is not None else None
         if report_type == "teacher" and teacher is None:
             raise HTTPException(status_code=422, detail="اختر معلمًا موجودًا لإنشاء تقرير المعلم.")
 
         requests = [_request_dict(r) for r in conn.execute(
-            """SELECT r.*, t.name AS teacher_name FROM upload_requests r JOIN teachers t ON t.id=r.teacher_id ORDER BY r.created_at DESC"""
+            """SELECT r.*, ry.academic_year, t.name AS teacher_name FROM upload_requests r JOIN teachers t ON t.id=r.teacher_id LEFT JOIN request_record_years ry ON ry.request_id=r.id ORDER BY r.created_at DESC"""
         ).fetchall()]
         documents = [_document_dict(r) for r in conn.execute("SELECT * FROM documents ORDER BY uploaded_at DESC").fetchall()]
         events = [_event_dict(r) for r in conn.execute(
-            """SELECT e.*, COUNT(m.id) AS media_count FROM events e LEFT JOIN event_media m ON m.event_id=e.id GROUP BY e.id ORDER BY e.event_date DESC"""
+            """SELECT e.*, ey.academic_year, COUNT(m.id) AS media_count FROM events e LEFT JOIN event_media m ON m.event_id=e.id LEFT JOIN event_record_years ey ON ey.event_id=e.id GROUP BY e.id ORDER BY e.event_date DESC"""
         ).fetchall()]
         meetings = [_meeting_dict(r) for r in _meeting_summary_rows(conn)]
         plans = [_plan_dict(r) for r in _plan_summary_rows(conn)]
@@ -1242,9 +1337,9 @@ def _official_report(report_type: str, academic_year: str, term: str, teacher_id
         plans_scope = [x for x in plans if x["academicYear"] == academic_year and (not term_filter or x["term"] == term_filter)]
         visits_scope = [x for x in visits if x["academicYear"] == academic_year]
         assessments_scope = [x for x in assessments if x["academicYear"] == academic_year and (not term_filter or x["term"] == term_filter)]
-        events_scope = [x for x in events if _within_year(x.get("eventDate"), academic_year)]
-        documents_scope = [x for x in documents if x.get("academicYear") == academic_year or (not x.get("academicYear") and _within_year(x.get("uploadedAt"), academic_year))]
-        requests_scope = [x for x in requests if _within_year(x.get("createdAt"), academic_year)]
+        events_scope = [x for x in events if x.get("academicYear") == academic_year]
+        documents_scope = [x for x in documents if x.get("academicYear") == academic_year]
+        requests_scope = [x for x in requests if x.get("academicYear") == academic_year]
 
         generated_at = utc_now()
         base = {
@@ -1260,8 +1355,7 @@ def _official_report(report_type: str, academic_year: str, term: str, teacher_id
 
         if report_type == "department":
             active_plans = [x for x in plans_scope if x["status"] == "active"]
-            assessment_students = sum(x["studentCount"] for x in assessments_scope if x["status"] != "draft")
-            mastered_students = sum(x["masteredCount"] for x in assessments_scope if x["status"] != "draft")
+            achievement_aggregate = _achievement_standard_aggregate(assessments_scope)
             decisions_total = sum(x["decisionCount"] for x in meetings_scope)
             decisions_done = sum(x["completedDecisionCount"] for x in meetings_scope)
             request_den = sum(1 for x in requests_scope if x["status"] != "cancelled")
@@ -1273,7 +1367,11 @@ def _official_report(report_type: str, academic_year: str, term: str, teacher_id
                 "metrics": [
                     _report_metric("المعلمون", len(teachers), "إجمالي السجلات المهنية الحالية"),
                     _report_metric("تقدم الخطط", f"{int(round(sum(x['progressPercent'] for x in active_plans)/len(active_plans))) if active_plans else 0}%", "متوسط الخطط النشطة في النطاق"),
-                    _report_metric("نسبة الفئة المحققة للحدود المسجلة", f"{_report_pct(mastered_students, assessment_students)}%", f"{mastered_students} من {assessment_students} طالبًا في التقويمات المسجلة"),
+                    _report_metric(
+                        "الفئة المحققة للحد عبر التقويمات",
+                        f"{achievement_aggregate['rate']}%" if achievement_aggregate["comparable"] else "غير مجمعة",
+                        achievement_aggregate["detail"],
+                    ),
                     _report_metric("إغلاق الزيارات", f"{_report_pct(sum(1 for x in visits_scope if x['status']=='closed'), len(visits_scope))}%", "نسبة الزيارات المغلقة من إجمالي الزيارات"),
                     _report_metric("تنفيذ القرارات", f"{_report_pct(decisions_done, decisions_total)}%", f"{decisions_done} قرارًا مكتملًا من {decisions_total}"),
                     _report_metric("اكتمال الطلبات", f"{_report_pct(request_done, request_den)}%", f"{request_done} طلبات معتمدة من {request_den}"),
@@ -1309,10 +1407,11 @@ def _official_report(report_type: str, academic_year: str, term: str, teacher_id
             teacher_documents = [x for x in documents_scope if x.get("teacherId") == tid]
             teacher_visits = [x for x in visits_scope if x["teacherId"] == tid]
             teacher_assessments = [x for x in assessments_scope if x.get("teacherId") == tid]
+            scoped_event_ids = {item["id"] for item in events_scope}
             teacher_events = [dict(r) for r in conn.execute(
                 """SELECT e.id,e.title,e.event_type,e.event_date,l.role FROM event_teacher_links l JOIN events e ON e.id=l.event_id WHERE l.teacher_id=? ORDER BY e.event_date DESC""",
                 (tid,),
-            ).fetchall() if _within_year(r["event_date"], academic_year)]
+            ).fetchall() if r["id"] in scoped_event_ids]
             cv_count = conn.execute("SELECT COUNT(*) FROM teacher_cv_items WHERE teacher_id=?", (tid,)).fetchone()[0]
             open_followups = sum(x["openActionCount"] for x in teacher_visits)
             base.update({
@@ -1357,7 +1456,8 @@ def _official_report(report_type: str, academic_year: str, term: str, teacher_id
 
         if report_type == "achievement":
             rows=[x for x in assessments_scope if x["status"]!="draft"]
-            students=sum(x["studentCount"] for x in rows); mastered=sum(x["masteredCount"] for x in rows)
+            achievement_aggregate = _achievement_standard_aggregate(rows)
+            students = achievement_aggregate["students"]
             action_rows = []
             for assessment in rows:
                 detail = _achievement_detail(assessment["id"])
@@ -1380,7 +1480,7 @@ def _official_report(report_type: str, academic_year: str, term: str, teacher_id
             base.update({
                 "title":"تقرير التحصيل والنتائج","subtitle":f"{term} • {academic_year}",
                 "summary":"يجمع التقرير نتائج التقويمات والتدخلات وقياس أثرها كما سُجلت. لا يضع حدًا تربويًا من عنده ولا يحول الدرجة الكلية إلى تشخيص مهاري غير موجود في البيانات.",
-                "metrics":[_report_metric("التقويمات",len(rows)),_report_metric("الطلبة",students),_report_metric("نسبة فئة الإتقان وفق الحدود المسجلة",f"{_report_pct(mastered,students)}%"),_report_metric("تدخلات مفتوحة",sum(x["openActionCount"] for x in rows)),_report_metric("تدخلات مقاسة",measured),_report_metric("حققت الهدف المسجل",target_met, f"{_report_pct(target_met, measured)}% من التدخلات المقاسة" if measured else "لا توجد قياسات نهائية")],
+                "metrics":[_report_metric("التقويمات",len(rows)),_report_metric("الطلبة",students),_report_metric("الفئة المحققة للحد عبر التقويمات",f"{achievement_aggregate['rate']}%" if achievement_aggregate["comparable"] else "غير مجمعة", achievement_aggregate["detail"]),_report_metric("تدخلات مفتوحة",sum(x["openActionCount"] for x in rows)),_report_metric("تدخلات مقاسة",measured),_report_metric("حققت الهدف المسجل",target_met, f"{_report_pct(target_met, measured)}% من التدخلات المقاسة" if measured else "لا توجد قياسات نهائية")],
                 "sections":[
                     _report_section("assessments","التقويمات",[("title","التقويم"),("scope","النطاق"),("teacher","المعلم"),("average","المتوسط"),("mastery","الفئة المحققة للحد المسجل"),("reference","مرجع الحد"),("actions","المتابعة")],[{"title":x["title"],"scope":f"{x['subject']} • {x['grade']}","teacher":x.get("teacherName") or "—","average":f"{x['averagePercent']}%","mastery":f"{x['masteryPercent']}% وفق {x['masteryThresholdPct']}%","reference":x.get("masteryReferenceSource") or "سجل سابق بلا مرجع موثق","actions":x["openActionCount"]} for x in rows]),
                     _report_section("interventions","التدخلات والمتابعات وقياس الأثر",[("title","التدخل"),("type","النوع"),("targetGroup","الفئة المستهدفة"),("metric","المؤشر"),("baseline","خط الأساس"),("target","الهدف المسجل"),("outcome","النتيجة"),("impact","الأثر الحسابي"),("reference","مصدر المعيار/الهدف")], action_rows, "الحكم هنا حسابي بالنسبة للهدف المسجل فقط، ولا يعني اعتماد معيار تربوي ما لم يكن مصدره موثقًا.")
@@ -1419,6 +1519,9 @@ def _official_report(report_type: str, academic_year: str, term: str, teacher_id
 
 
 ARCHIVE_EXPLICIT_YEAR_SOURCES = (
+    ("request_record_years", "academic_year"),
+    ("event_record_years", "academic_year"),
+    ("teacher_record_years", "academic_year"),
     ("documents", "academic_year"),
     ("meetings", "academic_year"),
     ("curriculum_plans", "academic_year"),
@@ -1445,21 +1548,23 @@ def _archive_available_years(conn) -> list[str]:
     for table, column in ARCHIVE_EXPLICIT_YEAR_SOURCES:
         for row in conn.execute(f"SELECT DISTINCT {column} AS academic_year FROM {table} WHERE {column} IS NOT NULL AND TRIM({column}) <> ''").fetchall():
             value = str(row["academic_year"] or "").strip()
-            if _academic_year_bounds(value)[0]:
-                years.add(value)
-    for row in conn.execute("SELECT event_date FROM events").fetchall():
+            try:
+                years.add(_validate_academic_year(value))
+            except HTTPException:
+                continue
+    for row in conn.execute("SELECT e.event_date FROM events e LEFT JOIN event_record_years ey ON ey.event_id=e.id WHERE ey.event_id IS NULL").fetchall():
         value = _academic_year_from_date(row["event_date"])
         if value:
             years.add(value)
-    for row in conn.execute("SELECT created_at FROM upload_requests").fetchall():
+    for row in conn.execute("SELECT r.created_at FROM upload_requests r LEFT JOIN request_record_years ry ON ry.request_id=r.id WHERE ry.request_id IS NULL").fetchall():
         value = _academic_year_from_date(row["created_at"])
         if value:
             years.add(value)
     return sorted(years, key=lambda value: int(value[:4]), reverse=True)
 
 
-def _archive_linked_teachers(conn, *, requests: list[dict], documents: list[dict], plans: list[dict], visits: list[dict], assessments: list[dict], events: list[dict], meetings: list[dict]) -> list[dict]:
-    counts: dict[int, int] = {}
+def _archive_linked_teachers(conn, *, academic_year: str, requests: list[dict], documents: list[dict], plans: list[dict], visits: list[dict], assessments: list[dict], events: list[dict], meetings: list[dict]) -> list[dict]:
+    counts: dict[int, int] = {row["teacher_id"]: 0 for row in conn.execute("SELECT teacher_id FROM teacher_record_years WHERE academic_year = ?", (academic_year,)).fetchall()}
 
     def add(teacher_id) -> None:
         if teacher_id is None:
@@ -1528,20 +1633,20 @@ def _archive_linked_teachers(conn, *, requests: list[dict], documents: list[dict
 
 def _archive_scope(conn, academic_year: str) -> dict:
     requests = [_request_dict(row) for row in conn.execute(
-        """SELECT r.*, t.name AS teacher_name FROM upload_requests r JOIN teachers t ON t.id = r.teacher_id ORDER BY r.created_at DESC"""
+        """SELECT r.*, ry.academic_year, t.name AS teacher_name FROM upload_requests r JOIN teachers t ON t.id = r.teacher_id LEFT JOIN request_record_years ry ON ry.request_id = r.id ORDER BY r.created_at DESC"""
     ).fetchall()]
     documents = [_document_dict(row) for row in conn.execute("SELECT * FROM documents ORDER BY uploaded_at DESC").fetchall()]
     events = [_event_dict(row) for row in conn.execute(
-        """SELECT e.*, COUNT(m.id) AS media_count FROM events e LEFT JOIN event_media m ON m.event_id = e.id GROUP BY e.id ORDER BY e.event_date DESC"""
+        """SELECT e.*, ey.academic_year, COUNT(m.id) AS media_count FROM events e LEFT JOIN event_media m ON m.event_id = e.id LEFT JOIN event_record_years ey ON ey.event_id = e.id GROUP BY e.id ORDER BY e.event_date DESC"""
     ).fetchall()]
     meetings = [_meeting_dict(row) for row in _meeting_summary_rows(conn)]
     plans = [_plan_dict(row) for row in _plan_summary_rows(conn)]
     visits = [_supervision_visit_dict(row) for row in _supervision_summary_rows(conn)]
     assessments = [_achievement_assessment_dict(row) for row in _achievement_summary_rows(conn)]
 
-    requests_scope = [item for item in requests if _within_year(item.get("createdAt"), academic_year)]
-    documents_scope = [item for item in documents if item.get("academicYear") == academic_year or (not item.get("academicYear") and _within_year(item.get("uploadedAt"), academic_year))]
-    events_scope = [item for item in events if _within_year(item.get("eventDate"), academic_year)]
+    requests_scope = [item for item in requests if item.get("academicYear") == academic_year]
+    documents_scope = [item for item in documents if item.get("academicYear") == academic_year]
+    events_scope = [item for item in events if item.get("academicYear") == academic_year]
     meetings_scope = [item for item in meetings if item.get("academicYear") == academic_year]
     plans_scope = [item for item in plans if item.get("academicYear") == academic_year]
     visits_scope = [item for item in visits if item.get("academicYear") == academic_year]
@@ -1549,6 +1654,7 @@ def _archive_scope(conn, academic_year: str) -> dict:
 
     teachers = _archive_linked_teachers(
         conn,
+        academic_year=academic_year,
         requests=requests_scope,
         documents=documents_scope,
         plans=plans_scope,
@@ -1661,17 +1767,72 @@ def _resolve_event_local_path(storage_path: str) -> Path:
     return resolved
 
 
+def _activity_academic_year(conn, row) -> str:
+    entity_type = row["entity_type"] if "entity_type" in row.keys() else None
+    entity_id = row["entity_id"] if "entity_id" in row.keys() else None
+    if not entity_type or entity_id is None:
+        return _academic_year_from_date(row["created_at"]) or ACADEMIC_YEAR
+    if entity_type == "event":
+        found = conn.execute(
+            """SELECT e.event_date, ey.academic_year FROM events e
+               LEFT JOIN event_record_years ey ON ey.event_id=e.id WHERE e.id=?""",
+            (entity_id,),
+        ).fetchone()
+        if found:
+            return found["academic_year"] or _academic_year_from_date(found["event_date"]) or ACADEMIC_YEAR
+    if entity_type == "meeting":
+        found = conn.execute("SELECT academic_year FROM meetings WHERE id=?", (entity_id,)).fetchone()
+        if found:
+            return found["academic_year"]
+    if entity_type == "curriculum_plan":
+        found = conn.execute("SELECT academic_year FROM curriculum_plans WHERE id=?", (entity_id,)).fetchone()
+        if found:
+            return found["academic_year"]
+    if entity_type == "supervision_visit":
+        found = conn.execute("SELECT academic_year FROM supervision_visits WHERE id=?", (entity_id,)).fetchone()
+        if found:
+            return found["academic_year"]
+    if entity_type == "achievement_assessment":
+        found = conn.execute("SELECT academic_year FROM achievement_assessments WHERE id=?", (entity_id,)).fetchone()
+        if found:
+            return found["academic_year"]
+    if entity_type == "request":
+        found = conn.execute(
+            """SELECT r.created_at, ry.academic_year FROM upload_requests r
+               LEFT JOIN request_record_years ry ON ry.request_id=r.id WHERE r.id=?""",
+            (entity_id,),
+        ).fetchone()
+        if found:
+            return found["academic_year"] or _academic_year_from_date(found["created_at"]) or ACADEMIC_YEAR
+    if entity_type == "document":
+        found = conn.execute("SELECT academic_year, uploaded_at FROM documents WHERE id=?", (entity_id,)).fetchone()
+        if found:
+            return found["academic_year"] or _academic_year_from_date(found["uploaded_at"]) or ACADEMIC_YEAR
+    # Teacher/profile activity is attached to the current master record, not a historical school-year record.
+    if entity_type in {"teacher", "teacher_cv_item"}:
+        return ACADEMIC_YEAR
+    return _academic_year_from_date(row["created_at"]) or ACADEMIC_YEAR
+
+
+def _activities_for_year(conn, academic_year: str, limit: int = 8) -> list[dict]:
+    rows = conn.execute("SELECT * FROM activities ORDER BY created_at DESC, id DESC LIMIT 120").fetchall()
+    return [dict(row) for row in rows if _activity_academic_year(conn, row) == academic_year][:limit]
+
+
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "0.12.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
+    return {"ok": True, "version": "0.13.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
 
 
 @app.get("/api/bootstrap")
-def bootstrap():
+def bootstrap(academicYear: str = ACADEMIC_YEAR):
+    scope_year = _validate_academic_year(academicYear)
     with connect() as conn:
-        teachers = [_teacher_dict(r) for r in conn.execute("SELECT * FROM teachers ORDER BY name").fetchall()]
-        request_items = [_request_dict(r) for r in _get_request_rows()]
-        events = [_event_dict(r) for r in conn.execute("""SELECT e.*, COUNT(m.id) AS media_count FROM events e LEFT JOIN event_media m ON m.event_id = e.id GROUP BY e.id ORDER BY e.event_date DESC""").fetchall()]
+        teachers = _teachers_for_year(conn, scope_year)
+        all_requests = [_request_dict(r) for r in _get_request_rows()]
+        request_items = [item for item in all_requests if item.get("academicYear") == scope_year]
+        all_events = [_event_dict(r) for r in conn.execute("""SELECT e.*, ey.academic_year, COUNT(m.id) AS media_count FROM events e LEFT JOIN event_media m ON m.event_id = e.id LEFT JOIN event_record_years ey ON ey.event_id = e.id GROUP BY e.id ORDER BY e.event_date DESC""").fetchall()]
+        events = [item for item in all_events if item.get("academicYear") == scope_year]
         cover_rows = conn.execute(
             """SELECT m.event_id, m.id AS media_id
                FROM event_media m JOIN event_media_meta meta ON meta.media_id = m.id
@@ -1682,33 +1843,41 @@ def bootstrap():
             cover_id = cover_by_event.get(event["id"])
             event["coverMediaId"] = cover_id
             event["coverMediaUrl"] = f"/api/events/{event['id']}/media/{cover_id}/content" if cover_id else None
-        meetings = [_meeting_dict(r) for r in _meeting_summary_rows(conn)]
-        decision_attention = _decision_attention(conn)
-        plans = [_plan_dict(r) for r in _plan_summary_rows(conn)]
-        planning_attention = _planning_attention(conn)
-        visits = [_supervision_visit_dict(r) for r in _supervision_summary_rows(conn)]
-        supervision_attention = _supervision_attention(conn)
-        assessments = [_achievement_assessment_dict(r) for r in _achievement_summary_rows(conn)]
-        achievement_attention = _achievement_attention(conn)
-        documents = [_document_dict(r) for r in conn.execute("SELECT * FROM documents ORDER BY uploaded_at DESC LIMIT 30").fetchall()]
-        activities = [dict(r) for r in conn.execute("SELECT * FROM activities ORDER BY created_at DESC LIMIT 8").fetchall()]
+        meetings = [item for item in (_meeting_dict(r) for r in _meeting_summary_rows(conn)) if item.get("academicYear") == scope_year]
+        decision_attention = _decision_attention(conn, scope_year)
+        plans = [item for item in (_plan_dict(r) for r in _plan_summary_rows(conn)) if item.get("academicYear") == scope_year]
+        planning_attention = _planning_attention(conn, scope_year)
+        visits = [item for item in (_supervision_visit_dict(r) for r in _supervision_summary_rows(conn)) if item.get("academicYear") == scope_year]
+        supervision_attention = _supervision_attention(conn, scope_year)
+        assessments = [item for item in (_achievement_assessment_dict(r) for r in _achievement_summary_rows(conn)) if item.get("academicYear") == scope_year]
+        achievement_attention = _achievement_attention(conn, scope_year)
+        all_documents = [_document_dict(r) for r in conn.execute("SELECT * FROM documents ORDER BY uploaded_at DESC").fetchall()]
+        documents = [item for item in all_documents if item.get("academicYear") == scope_year or (not item.get("academicYear") and _academic_year_from_date(item.get("uploadedAt")) == scope_year)][:30]
+        activities = _activities_for_year(conn, scope_year)
+        available_years = sorted(set(_archive_available_years(conn)) | {scope_year}, key=lambda value: int(value[:4]), reverse=True)
 
     counts = _status_counts(request_items)
+    request_den = sum(1 for item in request_items if item["status"] != "cancelled")
+    request_done = sum(1 for item in request_items if item["status"] == "approved")
+    achievement_aggregate = _achievement_standard_aggregate(assessments)
     dashboard = {
         "teacherCount": len(teachers),
         "openRequests": sum(counts.get(k, 0) for k in ["waiting_upload", "received", "review", "needs_revision", "late"]),
         "needsReview": counts.get("review", 0) + counts.get("received", 0),
         "lateRequests": counts.get("late", 0),
         "openDecisions": sum(item["openDecisionCount"] for item in meetings),
-        "upcomingVisits": sum(1 for item in visits if item["status"] == "planned" and item["visitDate"] >= _oman_today_iso()),
+        "upcomingVisits": sum(1 for item in visits if item["status"] == "planned" and item["visitDate"] >= _oman_today_iso()) if scope_year == ACADEMIC_YEAR else 0,
         "planProgress": int(round(sum(item["progressPercent"] for item in plans if item["status"] == "active") / sum(1 for item in plans if item["status"] == "active"))) if any(item["status"] == "active" for item in plans) else 0,
         "visitProgress": int(round(100 * sum(1 for item in visits if item["status"] in {"completed", "needs_followup", "closed"}) / len(visits))) if visits else 0,
-        "requestCompletion": 91,
-        "achievementMastery": int(round(sum(item["masteryPercent"] for item in assessments if item["status"] != "draft" and item["studentCount"] > 0) / sum(1 for item in assessments if item["status"] != "draft" and item["studentCount"] > 0))) if any(item["status"] != "draft" and item["studentCount"] > 0 for item in assessments) else 0,
+        "requestCompletion": int(round(100 * request_done / request_den)) if request_den else 0,
+        "achievementMastery": achievement_aggregate["rate"] if achievement_aggregate["comparable"] else 0,
+        "achievementMasteryComparable": achievement_aggregate["comparable"],
         "openAchievementActions": sum(item["openActionCount"] for item in assessments),
     }
     return {
-        "academicYear": ACADEMIC_YEAR,
+        "academicYear": scope_year,
+        "currentAcademicYear": ACADEMIC_YEAR,
+        "availableAcademicYears": available_years,
         "term": "الفصل الأول",
         "dashboard": dashboard,
         "teachers": teachers,
@@ -1727,7 +1896,6 @@ def bootstrap():
         "drive": drive.status(),
     }
 
-
 @app.get("/api/reports/official")
 def official_report(reportType: str = "department", academicYear: str = ACADEMIC_YEAR, term: str = "الفصل الأول", teacherId: int | None = None):
     return _official_report(reportType, academicYear, term, teacherId)
@@ -1744,8 +1912,7 @@ def archive_years():
 
 @app.get("/api/archive/year")
 def archive_year(academicYear: str = ACADEMIC_YEAR):
-    if not _academic_year_bounds(academicYear)[0]:
-        raise HTTPException(status_code=422, detail="صيغة العام الدراسي غير صحيحة. استخدم مثال 2026/2027.")
+    academicYear = _validate_academic_year(academicYear)
     with connect() as conn:
         years = _archive_available_years(conn)
         if academicYear not in years:
@@ -1761,21 +1928,38 @@ def global_search(q: str = "", section: str = "all", academicYear: str = "all", 
 
 @app.post("/api/teachers", status_code=201)
 def create_teacher(payload: TeacherPayload):
+    academic_year = _validate_academic_year(payload.academicYear)
     now = utc_now()
     cv_fields = [payload.specialization, payload.qualification, payload.email]
     cv_completion = min(100, 40 + sum(20 for value in cv_fields if value.strip()))
     with connect() as conn:
+        existing = None
+        if payload.email.strip():
+            existing = conn.execute("SELECT * FROM teachers WHERE lower(email)=lower(?) LIMIT 1", (payload.email.strip(),)).fetchone()
+        if existing is None:
+            existing = conn.execute(
+                "SELECT * FROM teachers WHERE trim(name)=trim(?) AND trim(subject)=trim(?) ORDER BY id LIMIT 1",
+                (payload.name, payload.subject),
+            ).fetchone()
+        if existing is not None:
+            teacher_id = existing["id"]
+            _ensure_teacher_year_links(conn, [teacher_id], academic_year)
+            return {"id": teacher_id, "linkedExisting": True, "academicYear": academic_year}
+
         cursor = conn.execute(
             """INSERT INTO teachers
             (name, subject, specialization, qualification, experience_years, workload, cv_completion, email, phone, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (payload.name, payload.subject, payload.specialization, payload.qualification, payload.experienceYears, payload.workload, cv_completion, payload.email, payload.phone, now, now),
         )
-        conn.execute(
-            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-            ("teacher", f"إضافة {payload.name}", payload.subject, "teacher", cursor.lastrowid, now),
-        )
-    return {"id": cursor.lastrowid}
+        teacher_id = cursor.lastrowid
+        _ensure_teacher_year_links(conn, [teacher_id], academic_year)
+        if academic_year == ACADEMIC_YEAR:
+            conn.execute(
+                "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                ("teacher", f"إضافة {payload.name}", payload.subject, "teacher", teacher_id, now),
+            )
+    return {"id": teacher_id, "linkedExisting": False, "academicYear": academic_year}
 
 
 @app.get("/api/teachers/{teacher_id}/profile")
@@ -1867,10 +2051,9 @@ def delete_teacher_cv_item(teacher_id: int, item_id: int):
 
 @app.post("/api/events", status_code=201)
 def create_event(payload: EventPayload):
-    try:
-        datetime.fromisoformat(payload.eventDate)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail="تاريخ الفعالية غير صالح.") from exc
+    event_date = _validate_iso_date(payload.eventDate, "تاريخ الفعالية")
+    academic_year = _validate_academic_year(payload.academicYear) if payload.academicYear else (_academic_year_from_date(event_date) or ACADEMIC_YEAR)
+    _validate_date_in_academic_year(event_date, academic_year, "تاريخ الفعالية")
     teacher_ids = list(dict.fromkeys(payload.teacherIds))
     now = utc_now()
     tones = ["teal", "navy", "gold"]
@@ -1887,9 +2070,13 @@ def create_event(payload: EventPayload):
             """INSERT INTO events
             (title, event_type, event_date, location, audience, participant_count, goals, summary, outcomes, recommendations, cover_tone, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (payload.title, payload.eventType, payload.eventDate, payload.location, payload.audience, payload.participantCount, payload.goals, payload.summary, payload.outcomes, payload.recommendations, tones[count % len(tones)], now, now),
+            (payload.title, payload.eventType, event_date, payload.location, payload.audience, payload.participantCount, payload.goals, payload.summary, payload.outcomes, payload.recommendations, tones[count % len(tones)], now, now),
         )
         event_id = cursor.lastrowid
+        conn.execute(
+            "INSERT INTO event_record_years (event_id, academic_year, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            (event_id, academic_year, now, now),
+        )
         if teacher_ids:
             conn.executemany(
                 "INSERT INTO event_teacher_links (event_id, teacher_id, role, created_at) VALUES (?, ?, 'مشارك', ?)",
@@ -1912,10 +2099,9 @@ def get_event(event_id: int):
 
 @app.patch("/api/events/{event_id}")
 def update_event(event_id: int, payload: EventPayload):
-    try:
-        datetime.fromisoformat(payload.eventDate)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail="تاريخ الفعالية غير صالح.") from exc
+    event_date = _validate_iso_date(payload.eventDate, "تاريخ الفعالية")
+    academic_year = _validate_academic_year(payload.academicYear) if payload.academicYear else (_academic_year_from_date(event_date) or ACADEMIC_YEAR)
+    _validate_date_in_academic_year(event_date, academic_year, "تاريخ الفعالية")
     teacher_ids = list(dict.fromkeys(payload.teacherIds))
     now = utc_now()
     with connect() as conn:
@@ -1933,9 +2119,14 @@ def update_event(event_id: int, payload: EventPayload):
             """UPDATE events SET title = ?, event_type = ?, event_date = ?, location = ?, audience = ?,
                participant_count = ?, goals = ?, summary = ?, outcomes = ?, recommendations = ?, updated_at = ?
                WHERE id = ?""",
-            (payload.title, payload.eventType, payload.eventDate, payload.location, payload.audience,
+            (payload.title, payload.eventType, event_date, payload.location, payload.audience,
              payload.participantCount, payload.goals, payload.summary, payload.outcomes, payload.recommendations,
              now, event_id),
+        )
+        conn.execute(
+            """INSERT INTO event_record_years (event_id, academic_year, created_at, updated_at) VALUES (?, ?, ?, ?)
+               ON CONFLICT(event_id) DO UPDATE SET academic_year=excluded.academic_year, updated_at=excluded.updated_at""",
+            (event_id, academic_year, now, now),
         )
         conn.execute("DELETE FROM event_teacher_links WHERE event_id = ?", (event_id,))
         if teacher_ids:
@@ -1987,7 +2178,7 @@ async def upload_event_media(event_id: int, file: UploadFile = File(...), captio
             if not drive.is_connected():
                 raise HTTPException(status_code=503, detail="Google Drive غير مربوط بعد.")
             try:
-                result = drive.upload_event_file(temp_path, safe_name, mime_type, ACADEMIC_YEAR, event_id, detail["title"])
+                result = drive.upload_event_file(temp_path, safe_name, mime_type, detail.get("academicYear") or ACADEMIC_YEAR, event_id, detail["title"])
             except Exception as exc:
                 raise HTTPException(status_code=502, detail=f"فشل رفع دليل الفعالية إلى Google Drive: {exc}") from exc
             storage_provider = "google_drive"
@@ -2167,7 +2358,8 @@ def list_meetings():
 
 @app.post("/api/meetings", status_code=201)
 def create_meeting(payload: MeetingPayload):
-    meeting_date = _validate_iso_date(payload.meetingDate, "تاريخ الاجتماع")
+    academic_year = _validate_academic_year(payload.academicYear)
+    meeting_date = _validate_date_in_academic_year(payload.meetingDate, academic_year, "تاريخ الاجتماع")
     meeting_time = _validate_meeting_time(payload.meetingTime)
     now = utc_now()
     with connect() as conn:
@@ -2179,7 +2371,7 @@ def create_meeting(payload: MeetingPayload):
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 payload.title.strip(), payload.meetingType.strip(), meeting_date, meeting_time, payload.location.strip(),
-                payload.agenda.strip(), payload.discussionSummary.strip(), payload.notes.strip(), ACADEMIC_YEAR,
+                payload.agenda.strip(), payload.discussionSummary.strip(), payload.notes.strip(), academic_year,
                 payload.status, now, now,
             ),
         )
@@ -2206,7 +2398,8 @@ def get_meeting(meeting_id: int):
 
 @app.patch("/api/meetings/{meeting_id}")
 def update_meeting(meeting_id: int, payload: MeetingPayload):
-    meeting_date = _validate_iso_date(payload.meetingDate, "تاريخ الاجتماع")
+    academic_year = _validate_academic_year(payload.academicYear)
+    meeting_date = _validate_date_in_academic_year(payload.meetingDate, academic_year, "تاريخ الاجتماع")
     meeting_time = _validate_meeting_time(payload.meetingTime)
     now = utc_now()
     with connect() as conn:
@@ -2216,10 +2409,10 @@ def update_meeting(meeting_id: int, payload: MeetingPayload):
         attendee_ids = _validate_teacher_ids(conn, payload.attendeeIds, "تتضمن قائمة الحضور معلمًا غير موجود.")
         conn.execute(
             """UPDATE meetings SET title = ?, meeting_type = ?, meeting_date = ?, meeting_time = ?, location = ?,
-               agenda = ?, discussion_summary = ?, notes = ?, status = ?, updated_at = ? WHERE id = ?""",
+               agenda = ?, discussion_summary = ?, notes = ?, academic_year = ?, status = ?, updated_at = ? WHERE id = ?""",
             (
                 payload.title.strip(), payload.meetingType.strip(), meeting_date, meeting_time, payload.location.strip(),
-                payload.agenda.strip(), payload.discussionSummary.strip(), payload.notes.strip(), payload.status, now, meeting_id,
+                payload.agenda.strip(), payload.discussionSummary.strip(), payload.notes.strip(), academic_year, payload.status, now, meeting_id,
             ),
         )
         conn.execute("DELETE FROM meeting_attendees WHERE meeting_id = ?", (meeting_id,))
@@ -2237,7 +2430,12 @@ def update_meeting(meeting_id: int, payload: MeetingPayload):
 
 @app.post("/api/plans", status_code=201)
 def create_curriculum_plan(payload: CurriculumPlanPayload):
+    academic_year = _validate_academic_year(payload.academicYear)
     start_date, end_date = _normalize_plan_dates(payload.startDate, payload.endDate)
+    if start_date:
+        _validate_date_in_academic_year(start_date, academic_year, "تاريخ بداية الخطة")
+    if end_date:
+        _validate_date_in_academic_year(end_date, academic_year, "تاريخ نهاية الخطة")
     now = utc_now()
     with connect() as conn:
         if payload.ownerTeacherId is not None:
@@ -2246,7 +2444,7 @@ def create_curriculum_plan(payload: CurriculumPlanPayload):
             """INSERT INTO curriculum_plans
                (title, subject, grade, term, academic_year, owner_teacher_id, start_date, end_date, notes, status, created_at, updated_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (payload.title, payload.subject, payload.grade, payload.term, ACADEMIC_YEAR, payload.ownerTeacherId, start_date, end_date, payload.notes, payload.status, now, now),
+            (payload.title, payload.subject, payload.grade, payload.term, academic_year, payload.ownerTeacherId, start_date, end_date, payload.notes, payload.status, now, now),
         )
         plan_id = cursor.lastrowid
         conn.execute(
@@ -2266,7 +2464,12 @@ def get_curriculum_plan(plan_id: int):
 
 @app.patch("/api/plans/{plan_id}")
 def update_curriculum_plan(plan_id: int, payload: CurriculumPlanPayload):
+    academic_year = _validate_academic_year(payload.academicYear)
     start_date, end_date = _normalize_plan_dates(payload.startDate, payload.endDate)
+    if start_date:
+        _validate_date_in_academic_year(start_date, academic_year, "تاريخ بداية الخطة")
+    if end_date:
+        _validate_date_in_academic_year(end_date, academic_year, "تاريخ نهاية الخطة")
     now = utc_now()
     with connect() as conn:
         if not conn.execute("SELECT id FROM curriculum_plans WHERE id = ?", (plan_id,)).fetchone():
@@ -2274,8 +2477,8 @@ def update_curriculum_plan(plan_id: int, payload: CurriculumPlanPayload):
         if payload.ownerTeacherId is not None:
             _validate_teacher_ids(conn, [payload.ownerTeacherId], "المعلم المسؤول عن الخطة غير موجود.")
         conn.execute(
-            """UPDATE curriculum_plans SET title=?, subject=?, grade=?, term=?, owner_teacher_id=?, start_date=?, end_date=?, notes=?, status=?, updated_at=? WHERE id=?""",
-            (payload.title, payload.subject, payload.grade, payload.term, payload.ownerTeacherId, start_date, end_date, payload.notes, payload.status, now, plan_id),
+            """UPDATE curriculum_plans SET title=?, subject=?, grade=?, term=?, academic_year=?, owner_teacher_id=?, start_date=?, end_date=?, notes=?, status=?, updated_at=? WHERE id=?""",
+            (payload.title, payload.subject, payload.grade, payload.term, academic_year, payload.ownerTeacherId, start_date, end_date, payload.notes, payload.status, now, plan_id),
         )
         conn.execute(
             "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -2289,7 +2492,7 @@ def create_curriculum_unit(plan_id: int, payload: CurriculumUnitPayload):
     planned_start, planned_end, progress, status = _normalize_unit_payload(payload)
     now = utc_now()
     with connect() as conn:
-        plan = conn.execute("SELECT id, title FROM curriculum_plans WHERE id = ?", (plan_id,)).fetchone()
+        plan = conn.execute("SELECT id, title, academic_year FROM curriculum_plans WHERE id = ?", (plan_id,)).fetchone()
         if not plan:
             raise HTTPException(status_code=404, detail="الخطة غير موجودة.")
         if payload.responsibleTeacherId is not None:
@@ -2317,6 +2520,7 @@ def update_curriculum_unit(plan_id: int, unit_id: int, payload: CurriculumUnitPa
         row = conn.execute("SELECT id FROM curriculum_units WHERE id = ? AND plan_id = ?", (unit_id, plan_id)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="الوحدة غير موجودة.")
+        plan = conn.execute("SELECT academic_year FROM curriculum_plans WHERE id = ?", (plan_id,)).fetchone()
         if payload.responsibleTeacherId is not None:
             _validate_teacher_ids(conn, [payload.responsibleTeacherId], "المعلم المسؤول عن الوحدة غير موجود.")
         conn.execute(
@@ -2354,7 +2558,11 @@ def list_supervision_visits():
 
 @app.post("/api/supervision/visits", status_code=201)
 def create_supervision_visit(payload: SupervisionVisitPayload):
+    academic_year = _validate_academic_year(payload.academicYear)
     visit_date, followup_date = _normalize_supervision_visit(payload)
+    _validate_date_in_academic_year(visit_date, academic_year, "تاريخ الزيارة")
+    if followup_date:
+        _validate_date_in_academic_year(followup_date, academic_year, "موعد المتابعة")
     now = utc_now()
     with connect() as conn:
         _validate_teacher_ids(conn, [payload.teacherId], "المعلم المحدد للزيارة غير موجود.")
@@ -2367,7 +2575,7 @@ def create_supervision_visit(payload: SupervisionVisitPayload):
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (payload.teacherId, payload.visitType.strip(), visit_date, payload.periodLabel.strip(), payload.grade.strip(), payload.lessonTitle.strip(),
              payload.objectives.strip(), payload.strengths.strip(), payload.developmentAreas.strip(), payload.recommendations.strip(),
-             followup_date, payload.followupNotes.strip(), ACADEMIC_YEAR, payload.status, closed_at, now, now),
+             followup_date, payload.followupNotes.strip(), academic_year, payload.status, closed_at, now, now),
         )
         visit_id = cursor.lastrowid
         conn.execute(
@@ -2387,7 +2595,11 @@ def get_supervision_visit(visit_id: int):
 
 @app.patch("/api/supervision/visits/{visit_id}")
 def update_supervision_visit(visit_id: int, payload: SupervisionVisitPayload):
+    academic_year = _validate_academic_year(payload.academicYear)
     visit_date, followup_date = _normalize_supervision_visit(payload)
+    _validate_date_in_academic_year(visit_date, academic_year, "تاريخ الزيارة")
+    if followup_date:
+        _validate_date_in_academic_year(followup_date, academic_year, "موعد المتابعة")
     now = utc_now()
     with connect() as conn:
         current = conn.execute("SELECT * FROM supervision_visits WHERE id = ?", (visit_id,)).fetchone()
@@ -2401,9 +2613,9 @@ def update_supervision_visit(visit_id: int, payload: SupervisionVisitPayload):
         elif payload.status != "closed":
             closed_at = None
         conn.execute(
-            """UPDATE supervision_visits SET teacher_id=?, visit_type=?, visit_date=?, period_label=?, grade=?, lesson_title=?, objectives=?, strengths=?,
+            """UPDATE supervision_visits SET teacher_id=?, visit_type=?, visit_date=?, academic_year=?, period_label=?, grade=?, lesson_title=?, objectives=?, strengths=?,
                development_areas=?, recommendations=?, followup_date=?, followup_notes=?, status=?, closed_at=?, updated_at=? WHERE id=?""",
-            (payload.teacherId, payload.visitType.strip(), visit_date, payload.periodLabel.strip(), payload.grade.strip(), payload.lessonTitle.strip(),
+            (payload.teacherId, payload.visitType.strip(), visit_date, academic_year, payload.periodLabel.strip(), payload.grade.strip(), payload.lessonTitle.strip(),
              payload.objectives.strip(), payload.strengths.strip(), payload.developmentAreas.strip(), payload.recommendations.strip(), followup_date,
              payload.followupNotes.strip(), payload.status, closed_at, now, visit_id),
         )
@@ -2419,7 +2631,7 @@ def create_supervision_action(visit_id: int, payload: SupervisionActionPayload):
     due_date = _validate_iso_date(payload.dueDate, "موعد الإجراء") if payload.dueDate else None
     now = utc_now()
     with connect() as conn:
-        visit = conn.execute("SELECT id FROM supervision_visits WHERE id = ?", (visit_id,)).fetchone()
+        visit = conn.execute("SELECT id, academic_year FROM supervision_visits WHERE id = ?", (visit_id,)).fetchone()
         if not visit:
             raise HTTPException(status_code=404, detail="الزيارة غير موجودة.")
         if payload.responsibleTeacherId is not None:
@@ -2454,6 +2666,7 @@ def update_supervision_action(visit_id: int, action_id: int, payload: Supervisio
             raise HTTPException(status_code=404, detail="إجراء المتابعة غير موجود ضمن هذه الزيارة.")
         if payload.responsibleTeacherId is not None:
             _validate_teacher_ids(conn, [payload.responsibleTeacherId], "المسؤول عن الإجراء غير موجود.")
+            visit = conn.execute("SELECT academic_year FROM supervision_visits WHERE id = ?", (visit_id,)).fetchone()
         completed_at = current["completed_at"]
         if payload.status == "completed" and not completed_at:
             completed_at = now
@@ -2496,7 +2709,7 @@ def create_meeting_decision(meeting_id: int, payload: MeetingDecisionPayload):
     due_date = _validate_iso_date(payload.dueDate, "موعد القرار") if payload.dueDate else None
     now = utc_now()
     with connect() as conn:
-        meeting = conn.execute("SELECT id, title FROM meetings WHERE id = ?", (meeting_id,)).fetchone()
+        meeting = conn.execute("SELECT id, title, academic_year FROM meetings WHERE id = ?", (meeting_id,)).fetchone()
         if not meeting:
             raise HTTPException(status_code=404, detail="الاجتماع غير موجود.")
         responsible_name = payload.responsibleName.strip()
@@ -2536,6 +2749,7 @@ def update_meeting_decision(meeting_id: int, decision_id: int, payload: MeetingD
         ).fetchone()
         if not current:
             raise HTTPException(status_code=404, detail="القرار غير موجود ضمن هذا الاجتماع.")
+        meeting = conn.execute("SELECT academic_year FROM meetings WHERE id = ?", (meeting_id,)).fetchone()
         responsible_name = payload.responsibleName.strip()
         if payload.responsibleTeacherId is not None:
             teacher = conn.execute("SELECT id, name FROM teachers WHERE id = ?", (payload.responsibleTeacherId,)).fetchone()
@@ -2593,6 +2807,8 @@ def create_achievement_assessment(payload: AchievementAssessmentPayload):
     _validate_achievement_payload(payload)
     now = utc_now()
     with connect() as conn:
+        if payload.teacherId is not None:
+            _validate_teacher_ids(conn, [payload.teacherId], "المعلم المسؤول عن التقويم غير موجود.")
         cursor = conn.execute(
             """INSERT INTO achievement_assessments
                (title, assessment_type, subject, grade, assessment_date, term, academic_year, teacher_id,
@@ -2633,6 +2849,8 @@ def update_achievement_assessment(assessment_id: int, payload: AchievementAssess
     with connect() as conn:
         if not conn.execute("SELECT 1 FROM achievement_assessments WHERE id = ?", (assessment_id,)).fetchone():
             raise HTTPException(status_code=404, detail="سجل التحصيل غير موجود.")
+        if payload.teacherId is not None:
+            _validate_teacher_ids(conn, [payload.teacherId], "المعلم المسؤول عن التقويم غير موجود.")
         conn.execute(
             """UPDATE achievement_assessments SET
                title=?, assessment_type=?, subject=?, grade=?, assessment_date=?, term=?, academic_year=?, teacher_id=?,
@@ -2668,9 +2886,11 @@ def create_achievement_action(assessment_id: int, payload: AchievementActionPayl
     start, due = _validate_achievement_action(payload)
     now = utc_now()
     with connect() as conn:
-        assessment = conn.execute("SELECT title FROM achievement_assessments WHERE id = ?", (assessment_id,)).fetchone()
+        assessment = conn.execute("SELECT title, academic_year FROM achievement_assessments WHERE id = ?", (assessment_id,)).fetchone()
         if not assessment:
             raise HTTPException(status_code=404, detail="سجل التحصيل غير موجود.")
+        if payload.responsibleTeacherId is not None:
+            _validate_teacher_ids(conn, [payload.responsibleTeacherId], "المسؤول عن التدخل غير موجود.")
         completed_at = now if payload.status == "completed" else None
         cursor = conn.execute(
             """INSERT INTO achievement_actions
@@ -2698,6 +2918,9 @@ def update_achievement_action(assessment_id: int, action_id: int, payload: Achie
         if not row:
             raise HTTPException(status_code=404, detail="الإجراء التحصيلي غير موجود.")
         current = conn.execute("SELECT completed_at FROM achievement_actions WHERE id = ?", (action_id,)).fetchone()
+        if payload.responsibleTeacherId is not None:
+            _validate_teacher_ids(conn, [payload.responsibleTeacherId], "المسؤول عن التدخل غير موجود.")
+            assessment = conn.execute("SELECT academic_year FROM achievement_assessments WHERE id = ?", (assessment_id,)).fetchone()
         completed_at = current["completed_at"]
         if payload.status == "completed" and not completed_at:
             completed_at = now
@@ -2830,6 +3053,10 @@ def create_request(payload: CreateRequestPayload):
         )
         request_id = cursor.lastrowid
         conn.execute(
+            "INSERT INTO request_record_years (request_id, academic_year, created_at, updated_at) VALUES (?, ?, ?, ?)",
+            (request_id, ACADEMIC_YEAR, now, now),
+        )
+        conn.execute(
             "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
             ("request", f"طلب ملف من {teacher['name']}", payload.title, "request", request_id, now),
         )
@@ -2920,7 +3147,7 @@ async def public_upload_file(token: str, file: UploadFile = File(...)):
         if use_drive:
             if not drive.is_connected():
                 raise HTTPException(status_code=503, detail="Google Drive غير مربوط بعد.")
-            result = drive.upload_file(temp_path, safe_name, mime_type, ACADEMIC_YEAR, row["id"])
+            result = drive.upload_file(temp_path, safe_name, mime_type, row["academic_year"] or ACADEMIC_YEAR, row["id"])
             storage_provider = "google_drive"
             storage_file_id = result.get("id")
             web_view_link = result.get("webViewLink")
@@ -2947,7 +3174,7 @@ async def public_upload_file(token: str, file: UploadFile = File(...)):
             """,
             (
                 row["id"], row["teacher_id"], row["title"], row["request_type"], row["subject"], row["grade"],
-                ACADEMIC_YEAR, safe_name, mime_type, total, storage_provider, storage_file_id, storage_path, web_view_link, now,
+                row["academic_year"] or ACADEMIC_YEAR, safe_name, mime_type, total, storage_provider, storage_file_id, storage_path, web_view_link, now,
             ),
         )
         conn.execute("UPDATE upload_requests SET status = 'review', updated_at = ? WHERE id = ?", (now, row["id"]))
@@ -2957,6 +3184,97 @@ async def public_upload_file(token: str, file: UploadFile = File(...)):
         )
 
     return {"ok": True, "documentId": cursor.lastrowid, "storageProvider": storage_provider}
+
+
+@app.post("/api/documents", status_code=201)
+async def upload_direct_document(
+    file: UploadFile = File(...),
+    title: str = Form(...),
+    category: str = Form(default="وثيقة"),
+    academicYear: str = Form(...),
+    teacherId: int | None = Form(default=None),
+    subject: str = Form(default=""),
+    grade: str = Form(default=""),
+):
+    clean_title = title.strip()
+    clean_category = category.strip() or "وثيقة"
+    if len(clean_title) < 3 or len(clean_title) > 220:
+        raise HTTPException(status_code=422, detail="عنوان الوثيقة يجب أن يكون بين 3 و220 حرفًا.")
+    if len(clean_category) > 120 or len(subject.strip()) > 80 or len(grade.strip()) > 40:
+        raise HTTPException(status_code=422, detail="بيانات تصنيف الوثيقة أطول من المسموح.")
+    academic_year = _validate_academic_year(academicYear)
+    if teacherId is not None:
+        with connect() as conn:
+            _validate_teacher_ids(conn, [teacherId], "المعلم المرتبط بالوثيقة غير موجود.")
+
+    safe_name = _safe_filename(file.filename or "file")
+    suffix = Path(safe_name).suffix.lower()
+    allowed = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".jpg", ".jpeg", ".png", ".webp"}
+    if suffix not in allowed:
+        raise HTTPException(status_code=415, detail="نوع الوثيقة غير مسموح به.")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp:
+        temp_path = Path(temp.name)
+        total = 0
+        while chunk := await file.read(1024 * 1024):
+            total += len(chunk)
+            if total > MAX_UPLOAD_BYTES:
+                temp_path.unlink(missing_ok=True)
+                raise HTTPException(status_code=413, detail=f"الحد الأقصى للملف {MAX_UPLOAD_MB} MB.")
+            temp.write(chunk)
+
+    mime_type = file.content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
+    storage_mode = os.getenv("STORAGE_MODE", "auto")
+    storage_provider = "local"
+    storage_file_id = None
+    storage_path = None
+    web_view_link = None
+
+    try:
+        use_drive = storage_mode == "google_drive" or (storage_mode == "auto" and drive.is_connected())
+        if use_drive:
+            if not drive.is_connected():
+                raise HTTPException(status_code=503, detail="Google Drive غير مربوط بعد.")
+            try:
+                result = drive.upload_document_file(temp_path, safe_name, mime_type, academic_year, clean_title)
+            except Exception as exc:
+                raise HTTPException(status_code=502, detail=f"فشل رفع الوثيقة إلى Google Drive: {exc}") from exc
+            storage_provider = "google_drive"
+            storage_file_id = result.get("id")
+            web_view_link = result.get("webViewLink")
+        else:
+            document_dir = UPLOADS_DIR / "documents" / academic_year.replace("/", "-")
+            document_dir.mkdir(parents=True, exist_ok=True)
+            target = document_dir / f"{secrets.token_hex(4)}-{safe_name}"
+            shutil.move(str(temp_path), target)
+            try:
+                storage_path = str(target.relative_to(BASE_DIR))
+            except ValueError:
+                storage_path = str(target)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+    now = utc_now()
+    with connect() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO documents
+            (request_id, teacher_id, title, category, subject, grade, academic_year, original_name, mime_type, size_bytes,
+             storage_provider, storage_file_id, storage_path, web_view_link, status, uploaded_at, approved_at)
+            VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', ?, ?)
+            """,
+            (
+                teacherId, clean_title, clean_category, subject.strip(), grade.strip(), academic_year,
+                safe_name, mime_type, total, storage_provider, storage_file_id, storage_path, web_view_link, now, now,
+            ),
+        )
+        document_id = cursor.lastrowid
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            ("document", f"إضافة وثيقة: {clean_title}", clean_category, "document", document_id, now),
+        )
+        row = conn.execute("SELECT * FROM documents WHERE id = ?", (document_id,)).fetchone()
+    return _document_dict(row)
 
 
 @app.get("/api/integrations/google-drive/status")

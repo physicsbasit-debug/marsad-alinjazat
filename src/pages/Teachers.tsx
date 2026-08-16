@@ -24,6 +24,8 @@ export function Teachers({
   requests,
   documents,
   visits,
+  academicYear,
+  currentAcademicYear,
   onAddTeacher,
   onChanged,
   initialOpenId = null,
@@ -33,6 +35,8 @@ export function Teachers({
   requests: UploadRequest[];
   documents: DocumentRecord[];
   visits: SupervisionVisitRecord[];
+  academicYear: string;
+  currentAcademicYear: string;
   onAddTeacher: () => void;
   onChanged: () => Promise<void>;
   initialOpenId?: number | null;
@@ -65,7 +69,7 @@ export function Teachers({
       <PageHeader
         eyebrow="الفريق"
         title="المعلمون والسير الذاتية"
-        description="ملف مهني مترابط لكل معلم: بيانات أساسية، سيرة ذاتية، أعمال مقدمة، وإنجازات قابلة للبناء سنة بعد سنة."
+        description={academicYear === currentAcademicYear ? "ملف مهني مترابط لكل معلم: بيانات أساسية، سيرة ذاتية، أعمال مقدمة، وإنجازات قابلة للبناء سنة بعد سنة." : `معلمو عام ${academicYear} هم المرتبطون صراحةً بهذا العام أو بسجلاته. الملف المهني الأساسي هو هوية مستمرة ولا يُعامل كلقطة تاريخية لخصائص ذلك العام.`}
         action="إضافة معلم"
         onAction={onAddTeacher}
       />
@@ -119,6 +123,8 @@ export function Teachers({
             documents={documents.filter((item) => item.teacherId === selected.id)}
             visits={visits.filter((item) => item.teacherId === selected.id)}
             onChanged={onChanged}
+            historicalContext={academicYear !== currentAcademicYear}
+            academicYear={academicYear}
           />
         )}
       </Modal>
@@ -134,12 +140,16 @@ function TeacherProfile({
   documents,
   visits,
   onChanged,
+  historicalContext,
+  academicYear,
 }: {
   teacher: Teacher;
   requests: UploadRequest[];
   documents: DocumentRecord[];
   visits: SupervisionVisitRecord[];
   onChanged: () => Promise<void>;
+  historicalContext: boolean;
+  academicYear: string;
 }) {
   const [details, setDetails] = useState<TeacherProfileDetails | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
@@ -263,9 +273,11 @@ function TeacherProfile({
         </div>
         <div className="profile-header-actions">
           <span className="profile-completion"><strong>{current.cvCompletion}%</strong><small>اكتمال السيرة</small></span>
-          <button className="soft-button" onClick={() => setEditing((value) => !value)}><Icon name="user" size={17} /> {editing ? 'إلغاء التعديل' : 'تحديث البيانات'}</button>
+          {!historicalContext && <button className="soft-button" onClick={() => setEditing((value) => !value)}><Icon name="user" size={17} /> {editing ? 'إلغاء التعديل' : 'تحديث البيانات'}</button>}
         </div>
       </div>
+
+      {historicalContext && <div className="quiet-note">عرض عام {academicYear}: الأعمال والزيارات أدناه تخص هذا العام، أما بيانات الهوية المهنية الأساسية فتمثل الملف المستمر الحالي ولا تُعد لقطة تاريخية مفترضة.</div>}
 
       <div className="profile-tabs" role="tablist" aria-label="أقسام الملف المهني">
         <Tab id="overview" current={activeTab} onSelect={setActiveTab}>نظرة عامة</Tab>

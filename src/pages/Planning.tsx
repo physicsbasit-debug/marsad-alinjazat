@@ -22,6 +22,7 @@ export function Planning({
   plans,
   planningAttention,
   teachers,
+  academicYear,
   onRefresh,
   initialOpenId = null,
   onInitialOpened,
@@ -29,6 +30,7 @@ export function Planning({
   plans: CurriculumPlanRecord[];
   planningAttention: CurriculumUnit[];
   teachers: Teacher[];
+  academicYear: string;
   onRefresh: () => Promise<void>;
   initialOpenId?: number | null;
   onInitialOpened?: () => void;
@@ -111,7 +113,7 @@ export function Planning({
         {!visible.length && <div className="panel planning-empty"><Icon name="planning" size={28}/><strong>لا توجد خطط مطابقة</strong><span>أضف خطة أو غيّر المرشحات الحالية.</span></div>}
       </section>
 
-      <PlanFormModal open={planModal} teachers={teachers} onClose={() => setPlanModal(false)} onSaved={async () => { setPlanModal(false); await onRefresh(); }} />
+      <PlanFormModal open={planModal} teachers={teachers} academicYear={academicYear} onClose={() => setPlanModal(false)} onSaved={async () => { setPlanModal(false); await onRefresh(); }} />
       <Modal open={!!selected} onClose={() => setSelected(null)}>
         {selected && <PlanDetails plan={selected} teachers={teachers} onReload={async () => { const next = await getCurriculumPlan(selected.id); setSelected(next); await onRefresh(); }} />}
       </Modal>
@@ -144,7 +146,7 @@ function PlanDetails({ plan, teachers, onReload }: { plan: CurriculumPlanDetails
   return (
     <div className="plan-details">
       <div className="plan-detail-hero">
-        <div><span className="eyebrow">{plan.subject} • {plan.grade} • {plan.term}</span><h2>{plan.title}</h2><p>{plan.ownerName || 'دون مسؤول محدد'}{plan.startDate || plan.endDate ? ` • ${plan.startDate ? formatDate(plan.startDate) : '—'} إلى ${plan.endDate ? formatDate(plan.endDate) : '—'}` : ''}</p></div>
+        <div><span className="eyebrow">{plan.subject} • {plan.grade} • {plan.term} • {plan.academicYear}</span><h2>{plan.title}</h2><p>{plan.ownerName || 'دون مسؤول محدد'}{plan.startDate || plan.endDate ? ` • ${plan.startDate ? formatDate(plan.startDate) : '—'} إلى ${plan.endDate ? formatDate(plan.endDate) : '—'}` : ''}</p></div>
         <div className="plan-detail-score"><strong>{plan.progressPercent}%</strong><span>تنفيذ المنهج</span></div>
       </div>
       <div className="plan-detail-actions"><button className="soft-button" onClick={() => setEditing(true)}><Icon name="edit" size={16}/> تعديل الخطة</button><button className="primary-button" onClick={() => setUnitModal('new')}><Icon name="plus" size={16}/> إضافة وحدة</button></div>
@@ -164,13 +166,13 @@ function PlanDetails({ plan, teachers, onReload }: { plan: CurriculumPlanDetails
         </div>
       </section>
       <section className="plan-timeline"><div className="panel-heading"><div><span className="eyebrow">السجل الزمني</span><h3>تحديثات الخطة</h3></div></div>{plan.timeline.length ? plan.timeline.slice(0, 8).map((item) => <div className="activity-row" key={item.id}><span className="activity-icon"><Icon name="planning" size={17}/></span><div><strong>{item.title}</strong><small>{item.detail} • {formatDateTime(item.created_at)}</small></div></div>) : <div className="quiet-note">لا توجد تحديثات إضافية بعد.</div>}</section>
-      <PlanFormModal open={editing} teachers={teachers} initial={plan} onClose={() => setEditing(false)} onSaved={async () => { setEditing(false); await onReload(); }} />
+      <PlanFormModal open={editing} teachers={teachers} academicYear={plan.academicYear} initial={plan} onClose={() => setEditing(false)} onSaved={async () => { setEditing(false); await onReload(); }} />
       <UnitFormModal open={!!unitModal} planId={plan.id} teachers={teachers} initial={unitModal === 'new' ? undefined : unitModal || undefined} nextSequence={plan.units.length ? Math.max(...plan.units.map((unit) => unit.sequence)) + 1 : 1} onClose={() => setUnitModal(null)} onSaved={async () => { setUnitModal(null); await onReload(); }} />
     </div>
   );
 }
 
-function PlanFormModal({ open, teachers, initial, onClose, onSaved }: { open: boolean; teachers: Teacher[]; initial?: CurriculumPlanRecord; onClose: () => void; onSaved: () => Promise<void> }) {
+function PlanFormModal({ open, teachers, academicYear, initial, onClose, onSaved }: { open: boolean; teachers: Teacher[]; academicYear: string; initial?: CurriculumPlanRecord; onClose: () => void; onSaved: () => Promise<void> }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -178,13 +180,13 @@ function PlanFormModal({ open, teachers, initial, onClose, onSaved }: { open: bo
     const form = new FormData(event.currentTarget);
     const ownerRaw = String(form.get('ownerTeacherId') || '');
     const input: CurriculumPlanInput = {
-      title: String(form.get('title') || ''), subject: String(form.get('subject') || ''), grade: String(form.get('grade') || ''), term: String(form.get('term') || ''),
+      title: String(form.get('title') || ''), subject: String(form.get('subject') || ''), grade: String(form.get('grade') || ''), term: String(form.get('term') || ''), academicYear: String(form.get('academicYear') || academicYear),
       ownerTeacherId: ownerRaw ? Number(ownerRaw) : null, startDate: String(form.get('startDate') || '') || null, endDate: String(form.get('endDate') || '') || null,
       notes: String(form.get('notes') || ''), status: String(form.get('status') || 'active') as CurriculumPlanInput['status'],
     };
     try { if (initial) await updateCurriculumPlan(initial.id, input); else await createCurriculumPlan(input); await onSaved(); } catch (error) { setMessage(error instanceof Error ? error.message : 'تعذر حفظ الخطة.'); } finally { setSaving(false); }
   }
-  return <Modal open={open} onClose={onClose}><form className="request-form" onSubmit={submit}><div className="modal-heading"><span className="eyebrow">{initial ? 'تحديث الخطة' : 'خطة جديدة'}</span><h2>{initial ? initial.title : 'إضافة خطة منهج'}</h2><p>اربط الخطة بمادة وصف ومعلم، ثم أضف الوحدات من داخلها.</p></div><div className="form-grid"><label className="full">عنوان الخطة<input name="title" required defaultValue={initial?.title || ''} placeholder="مثال: خطة الفيزياء للفصل الأول"/></label><label>المادة<select name="subject" defaultValue={initial?.subject || 'الفيزياء'}><option>الفيزياء</option><option>الكيمياء</option><option>الأحياء</option><option>العلوم</option></select></label><label>الصف<select name="grade" defaultValue={initial?.grade || 'العاشر'}><option>العاشر</option><option>التاسع</option><option>الثامن</option></select></label><label>الفصل<select name="term" defaultValue={initial?.term || 'الفصل الأول'}><option>الفصل الأول</option><option>الفصل الثاني</option></select></label><label>المعلم المسؤول<select name="ownerTeacherId" defaultValue={initial?.ownerTeacherId || ''}><option value="">دون تحديد</option>{teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}</select></label><label>بداية الخطة<input type="date" name="startDate" defaultValue={initial?.startDate || ''}/></label><label>نهاية الخطة<input type="date" name="endDate" defaultValue={initial?.endDate || ''}/></label><label>الحالة<select name="status" defaultValue={initial?.status || 'active'}><option value="active">نشطة</option><option value="completed">مكتملة</option><option value="archived">مؤرشفة</option></select></label><label className="full">ملاحظات<textarea name="notes" rows={3} defaultValue={initial?.notes || ''}/></label></div>{message && <div className="inline-error"><Icon name="alert" size={17}/>{message}</div>}<div className="modal-actions"><button type="button" className="ghost-button" onClick={onClose}>إلغاء</button><button className="primary-button" disabled={saving}>{saving ? 'جاري الحفظ...' : 'حفظ الخطة'}</button></div></form></Modal>;
+  return <Modal open={open} onClose={onClose}><form className="request-form" onSubmit={submit}><div className="modal-heading"><span className="eyebrow">{initial ? 'تحديث الخطة' : 'خطة جديدة'}</span><h2>{initial ? initial.title : 'إضافة خطة منهج'}</h2><p>اربط الخطة بمادة وصف ومعلم، ثم أضف الوحدات من داخلها.</p></div><div className="form-grid"><label className="full">عنوان الخطة<input name="title" required defaultValue={initial?.title || ''} placeholder="مثال: خطة الفيزياء للفصل الأول"/></label><label>المادة<select name="subject" defaultValue={initial?.subject || 'الفيزياء'}><option>الفيزياء</option><option>الكيمياء</option><option>الأحياء</option><option>العلوم</option></select></label><label>الصف<select name="grade" defaultValue={initial?.grade || 'العاشر'}><option>العاشر</option><option>التاسع</option><option>الثامن</option></select></label><label>الفصل<select name="term" defaultValue={initial?.term || 'الفصل الأول'}><option>الفصل الأول</option><option>الفصل الثاني</option></select></label><label>العام الدراسي للسجل<input name="academicYear" required defaultValue={initial?.academicYear || academicYear} placeholder="2025/2026"/></label><label>المعلم المسؤول<select name="ownerTeacherId" defaultValue={initial?.ownerTeacherId || ''}><option value="">دون تحديد</option>{teachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.name}</option>)}</select></label><label>بداية الخطة<input type="date" name="startDate" defaultValue={initial?.startDate || ''}/></label><label>نهاية الخطة<input type="date" name="endDate" defaultValue={initial?.endDate || ''}/></label><label>الحالة<select name="status" defaultValue={initial?.status || 'active'}><option value="active">نشطة</option><option value="completed">مكتملة</option><option value="archived">مؤرشفة</option></select></label><label className="full">ملاحظات<textarea name="notes" rows={3} defaultValue={initial?.notes || ''}/></label></div>{message && <div className="inline-error"><Icon name="alert" size={17}/>{message}</div>}<div className="modal-actions"><button type="button" className="ghost-button" onClick={onClose}>إلغاء</button><button className="primary-button" disabled={saving}>{saving ? 'جاري الحفظ...' : 'حفظ الخطة'}</button></div></form></Modal>;
 }
 
 function UnitFormModal({ open, planId, teachers, initial, nextSequence, onClose, onSaved }: { open: boolean; planId: number; teachers: Teacher[]; initial?: CurriculumUnit; nextSequence: number; onClose: () => void; onSaved: () => Promise<void> }) {
