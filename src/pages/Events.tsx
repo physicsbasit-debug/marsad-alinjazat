@@ -205,7 +205,7 @@ function EventEditForm({ detail, onCancel, onSaved, onMessage }: { detail: Event
       <label className="full">عنوان الفعالية<input name="title" required defaultValue={detail.title}/></label>
       <label>نوع الفعالية<select name="eventType" defaultValue={detail.eventType}><option>فعالية</option><option>مسابقة</option><option>مبادرة</option><option>زيارة علمية</option><option>برنامج طلابي</option><option>مشاركة مجتمعية</option></select></label>
       <label>التاريخ<input type="date" name="eventDate" required defaultValue={detail.eventDate}/></label>
-      <label>العام الدراسي للسجل<input name="academicYear" required defaultValue={detail.academicYear || ''} placeholder="2025/2026"/></label>
+      <label>العام الدراسي للسجل<input name="academicYear" required readOnly value={detail.academicYear || ''} dir="ltr"/><small className="field-hint">عام السجل ثابت أثناء تحرير الفعالية.</small></label>
       <label>المكان<input name="location" defaultValue={detail.location || ''}/></label>
       <label>عدد المشاركين<input type="number" name="participantCount" min="0" max="100000" defaultValue={detail.participantCount}/></label>
       <label className="full">الفئة المستهدفة<input name="audience" defaultValue={detail.audience || ''}/></label>

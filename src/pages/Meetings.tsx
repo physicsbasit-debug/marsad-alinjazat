@@ -254,6 +254,26 @@ function DecisionForm({ meetingId, teachers, decision, onSaved, onCancel, onMess
 export function MeetingModal({ open, teachers, academicYear, onClose, onCreated }: { open: boolean; teachers: Teacher[]; academicYear: string; onClose: () => void; onCreated: () => Promise<void> }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [attendeeQuery, setAttendeeQuery] = useState('');
+  const [selectedAttendees, setSelectedAttendees] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    setAttendeeQuery('');
+    setSelectedAttendees([]);
+    setMessage('');
+  }, [open, academicYear]);
+
+  const visibleTeachers = useMemo(() => {
+    const query = attendeeQuery.trim().toLocaleLowerCase('ar');
+    if (!query) return teachers;
+    return teachers.filter((teacher) => `${teacher.name} ${teacher.subject} ${teacher.specialization || ''}`.toLocaleLowerCase('ar').includes(query));
+  }, [teachers, attendeeQuery]);
+
+  function toggleAttendee(teacherId: number) {
+    setSelectedAttendees((current) => current.includes(teacherId) ? current.filter((id) => id !== teacherId) : [...current, teacherId]);
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
@@ -261,19 +281,46 @@ export function MeetingModal({ open, teachers, academicYear, onClose, onCreated 
     setSaving(true);
     setMessage('');
     try {
-      const attendeeIds = form.getAll('attendeeIds').map((value) => Number(value));
-      await createMeeting(meetingInputFromForm(form, attendeeIds));
+      await createMeeting(meetingInputFromForm(form, selectedAttendees));
       formElement.reset();
+      setSelectedAttendees([]);
       await onCreated();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'تعذر إنشاء الاجتماع.');
     } finally { setSaving(false); }
   }
-  return <Modal open={open} onClose={onClose}><form className="request-form meeting-create-form" onSubmit={submit}><div className="modal-heading"><span className="eyebrow">محضر جديد</span><h2>إنشاء اجتماع</h2><p>أنشئ المحضر الآن، ثم أضف القرارات والمسؤوليات والمتابعة من صفحة الاجتماع.</p></div><MeetingFields academicYear={academicYear}/><div className="meeting-attendee-picker"><strong>الحضور</strong><div className="meeting-attendee-options">{teachers.map((teacher) => <label key={teacher.id}><input type="checkbox" name="attendeeIds" value={teacher.id}/><span className="avatar">{teacher.name[0]}</span><div><b>{teacher.name}</b><small>{teacher.subject}</small></div></label>)}</div></div>{message && <div className="inline-error"><Icon name="alert" size={17}/>{message}</div>}<div className="modal-actions"><button type="button" className="ghost-button" onClick={onClose}>إلغاء</button><button className="primary-button" disabled={saving}>{saving ? 'جاري الإنشاء...' : 'إنشاء الاجتماع'}</button></div></form></Modal>;
+
+  return <Modal open={open} onClose={onClose}><form className="request-form meeting-create-form" onSubmit={submit}>
+    <div className="modal-heading"><span className="eyebrow">محضر جديد</span><h2>إنشاء اجتماع</h2><p>أنشئ المحضر وحدد الحضور من دليل المعلمين. اختيار معلم في عام تاريخي يربطه بذلك العام تلقائيًا دون إنشاء نسخة جديدة منه.</p></div>
+    <MeetingFields academicYear={academicYear}/>
+    <div className="meeting-attendee-picker">
+      <div className="meeting-attendee-picker-head">
+        <div><strong>الحضور</strong><small>{selectedAttendees.length} محدد من {teachers.length}</small></div>
+        <div className="meeting-attendee-actions">
+          <button type="button" onClick={()=>setSelectedAttendees(teachers.map((teacher)=>teacher.id))} disabled={!teachers.length}>تحديد الكل</button>
+          <button type="button" onClick={()=>setSelectedAttendees([])} disabled={!selectedAttendees.length}>إلغاء الكل</button>
+        </div>
+      </div>
+      {teachers.length ? <>
+        <label className="meeting-attendee-search"><Icon name="search" size={17}/><input value={attendeeQuery} onChange={(event)=>setAttendeeQuery(event.target.value)} placeholder="ابحث عن معلم بالاسم أو المادة..."/></label>
+        <div className="meeting-attendee-options">{visibleTeachers.map((teacher) => {
+          const checked=selectedAttendees.includes(teacher.id);
+          return <label key={teacher.id} className={checked?'selected':''}>
+            <input type="checkbox" checked={checked} onChange={()=>toggleAttendee(teacher.id)}/>
+            <span className="avatar">{teacher.name[0]}</span>
+            <div><b>{teacher.name}</b><small>{teacher.subject}{teacher.specialization?` • ${teacher.specialization}`:''}</small></div>
+          </label>;
+        })}</div>
+        {!visibleTeachers.length&&<div className="quiet-note">لا توجد أسماء مطابقة للبحث.</div>}
+      </> : <div className="inline-warning"><Icon name="alert" size={17}/><span>دليل المعلمين فارغ. أضف المعلمين أولًا من قسم «المعلمون»، ثم سيظهرون هنا للاختيار في أي عام دراسي.</span></div>}
+    </div>
+    {message && <div className="inline-error"><Icon name="alert" size={17}/>{message}</div>}
+    <div className="modal-actions"><button type="button" className="ghost-button" onClick={onClose}>إلغاء</button><button className="primary-button" disabled={saving}>{saving ? 'جاري الإنشاء...' : 'إنشاء الاجتماع'}</button></div>
+  </form></Modal>;
 }
 
 function MeetingFields({ initial, academicYear }: { initial?: MeetingDetails; academicYear?: string }) {
-  return <div className="form-grid meeting-form-grid"><label className="full">عنوان الاجتماع<input name="title" required defaultValue={initial?.title || 'اجتماع قسم العلوم'} /></label><label>نوع الاجتماع<select name="meetingType" defaultValue={initial?.meetingType || 'اجتماع قسم'}><option>اجتماع قسم</option><option>اجتماع متابعة</option><option>اجتماع تنسيقي</option><option>اجتماع نتائج</option><option>اجتماع طارئ</option></select></label><label>الحالة<select name="status" defaultValue={initial?.status || 'planned'}><option value="planned">مخطط</option><option value="held">منعقد</option><option value="cancelled">ملغي</option></select></label><label>التاريخ<input type="date" name="meetingDate" required defaultValue={initial?.meetingDate || ''}/></label><label>العام الدراسي للسجل<input name="academicYear" required defaultValue={initial?.academicYear || academicYear || ''} placeholder="2025/2026"/></label><label>الوقت<input type="time" name="meetingTime" defaultValue={initial?.meetingTime || ''}/></label><label className="full">المكان<input name="location" defaultValue={initial?.location || 'قاعة العلوم'}/></label><label className="full">جدول الأعمال<textarea name="agenda" rows={4} defaultValue={initial?.agenda || ''} placeholder="اكتب المحاور الرئيسة للاجتماع..."/></label><label className="full">ملخص المناقشات<textarea name="discussionSummary" rows={4} defaultValue={initial?.discussionSummary || ''} placeholder="أهم ما نوقش وما تم الاتفاق عليه..."/></label><label className="full">ملاحظات<textarea name="notes" rows={2} defaultValue={initial?.notes || ''}/></label></div>;
+  return <div className="form-grid meeting-form-grid"><label className="full">عنوان الاجتماع<input name="title" required defaultValue={initial?.title || 'اجتماع قسم العلوم'} /></label><label>نوع الاجتماع<select name="meetingType" defaultValue={initial?.meetingType || 'اجتماع قسم'}><option>اجتماع قسم</option><option>اجتماع متابعة</option><option>اجتماع تنسيقي</option><option>اجتماع نتائج</option><option>اجتماع طارئ</option></select></label><label>الحالة<select name="status" defaultValue={initial?.status || 'planned'}><option value="planned">مخطط</option><option value="held">منعقد</option><option value="cancelled">ملغي</option></select></label><label>التاريخ<input type="date" name="meetingDate" required defaultValue={initial?.meetingDate || ''}/></label><label>العام الدراسي للسجل<input name="academicYear" required readOnly value={initial?.academicYear || academicYear || ''} dir="ltr"/><small className="field-hint">يُحدد من تقويم عام العمل أعلى التطبيق.</small></label><label>الوقت<input type="time" name="meetingTime" defaultValue={initial?.meetingTime || ''}/></label><label className="full">المكان<input name="location" defaultValue={initial?.location || 'قاعة العلوم'}/></label><label className="full">جدول الأعمال<textarea name="agenda" rows={4} defaultValue={initial?.agenda || ''} placeholder="اكتب المحاور الرئيسة للاجتماع..."/></label><label className="full">ملخص المناقشات<textarea name="discussionSummary" rows={4} defaultValue={initial?.discussionSummary || ''} placeholder="أهم ما نوقش وما تم الاتفاق عليه..."/></label><label className="full">ملاحظات<textarea name="notes" rows={2} defaultValue={initial?.notes || ''}/></label></div>;
 }
 
 function meetingInputFromForm(form: FormData, attendeeIds: number[]): CreateMeetingInput {

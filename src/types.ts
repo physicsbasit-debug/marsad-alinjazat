@@ -543,6 +543,7 @@ export type BootstrapData = {
   term: string;
   dashboard: DashboardStats;
   teachers: Teacher[];
+  teacherDirectory: Teacher[];
   requests: UploadRequest[];
   events: EventRecord[];
   meetings: MeetingRecord[];

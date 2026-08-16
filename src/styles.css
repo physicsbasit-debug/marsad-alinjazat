@@ -657,15 +657,26 @@ a { color: inherit; text-decoration: none; }
 .decision-form { margin-bottom:13px; padding:16px; border:1px solid #dce7e9; border-radius:16px; background:#fff; }
 .decision-form-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
 .decision-form-head h4 { margin:5px 0 0; color:var(--navy); font-size:14px; }
-.meeting-attendee-picker { margin-top:14px; padding:13px; border:1px solid #e1e8eb; border-radius:15px; background:#fafcfc; }
-.meeting-attendee-picker>strong { display:block; color:#536972; font-size:10px; margin-bottom:9px; }
-.meeting-attendee-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
-.meeting-attendee-options label { display:grid; grid-template-columns:auto 34px 1fr; align-items:center; gap:7px; padding:8px; border:1px solid #e7edef; border-radius:11px; background:#fff; cursor:pointer; }
+.meeting-attendee-picker { margin-top:14px; padding:13px; border:1px solid #e1e8eb; border-radius:15px; background:#fafcfc; display:grid; gap:10px; }
+.meeting-attendee-picker-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.meeting-attendee-picker-head>div:first-child { display:grid; gap:2px; }
+.meeting-attendee-picker-head strong { color:#536972; font-size:10px; }
+.meeting-attendee-picker-head small { color:#8b999f; font-size:8px; }
+.meeting-attendee-actions { display:flex; gap:6px; }
+.meeting-attendee-actions button { border:1px solid #dce6e8; background:#fff; color:#4f6a74; border-radius:9px; min-height:29px; padding:0 9px; font:inherit; font-size:8px; font-weight:800; cursor:pointer; }
+.meeting-attendee-actions button:disabled { opacity:.45; cursor:not-allowed; }
+.meeting-attendee-search { min-height:36px; display:flex; align-items:center; gap:7px; border:1px solid #e1e8eb; border-radius:11px; padding:0 10px; background:#fff; color:#78909a; }
+.meeting-attendee-search input { width:100%; border:0; outline:0; background:transparent; color:#435c67; font:inherit; font-size:9px; }
+.meeting-attendee-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; max-height:250px; overflow:auto; padding:1px; }
+.meeting-attendee-options label { display:grid; grid-template-columns:auto 34px 1fr; align-items:center; gap:7px; padding:8px; border:1px solid #e7edef; border-radius:11px; background:#fff; cursor:pointer; transition:border-color .16s ease,background .16s ease; }
+.meeting-attendee-options label.selected { border-color:#9fcfc9; background:#f0f8f7; }
 .meeting-attendee-options input { accent-color:var(--teal); }
 .meeting-attendee-options .avatar { width:32px; height:32px; border-radius:9px; font-size:10px; }
 .meeting-attendee-options b,.meeting-attendee-options small { display:block; }
 .meeting-attendee-options b { color:#465e69; font-size:9px; }
 .meeting-attendee-options small { color:#8b999f; font-size:7.5px; margin-top:2px; }
+.inline-warning { display:flex; align-items:flex-start; gap:8px; border:1px solid #ead7aa; background:#fffaf0; color:#7b6028; border-radius:11px; padding:10px 12px; font-size:9px; line-height:1.7; }
+.field-hint { display:block; margin-top:4px; color:#8a989f; font-size:8px; font-weight:500; }
 .meeting-timeline-head { margin-bottom:16px; }
 .meeting-timeline { position:relative; display:grid; gap:10px; }
 .meeting-timeline:before { content:""; position:absolute; top:9px; bottom:9px; right:17px; width:1px; background:#dbe5e7; }
@@ -1183,14 +1194,32 @@ a { color: inherit; text-decoration: none; }
   .search-result-copy em { display: none; }
 }
 
-/* v0.13 — الإدخال التاريخي والاستمرارية الطولية */
-.academic-year-control { display:flex; align-items:end; gap:7px; flex:0 0 auto; }
-.academic-year-control label { display:grid; gap:3px; }
-.academic-year-control label > span { padding-inline:2px; color:#7b8a92; font-size:9px; font-weight:800; }
-.academic-year-control input { width:118px; height:40px; border:1px solid #e2e8ea; background:rgba(255,255,255,.88); border-radius:12px; padding:0 10px; color:#455a64; font:inherit; font-size:11px; font-weight:800; text-align:center; outline:none; direction:ltr; }
-.academic-year-control input:focus { border-color:#9fc9c6; box-shadow:0 0 0 3px rgba(22,124,118,.07); }
-.academic-year-control > button { height:40px; border:1px solid #dce6e7; background:#fff; color:var(--teal); border-radius:11px; padding:0 10px; font:inherit; font-size:10px; font-weight:900; cursor:pointer; }
-.academic-year-control.historical input { border-color:#d9bf87; background:#fffaf0; color:#76571b; }
+/* v0.13.1 — تقويم الأعوام ودليل المعلمين التاريخي */
+.academic-year-control { position:relative; flex:0 0 auto; }
+.academic-year-trigger { min-width:118px; height:43px; display:flex; align-items:center; justify-content:space-between; gap:10px; border:1px solid #dfe7e9; background:#fff; border-radius:13px; padding:6px 11px; color:#49616b; font:inherit; cursor:pointer; box-shadow:0 3px 14px rgba(18,54,77,.035); }
+.academic-year-trigger>span { display:grid; gap:1px; text-align:right; }
+.academic-year-trigger small { color:#8a989f; font-size:7.5px; font-weight:800; }
+.academic-year-trigger strong { color:#344f5b; font-size:10.5px; direction:ltr; }
+.academic-year-control.historical .academic-year-trigger { border-color:#d9bf87; background:#fffaf0; }
+.academic-year-control.historical .academic-year-trigger strong { color:#76571b; }
+.academic-year-popover { position:absolute; top:calc(100% + 8px); left:0; z-index:120; width:min(430px,calc(100vw - 28px)); padding:13px; border:1px solid #dce6e8; background:#fff; border-radius:18px; box-shadow:0 22px 60px rgba(18,54,77,.18); }
+.academic-year-popover-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:2px 2px 11px; border-bottom:1px solid #edf1f2; }
+.academic-year-popover-head>div { display:grid; gap:3px; }
+.academic-year-popover-head strong { color:#17364d; font-size:12px; }
+.academic-year-popover-head small { color:#87969d; font-size:8.5px; }
+.academic-year-range-nav { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 2px 8px; }
+.academic-year-range-nav span { color:#697d86; font-size:8.5px; font-weight:800; direction:ltr; }
+.academic-year-range-nav button { display:flex; align-items:center; gap:4px; border:0; background:transparent; color:#54707b; font:inherit; font-size:8px; font-weight:800; cursor:pointer; }
+.academic-year-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
+.academic-year-grid button { position:relative; min-height:62px; display:grid; align-content:center; gap:3px; border:1px solid #e2e9eb; background:#fbfcfc; border-radius:12px; padding:9px 11px; text-align:right; font:inherit; cursor:pointer; }
+.academic-year-grid button:hover { border-color:#b7d2d0; background:#f5faf9; }
+.academic-year-grid button strong { color:#3e5965; font-size:10px; direction:ltr; text-align:right; }
+.academic-year-grid button span { color:#8a989f; font-size:7.5px; }
+.academic-year-grid button i { position:absolute; top:9px; left:9px; width:7px; height:7px; border-radius:50%; background:#6ea99e; }
+.academic-year-grid button.current { border-color:#b6d9d4; background:#f1f8f7; }
+.academic-year-grid button.selected { border-color:#167d77; box-shadow:inset 0 0 0 1px #167d77; background:#edf7f5; }
+.academic-year-grid button.selected strong { color:#135f5b; }
+.academic-year-popover-foot { display:flex; justify-content:flex-start; padding-top:10px; border-top:1px solid #edf1f2; margin-top:10px; }
 .historical-context-banner { max-width:1436px; margin:18px auto -8px; padding:12px 16px; display:flex; align-items:center; gap:11px; border:1px solid #ead7aa; background:#fffaf0; color:#795d23; border-radius:15px; }
 .historical-context-banner > svg { flex:0 0 auto; }
 .historical-context-banner > div { min-width:0; flex:1; display:grid; gap:2px; }
@@ -1199,12 +1228,14 @@ a { color: inherit; text-decoration: none; }
 .historical-context-banner .ghost-button { min-height:34px; flex:0 0 auto; background:#fff; }
 
 @media (max-width: 960px) {
-  .academic-year-control label > span { display:none; }
-  .academic-year-control > button { display:none; }
+  .academic-year-trigger { min-width:104px; height:38px; padding:5px 9px; }
+  .academic-year-trigger small { display:none; }
   .historical-context-banner { margin:14px 18px -5px; }
 }
 @media (max-width: 690px) {
-  .academic-year-control input { width:100px; height:36px; font-size:10px; }
+  .academic-year-trigger { min-width:96px; height:36px; }
+  .academic-year-popover { position:fixed; top:72px; left:12px; right:12px; width:auto; }
+  .academic-year-grid { grid-template-columns:1fr 1fr; }
   .historical-context-banner { margin:10px 10px -4px; align-items:flex-start; flex-wrap:wrap; padding:10px 12px; }
   .historical-context-banner .ghost-button { width:100%; }
 }

@@ -13,6 +13,7 @@ os.environ["APP_FRONTEND_URL"] = "http://testserver"
 
 from fastapi.testclient import TestClient
 from server.main import app
+from server.db import connect
 from server.achievement_metrics import evaluate_impact
 
 
@@ -28,12 +29,13 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         boot = self.client.get("/api/bootstrap")
         self.assertEqual(boot.status_code, 200)
         self.assertGreaterEqual(len(boot.json()["teachers"]), 6)
+        self.assertGreaterEqual(len(boot.json()["teacherDirectory"]), len(boot.json()["teachers"]))
         self.assertIn("dashboard", boot.json())
         self.assertIn("visits", boot.json())
         self.assertIn("supervisionAttention", boot.json())
         self.assertIn("assessments", boot.json())
         self.assertIn("achievementAttention", boot.json())
-        self.assertEqual(health.json()["version"], "0.13.0")
+        self.assertEqual(health.json()["version"], "0.13.1")
 
     def test_create_teacher_and_event(self):
         teacher = self.client.post("/api/teachers", json={
@@ -1324,3 +1326,80 @@ def _marsad_v013_mixed_mastery_standards_guard_test(self):
 
 
 MarsadAlInjazatApiTests.test_zz_mixed_mastery_standards_are_not_aggregated = _marsad_v013_mixed_mastery_standards_guard_test
+
+
+def _marsad_v0131_historical_teacher_directory_and_auto_year_link_test(self):
+    historical_year = '2022/2023'
+    empty_scope = self.client.get('/api/bootstrap', params={'academicYear': historical_year})
+    self.assertEqual(empty_scope.status_code, 200)
+    scope = empty_scope.json()
+    self.assertEqual(scope['academicYear'], historical_year)
+    self.assertEqual(scope['teachers'], [])
+    self.assertGreaterEqual(len(scope['teacherDirectory']), 6)
+    directory_ids = {item['id'] for item in scope['teacherDirectory']}
+    self.assertTrue({1, 2, 3, 4, 5, 6}.issubset(directory_ids))
+
+    meeting = self.client.post('/api/meetings', json={
+        'title': 'اجتماع دليل المعلمين التاريخي v0131', 'meetingType': 'اجتماع قسم',
+        'meetingDate': '2022-10-10', 'meetingTime': '10:00', 'location': 'قاعة العلوم',
+        'agenda': 'اختبار اختيار الحضور من الدليل', 'discussionSummary': 'اختبار تقني',
+        'notes': '', 'academicYear': historical_year, 'status': 'held', 'attendeeIds': [1, 2],
+    })
+    self.assertEqual(meeting.status_code, 201)
+
+    plan = self.client.post('/api/plans', json={
+        'title': 'خطة دليل تاريخية v0131', 'subject': 'العلوم', 'grade': 'العاشر',
+        'term': 'الفصل الأول', 'academicYear': historical_year, 'ownerTeacherId': 3,
+        'startDate': '2022-09-01', 'endDate': '2023-01-31', 'notes': '', 'status': 'completed',
+    })
+    self.assertEqual(plan.status_code, 201)
+
+    visit = self.client.post('/api/supervision/visits', json={
+        'teacherId': 4, 'visitType': 'زيارة صفية', 'visitDate': '2022-11-06',
+        'academicYear': historical_year, 'periodLabel': 'الحصة الثالثة', 'grade': 'العاشر',
+        'lessonTitle': 'درس تاريخي v0131', 'objectives': '', 'strengths': '',
+        'developmentAreas': '', 'recommendations': '', 'followupDate': '',
+        'followupNotes': '', 'status': 'completed',
+    })
+    self.assertEqual(visit.status_code, 201)
+
+    assessment = self.client.post('/api/achievement/assessments', json={
+        'title': 'تقويم دليل تاريخي v0131', 'assessmentType': 'اختبار قصير',
+        'subject': 'العلوم', 'grade': 'العاشر', 'assessmentDate': '2022-12-05',
+        'term': 'الفصل الأول', 'academicYear': historical_year, 'teacherId': 5,
+        'maxScore': 40, 'studentCount': 10, 'averageScore': 25, 'highestScore': 38, 'lowestScore': 10,
+        'masteryThresholdPct': 60,
+        'masteryReferenceSource': 'مرجع تقني للاختبار فقط — لا يمثل معيارًا وزاريًا',
+        'masteryReferenceYear': '', 'masteryReferenceNote': 'اختبار ربط الدليل التاريخي.',
+        'masteredCount': 6, 'nearMasteryCount': 2, 'interventionCount': 2,
+        'notes': '', 'status': 'recorded',
+    })
+    self.assertEqual(assessment.status_code, 201)
+
+    event = self.client.post('/api/events', json={
+        'title': 'فعالية دليل تاريخية v0131', 'eventType': 'فعالية', 'eventDate': '2023-02-12',
+        'academicYear': historical_year, 'location': 'المدرسة', 'audience': 'طلبة المدرسة',
+        'participantCount': 10, 'goals': '', 'summary': '', 'outcomes': '', 'recommendations': '',
+        'teacherIds': [6],
+    })
+    self.assertEqual(event.status_code, 201)
+
+    with connect() as conn:
+        linked_ids = {
+            row['teacher_id'] for row in conn.execute(
+                'SELECT teacher_id FROM teacher_record_years WHERE academic_year = ?',
+                (historical_year,),
+            ).fetchall()
+        }
+    self.assertTrue({1, 2, 3, 4, 5, 6}.issubset(linked_ids))
+
+    scoped_after = self.client.get('/api/bootstrap', params={'academicYear': historical_year})
+    self.assertEqual(scoped_after.status_code, 200)
+    body = scoped_after.json()
+    self.assertTrue({1, 2, 3, 4, 5, 6}.issubset({item['id'] for item in body['teachers']}))
+    meeting_detail = self.client.get(f"/api/meetings/{meeting.json()['id']}")
+    self.assertEqual(meeting_detail.status_code, 200)
+    self.assertEqual({item['id'] for item in meeting_detail.json()['attendees']}, {1, 2})
+
+
+MarsadAlInjazatApiTests.test_historical_teacher_directory_and_auto_year_link = _marsad_v0131_historical_teacher_directory_and_auto_year_link_test

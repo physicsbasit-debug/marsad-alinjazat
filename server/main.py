@@ -35,7 +35,7 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 EVENT_UPLOADS_DIR = Path(os.getenv("APP_EVENT_UPLOADS_DIR", BASE_DIR / "uploads" / "events"))
 EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="مرصد الإنجازات API", version="0.13.0")
+app = FastAPI(title="مرصد الإنجازات API", version="0.13.1")
 
 
 class CreateRequestPayload(BaseModel):
@@ -1821,7 +1821,7 @@ def _activities_for_year(conn, academic_year: str, limit: int = 8) -> list[dict]
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "0.13.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
+    return {"ok": True, "version": "0.13.1", "storageMode": os.getenv("STORAGE_MODE", "auto")}
 
 
 @app.get("/api/bootstrap")
@@ -1829,6 +1829,7 @@ def bootstrap(academicYear: str = ACADEMIC_YEAR):
     scope_year = _validate_academic_year(academicYear)
     with connect() as conn:
         teachers = _teachers_for_year(conn, scope_year)
+        teacher_directory = [_teacher_dict(row) for row in conn.execute("SELECT * FROM teachers ORDER BY name").fetchall()]
         all_requests = [_request_dict(r) for r in _get_request_rows()]
         request_items = [item for item in all_requests if item.get("academicYear") == scope_year]
         all_events = [_event_dict(r) for r in conn.execute("""SELECT e.*, ey.academic_year, COUNT(m.id) AS media_count FROM events e LEFT JOIN event_media m ON m.event_id = e.id LEFT JOIN event_record_years ey ON ey.event_id = e.id GROUP BY e.id ORDER BY e.event_date DESC""").fetchall()]
@@ -1881,6 +1882,7 @@ def bootstrap(academicYear: str = ACADEMIC_YEAR):
         "term": "الفصل الأول",
         "dashboard": dashboard,
         "teachers": teachers,
+        "teacherDirectory": teacher_directory,
         "requests": request_items,
         "events": events,
         "meetings": meetings,
@@ -2065,6 +2067,7 @@ def create_event(payload: EventPayload):
             ).fetchall()
             if len(found) != len(teacher_ids):
                 raise HTTPException(status_code=422, detail="تتضمن قائمة المشاركين معلمًا غير موجود.")
+            _ensure_teacher_year_links(conn, teacher_ids, academic_year)
         count = conn.execute("SELECT COUNT(*) FROM events").fetchone()[0]
         cursor = conn.execute(
             """INSERT INTO events
@@ -2115,6 +2118,7 @@ def update_event(event_id: int, payload: EventPayload):
             ).fetchall()
             if len(found) != len(teacher_ids):
                 raise HTTPException(status_code=422, detail="تتضمن قائمة المشاركين معلمًا غير موجود.")
+            _ensure_teacher_year_links(conn, teacher_ids, academic_year)
         conn.execute(
             """UPDATE events SET title = ?, event_type = ?, event_date = ?, location = ?, audience = ?,
                participant_count = ?, goals = ?, summary = ?, outcomes = ?, recommendations = ?, updated_at = ?
@@ -2364,6 +2368,7 @@ def create_meeting(payload: MeetingPayload):
     now = utc_now()
     with connect() as conn:
         attendee_ids = _validate_teacher_ids(conn, payload.attendeeIds, "تتضمن قائمة الحضور معلمًا غير موجود.")
+        _ensure_teacher_year_links(conn, attendee_ids, academic_year)
         cursor = conn.execute(
             """INSERT INTO meetings
                (title, meeting_type, meeting_date, meeting_time, location, agenda, discussion_summary, notes,
@@ -2407,6 +2412,7 @@ def update_meeting(meeting_id: int, payload: MeetingPayload):
         if not current:
             raise HTTPException(status_code=404, detail="الاجتماع غير موجود.")
         attendee_ids = _validate_teacher_ids(conn, payload.attendeeIds, "تتضمن قائمة الحضور معلمًا غير موجود.")
+        _ensure_teacher_year_links(conn, attendee_ids, academic_year)
         conn.execute(
             """UPDATE meetings SET title = ?, meeting_type = ?, meeting_date = ?, meeting_time = ?, location = ?,
                agenda = ?, discussion_summary = ?, notes = ?, academic_year = ?, status = ?, updated_at = ? WHERE id = ?""",
@@ -2440,6 +2446,7 @@ def create_curriculum_plan(payload: CurriculumPlanPayload):
     with connect() as conn:
         if payload.ownerTeacherId is not None:
             _validate_teacher_ids(conn, [payload.ownerTeacherId], "المعلم المسؤول عن الخطة غير موجود.")
+            _ensure_teacher_year_links(conn, [payload.ownerTeacherId], academic_year)
         cursor = conn.execute(
             """INSERT INTO curriculum_plans
                (title, subject, grade, term, academic_year, owner_teacher_id, start_date, end_date, notes, status, created_at, updated_at)
@@ -2476,6 +2483,7 @@ def update_curriculum_plan(plan_id: int, payload: CurriculumPlanPayload):
             raise HTTPException(status_code=404, detail="الخطة غير موجودة.")
         if payload.ownerTeacherId is not None:
             _validate_teacher_ids(conn, [payload.ownerTeacherId], "المعلم المسؤول عن الخطة غير موجود.")
+            _ensure_teacher_year_links(conn, [payload.ownerTeacherId], academic_year)
         conn.execute(
             """UPDATE curriculum_plans SET title=?, subject=?, grade=?, term=?, academic_year=?, owner_teacher_id=?, start_date=?, end_date=?, notes=?, status=?, updated_at=? WHERE id=?""",
             (payload.title, payload.subject, payload.grade, payload.term, academic_year, payload.ownerTeacherId, start_date, end_date, payload.notes, payload.status, now, plan_id),
@@ -2497,6 +2505,7 @@ def create_curriculum_unit(plan_id: int, payload: CurriculumUnitPayload):
             raise HTTPException(status_code=404, detail="الخطة غير موجودة.")
         if payload.responsibleTeacherId is not None:
             _validate_teacher_ids(conn, [payload.responsibleTeacherId], "المعلم المسؤول عن الوحدة غير موجود.")
+            _ensure_teacher_year_links(conn, [payload.responsibleTeacherId], plan["academic_year"])
         cursor = conn.execute(
             """INSERT INTO curriculum_units
                (plan_id, title, sequence, planned_start, planned_end, progress_percent, status, delay_reason, notes, responsible_teacher_id, created_at, updated_at)
@@ -2523,6 +2532,7 @@ def update_curriculum_unit(plan_id: int, unit_id: int, payload: CurriculumUnitPa
         plan = conn.execute("SELECT academic_year FROM curriculum_plans WHERE id = ?", (plan_id,)).fetchone()
         if payload.responsibleTeacherId is not None:
             _validate_teacher_ids(conn, [payload.responsibleTeacherId], "المعلم المسؤول عن الوحدة غير موجود.")
+            _ensure_teacher_year_links(conn, [payload.responsibleTeacherId], plan["academic_year"])
         conn.execute(
             """UPDATE curriculum_units SET title=?, sequence=?, planned_start=?, planned_end=?, progress_percent=?, status=?, delay_reason=?, notes=?, responsible_teacher_id=?, updated_at=? WHERE id=? AND plan_id=?""",
             (payload.title, payload.sequence, planned_start, planned_end, progress, status, payload.delayReason, payload.notes, payload.responsibleTeacherId, now, unit_id, plan_id),
@@ -2566,6 +2576,7 @@ def create_supervision_visit(payload: SupervisionVisitPayload):
     now = utc_now()
     with connect() as conn:
         _validate_teacher_ids(conn, [payload.teacherId], "المعلم المحدد للزيارة غير موجود.")
+        _ensure_teacher_year_links(conn, [payload.teacherId], academic_year)
         teacher = conn.execute("SELECT name FROM teachers WHERE id = ?", (payload.teacherId,)).fetchone()
         closed_at = now if payload.status == "closed" else None
         cursor = conn.execute(
@@ -2606,6 +2617,7 @@ def update_supervision_visit(visit_id: int, payload: SupervisionVisitPayload):
         if not current:
             raise HTTPException(status_code=404, detail="الزيارة غير موجودة.")
         _validate_teacher_ids(conn, [payload.teacherId], "المعلم المحدد للزيارة غير موجود.")
+        _ensure_teacher_year_links(conn, [payload.teacherId], academic_year)
         teacher = conn.execute("SELECT name FROM teachers WHERE id = ?", (payload.teacherId,)).fetchone()
         closed_at = current["closed_at"]
         if payload.status == "closed" and not closed_at:
@@ -2636,6 +2648,7 @@ def create_supervision_action(visit_id: int, payload: SupervisionActionPayload):
             raise HTTPException(status_code=404, detail="الزيارة غير موجودة.")
         if payload.responsibleTeacherId is not None:
             _validate_teacher_ids(conn, [payload.responsibleTeacherId], "المسؤول عن الإجراء غير موجود.")
+            _ensure_teacher_year_links(conn, [payload.responsibleTeacherId], visit["academic_year"])
         completed_at = now if payload.status == "completed" else None
         cursor = conn.execute(
             """INSERT INTO supervision_actions
@@ -2667,6 +2680,7 @@ def update_supervision_action(visit_id: int, action_id: int, payload: Supervisio
         if payload.responsibleTeacherId is not None:
             _validate_teacher_ids(conn, [payload.responsibleTeacherId], "المسؤول عن الإجراء غير موجود.")
             visit = conn.execute("SELECT academic_year FROM supervision_visits WHERE id = ?", (visit_id,)).fetchone()
+            _ensure_teacher_year_links(conn, [payload.responsibleTeacherId], visit["academic_year"])
         completed_at = current["completed_at"]
         if payload.status == "completed" and not completed_at:
             completed_at = now
@@ -2719,6 +2733,7 @@ def create_meeting_decision(meeting_id: int, payload: MeetingDecisionPayload):
                 raise HTTPException(status_code=422, detail="المسؤول المحدد غير موجود ضمن المعلمين.")
             if not responsible_name:
                 responsible_name = teacher["name"]
+            _ensure_teacher_year_links(conn, [payload.responsibleTeacherId], meeting["academic_year"])
         completed_at = now if payload.status == "completed" else None
         cursor = conn.execute(
             """INSERT INTO meeting_decisions
@@ -2757,6 +2772,7 @@ def update_meeting_decision(meeting_id: int, decision_id: int, payload: MeetingD
                 raise HTTPException(status_code=422, detail="المسؤول المحدد غير موجود ضمن المعلمين.")
             if not responsible_name:
                 responsible_name = teacher["name"]
+            _ensure_teacher_year_links(conn, [payload.responsibleTeacherId], meeting["academic_year"])
         completed_at = current["completed_at"]
         if payload.status == "completed" and not completed_at:
             completed_at = now
@@ -2809,6 +2825,7 @@ def create_achievement_assessment(payload: AchievementAssessmentPayload):
     with connect() as conn:
         if payload.teacherId is not None:
             _validate_teacher_ids(conn, [payload.teacherId], "المعلم المسؤول عن التقويم غير موجود.")
+            _ensure_teacher_year_links(conn, [payload.teacherId], payload.academicYear)
         cursor = conn.execute(
             """INSERT INTO achievement_assessments
                (title, assessment_type, subject, grade, assessment_date, term, academic_year, teacher_id,
@@ -2851,6 +2868,7 @@ def update_achievement_assessment(assessment_id: int, payload: AchievementAssess
             raise HTTPException(status_code=404, detail="سجل التحصيل غير موجود.")
         if payload.teacherId is not None:
             _validate_teacher_ids(conn, [payload.teacherId], "المعلم المسؤول عن التقويم غير موجود.")
+            _ensure_teacher_year_links(conn, [payload.teacherId], payload.academicYear)
         conn.execute(
             """UPDATE achievement_assessments SET
                title=?, assessment_type=?, subject=?, grade=?, assessment_date=?, term=?, academic_year=?, teacher_id=?,
@@ -2891,6 +2909,7 @@ def create_achievement_action(assessment_id: int, payload: AchievementActionPayl
             raise HTTPException(status_code=404, detail="سجل التحصيل غير موجود.")
         if payload.responsibleTeacherId is not None:
             _validate_teacher_ids(conn, [payload.responsibleTeacherId], "المسؤول عن التدخل غير موجود.")
+            _ensure_teacher_year_links(conn, [payload.responsibleTeacherId], assessment["academic_year"])
         completed_at = now if payload.status == "completed" else None
         cursor = conn.execute(
             """INSERT INTO achievement_actions
@@ -2921,6 +2940,7 @@ def update_achievement_action(assessment_id: int, action_id: int, payload: Achie
         if payload.responsibleTeacherId is not None:
             _validate_teacher_ids(conn, [payload.responsibleTeacherId], "المسؤول عن التدخل غير موجود.")
             assessment = conn.execute("SELECT academic_year FROM achievement_assessments WHERE id = ?", (assessment_id,)).fetchone()
+            _ensure_teacher_year_links(conn, [payload.responsibleTeacherId], assessment["academic_year"])
         completed_at = current["completed_at"]
         if payload.status == "completed" and not completed_at:
             completed_at = now
@@ -3017,6 +3037,7 @@ def create_request(payload: CreateRequestPayload):
         teacher = conn.execute("SELECT id, name FROM teachers WHERE id = ?", (payload.teacherId,)).fetchone()
         if not teacher:
             raise HTTPException(status_code=404, detail="المعلم غير موجود.")
+        _ensure_teacher_year_links(conn, [payload.teacherId], ACADEMIC_YEAR)
 
         token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(token.encode()).hexdigest()
@@ -3256,6 +3277,8 @@ async def upload_direct_document(
 
     now = utc_now()
     with connect() as conn:
+        if teacherId is not None:
+            _ensure_teacher_year_links(conn, [teacherId], academic_year)
         cursor = conn.execute(
             """
             INSERT INTO documents

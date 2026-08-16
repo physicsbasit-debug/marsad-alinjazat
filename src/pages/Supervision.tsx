@@ -276,7 +276,7 @@ function VisitForm({ teachers, visit, academicYear, busy, onSubmit, submitLabel 
         <label>نوع الزيارة<select name="visitType" defaultValue={visit?.visitType || 'زيارة صفية'}><option>زيارة صفية</option><option>زيارة تطويرية</option><option>زيارة متابعة</option><option>تبادل مهني</option></select></label>
         <label>الحالة<select name="status" defaultValue={visit?.status || 'planned'}><option value="planned">مخططة</option><option value="completed">منفذة</option><option value="needs_followup">تحتاج متابعة</option><option value="closed">مغلقة</option></select></label>
         <label>تاريخ الزيارة<input name="visitDate" type="date" required defaultValue={visit?.visitDate || ''}/></label>
-        <label>العام الدراسي للسجل<input name="academicYear" required defaultValue={visit?.academicYear || academicYear || ''} placeholder="2025/2026"/></label>
+        <label>العام الدراسي للسجل<input name="academicYear" required readOnly value={visit?.academicYear || academicYear || ''} dir="ltr"/><small className="field-hint">يُحدد من تقويم عام العمل أعلى التطبيق.</small></label>
         <label>موعد المتابعة<input name="followupDate" type="date" defaultValue={visit?.followupDate || ''}/></label>
         <label>الصف<input name="grade" defaultValue={visit?.grade || ''} placeholder="العاشر"/></label>
         <label>الحصة<input name="periodLabel" defaultValue={visit?.periodLabel || ''} placeholder="الحصة الثالثة"/></label>

@@ -39,6 +39,14 @@ export const previewBootstrap: BootstrapData = {
     { id: 5, name: 'يوسف البلوشي', subject: 'العلوم', specialization: 'علوم عامة', qualification: 'بكالوريوس تربية', experienceYears: 6, workload: 21, cvCompletion: 65, email: 'yousuf@example.edu' },
     { id: 6, name: 'ناصر الحوسني', subject: 'الفيزياء', specialization: 'فيزياء', qualification: 'ماجستير مناهج', experienceYears: 13, workload: 17, cvCompletion: 95, email: 'nasser@example.edu' },
   ],
+  teacherDirectory: [
+    { id: 1, name: 'أحمد السالمي', subject: 'الفيزياء', specialization: 'فيزياء', qualification: 'بكالوريوس تربية', experienceYears: 12, workload: 18, cvCompletion: 100, email: 'ahmed@example.edu' },
+    { id: 2, name: 'خالد الهنائي', subject: 'الكيمياء', specialization: 'كيمياء', qualification: 'بكالوريوس تربية', experienceYears: 8, workload: 20, cvCompletion: 78, email: 'khalid@example.edu' },
+    { id: 3, name: 'محمد المعمري', subject: 'العلوم', specialization: 'علوم عامة', qualification: 'بكالوريوس تربية', experienceYears: 15, workload: 16, cvCompletion: 92, email: 'mohammed@example.edu' },
+    { id: 4, name: 'سالم الرواحي', subject: 'الأحياء', specialization: 'أحياء', qualification: 'بكالوريوس تربية', experienceYears: 10, workload: 19, cvCompletion: 84, email: 'salim@example.edu' },
+    { id: 5, name: 'يوسف البلوشي', subject: 'العلوم', specialization: 'علوم عامة', qualification: 'بكالوريوس تربية', experienceYears: 6, workload: 21, cvCompletion: 65, email: 'yousuf@example.edu' },
+    { id: 6, name: 'ناصر الحوسني', subject: 'الفيزياء', specialization: 'فيزياء', qualification: 'ماجستير مناهج', experienceYears: 13, workload: 17, cvCompletion: 95, email: 'nasser@example.edu' },
+  ],
   requests: [
     { id: 1, teacherId: 1, teacherName: 'أحمد السالمي', requestType: 'اختبار', subject: 'الفيزياء', grade: 'العاشر', title: 'الاختبار القصير الأول', deadline: '2026-08-18', notes: '', allowedFiles: 'PDF / Word / Excel', status: 'review', academicYear: '2026/2027', expiresAt: '2026-09-18T00:00:00+00:00', createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
     { id: 2, teacherId: 2, teacherName: 'خالد الهنائي', requestType: 'خطة فصلية', subject: 'الكيمياء', grade: 'العاشر', title: 'الخطة الفصلية', deadline: '2026-08-19', notes: '', allowedFiles: 'PDF / Word / Excel', status: 'received', academicYear: '2026/2027', expiresAt: '2026-09-19T00:00:00+00:00', createdAt: '2026-08-15T05:00:00+00:00', updatedAt: '2026-08-15T05:00:00+00:00' },
@@ -459,7 +467,7 @@ export function getPreviewBootstrap(academicYear?: string): BootstrapData {
     academicYear: year,
     availableAcademicYears,
     dashboard: { teacherCount: 0, openRequests: 0, needsReview: 0, lateRequests: 0, openDecisions: 0, upcomingVisits: 0, planProgress: 0, visitProgress: 0, requestCompletion: 0, achievementMastery: 0, achievementMasteryComparable: false, openAchievementActions: 0 },
-    teachers: [], requests: [], events: [], meetings: [], decisionAttention: [], plans: [], planningAttention: [], visits: [], supervisionAttention: [], assessments: [], achievementAttention: [], documents: [], activities: [],
+    teachers: [], teacherDirectory: previewBootstrap.teacherDirectory, requests: [], events: [], meetings: [], decisionAttention: [], plans: [], planningAttention: [], visits: [], supervisionAttention: [], assessments: [], achievementAttention: [], documents: [], activities: [],
   };
 }
 

@@ -66,7 +66,7 @@ function DirectDocumentModal({
     <div className="form-grid">
       <label className="full">الملف<input type="file" name="file" required accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.webp"/></label>
       <label className="full">عنوان الوثيقة<input name="title" required placeholder="مثال: تحليل نتائج الاختبار النهائي"/></label>
-      <label>العام الدراسي للسجل<input name="academicYear" required defaultValue={academicYear} placeholder="2025/2026" dir="ltr"/></label>
+      <label>العام الدراسي للسجل<input name="academicYear" required readOnly value={academicYear} dir="ltr"/><small className="field-hint">يُحدد من تقويم عام العمل أعلى التطبيق.</small></label>
       <label>التصنيف<select name="category" defaultValue="وثيقة"><option>وثيقة</option><option>خطة</option><option>اختبار</option><option>تحليل نتائج</option><option>محضر</option><option>تقرير</option><option>مرجع</option><option>وثيقة أخرى</option></select></label>
       <label>المادة<input name="subject" placeholder="مثال: الفيزياء"/></label>
       <label>الصف<input name="grade" placeholder="مثال: العاشر"/></label>
