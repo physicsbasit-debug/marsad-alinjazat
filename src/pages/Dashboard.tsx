@@ -74,7 +74,7 @@ export function Dashboard({ data, onQuickAction }: { data: BootstrapData; onQuic
           <Progress label="تنفيذ الخطة" value={d.planProgress} />
           <Progress label="الزيارات والمتابعة" value={d.visitProgress} />
           <Progress label="الطلبات المكتملة" value={d.requestCompletion} />
-          <Progress label="الإتقان التحصيلي" value={d.achievementMastery} />
+          <Progress label="الفئة المحققة للحد المسجل" value={d.achievementMastery} />
         </article>
         <article className="panel activity-panel">
           <div className="panel-heading"><div><span className="eyebrow">آخر النشاطات</span><h2>ما حدث مؤخرًا</h2></div></div>

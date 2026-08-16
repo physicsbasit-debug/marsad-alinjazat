@@ -314,6 +314,15 @@ def init_db() -> None:
                 CHECK (lowest_score IS NULL OR lowest_score <= max_score)
             );
 
+            CREATE TABLE IF NOT EXISTS achievement_assessment_standards (
+                assessment_id INTEGER PRIMARY KEY REFERENCES achievement_assessments(id) ON DELETE CASCADE,
+                mastery_reference_source TEXT NOT NULL DEFAULT '',
+                mastery_reference_year TEXT,
+                mastery_reference_note TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS achievement_actions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 assessment_id INTEGER NOT NULL REFERENCES achievement_assessments(id) ON DELETE CASCADE,
@@ -329,6 +338,23 @@ def init_db() -> None:
                 outcome_indicator TEXT,
                 notes TEXT,
                 completed_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS achievement_action_metrics (
+                action_id INTEGER PRIMARY KEY REFERENCES achievement_actions(id) ON DELETE CASCADE,
+                metric_name TEXT NOT NULL,
+                unit TEXT NOT NULL DEFAULT '',
+                direction TEXT NOT NULL DEFAULT 'higher_better' CHECK (direction IN ('higher_better', 'lower_better')),
+                baseline_value REAL NOT NULL,
+                target_value REAL NOT NULL,
+                outcome_value REAL,
+                measured_at TEXT,
+                reference_source TEXT,
+                reference_year TEXT,
+                reference_note TEXT,
+                notes TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -353,8 +379,10 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_supervision_actions_open ON supervision_actions(status, due_date);
             CREATE INDEX IF NOT EXISTS idx_achievement_assessments_scope ON achievement_assessments(academic_year, term, subject, grade, assessment_date DESC);
             CREATE INDEX IF NOT EXISTS idx_achievement_assessments_teacher ON achievement_assessments(teacher_id, assessment_date DESC);
+            CREATE INDEX IF NOT EXISTS idx_achievement_assessment_standards_source ON achievement_assessment_standards(mastery_reference_source);
             CREATE INDEX IF NOT EXISTS idx_achievement_actions_assessment ON achievement_actions(assessment_id, status, due_date);
             CREATE INDEX IF NOT EXISTS idx_achievement_actions_open ON achievement_actions(status, due_date);
+            CREATE INDEX IF NOT EXISTS idx_achievement_action_metrics_status ON achievement_action_metrics(direction, outcome_value);
             """
         )
         _backfill_event_media_meta(conn)

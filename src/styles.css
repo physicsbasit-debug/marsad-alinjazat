@@ -930,6 +930,28 @@ a { color: inherit; text-decoration: none; }
   .performance-legend { display:grid; }
 }
 
+/* v0.12.0 — دورة التدخل وقياس الأثر */
+.intervention-metrics { margin-top:-4px; }
+.achievement-action-row.impact-review { border-color:#ead8b6; background:#fffdf8; }
+.impact-line { color:#527079 !important; line-height:1.6; }
+.impact-line.warning { color:var(--amber) !important; font-weight:800; }
+.action-row-status { display:grid; justify-items:end; gap:5px; }
+.impact-status { min-height:25px; display:inline-flex; align-items:center; justify-content:center; padding:0 7px; border-radius:8px; font-size:8.5px; font-weight:900; white-space:nowrap; background:#eef3f5; color:#60737c; }
+.impact-status.target_met { background:var(--teal-soft); color:var(--teal); }
+.impact-status.improved_not_met { background:var(--blue-soft); color:var(--blue); }
+.impact-status.no_change { background:var(--amber-soft); color:var(--amber); }
+.impact-status.regressed { background:var(--danger-soft); color:var(--danger); }
+.mastery-reference-note { margin-top:-4px; padding:10px 12px; border:1px solid #e1e8ea; border-radius:12px; background:#fafcfc; color:var(--muted); font-size:10px; line-height:1.7; display:flex; flex-wrap:wrap; gap:5px 8px; }
+.mastery-reference-note strong { color:var(--navy); }
+.mastery-reference-note small { width:100%; color:#788890; }
+.impact-contract-note,.impact-current { padding:12px 14px; border:1px solid var(--line); border-radius:13px; background:var(--surface-soft); display:grid; gap:5px; }
+.impact-contract-note strong,.impact-current strong { color:var(--navy); font-size:11px; }
+.impact-contract-note span,.impact-current span,.impact-current small { color:var(--muted); font-size:9.5px; line-height:1.7; }
+.impact-current small.warning { color:var(--amber); font-weight:800; }
+.impact-toggle { display:flex !important; flex-direction:row !important; align-items:center; gap:8px; font-weight:850; color:var(--navy); }
+.impact-toggle input { width:17px; height:17px; margin:0; }
+@media (max-width:720px) { .action-row-status { justify-items:start; } }
+
 /* v0.9.0 — مركز التقارير الرسمي */
 .reports-page { display: grid; gap: 18px; }
 .reports-hero { padding-bottom: 8px; }

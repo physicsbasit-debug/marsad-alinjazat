@@ -7,7 +7,7 @@ const reportCards: Array<{ id: OfficialReportType; title: string; detail: string
   { id: 'department', title: 'تقرير القسم الشامل', detail: 'صورة مؤسسية موحدة لأعمال القسم', icon: 'report' },
   { id: 'teacher', title: 'تقرير المعلم', detail: 'ملف مهني وتشغيلي للمعلم', icon: 'teachers' },
   { id: 'planning', title: 'تقرير التخطيط', detail: 'تقدم الخطط والوحدات المتأخرة', icon: 'planning' },
-  { id: 'achievement', title: 'تقرير التحصيل', detail: 'التقويمات والإتقان والتدخلات', icon: 'chart' },
+  { id: 'achievement', title: 'تقرير التحصيل', detail: 'التقويمات والفئات وفق الحدود الموثقة والتدخلات', icon: 'chart' },
   { id: 'supervision', title: 'تقرير الإشراف', detail: 'الزيارات وحالات المتابعة', icon: 'supervision' },
   { id: 'meetings', title: 'تقرير الاجتماعات', detail: 'الاجتماعات والقرارات والتنفيذ', icon: 'meeting' },
   { id: 'events', title: 'تقرير الفعاليات', detail: 'الفعاليات والمشاركة والأدلة', icon: 'spark' },

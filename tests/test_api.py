@@ -13,6 +13,7 @@ os.environ["APP_FRONTEND_URL"] = "http://testserver"
 
 from fastapi.testclient import TestClient
 from server.main import app
+from server.achievement_metrics import evaluate_impact
 
 
 class MarsadAlInjazatApiTests(unittest.TestCase):
@@ -32,7 +33,7 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         self.assertIn("supervisionAttention", boot.json())
         self.assertIn("assessments", boot.json())
         self.assertIn("achievementAttention", boot.json())
-        self.assertEqual(health.json()["version"], "0.11.0")
+        self.assertEqual(health.json()["version"], "0.12.0")
 
     def test_create_teacher_and_event(self):
         teacher = self.client.post("/api/teachers", json={
@@ -709,7 +710,7 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
             "subject": "الفيزياء", "grade": "العاشر", "assessmentDate": "2026-09-20",
             "term": "الفصل الأول", "academicYear": "2026/2027", "teacherId": 1,
             "maxScore": 40, "studentCount": 30, "averageScore": 22,
-            "highestScore": 39, "lowestScore": 8, "masteryThresholdPct": 60,
+            "highestScore": 39, "lowestScore": 8, "masteryThresholdPct": 60, "masteryReferenceSource": "مرجع اختبار آلي فقط — ليس معيارًا تربويًا",
             "masteredCount": 14, "nearMasteryCount": 8, "interventionCount": 8,
             "notes": "سجل تحصيل اختباري", "status": "recorded",
         })
@@ -718,6 +719,7 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         assessment_id = assessment["id"]
         self.assertEqual(assessment["masteryPercent"], 47)
         self.assertEqual(assessment["averagePercent"], 55)
+        self.assertEqual(assessment["masteryReferenceSource"], "مرجع اختبار آلي فقط — ليس معيارًا تربويًا")
         self.assertTrue(assessment["analysisReady"])
 
         boot = self.client.get("/api/bootstrap").json()
@@ -758,7 +760,7 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
             "subject": "الفيزياء", "grade": "العاشر", "assessmentDate": "2026-09-20",
             "term": "الفصل الأول", "academicYear": "2026/2027", "teacherId": 1,
             "maxScore": 40, "studentCount": 30, "averageScore": 27,
-            "highestScore": 40, "lowestScore": 12, "masteryThresholdPct": 60,
+            "highestScore": 40, "lowestScore": 12, "masteryThresholdPct": 60, "masteryReferenceSource": "مرجع اختبار آلي فقط — ليس معيارًا تربويًا",
             "masteredCount": 20, "nearMasteryCount": 6, "interventionCount": 4,
             "notes": "تحسن بعد التدخل", "status": "reviewed",
         })
@@ -771,12 +773,112 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         final = self.client.get(f"/api/achievement/assessments/{assessment_id}").json()
         self.assertEqual(final["actionCount"], 0)
 
+    def test_impact_evaluation_is_arithmetic_not_pedagogical(self):
+        self.assertEqual(evaluate_impact(direction="higher_better", baseline_value=48, target_value=70, outcome_value=None)["impactStatus"], "pending")
+        self.assertEqual(evaluate_impact(direction="higher_better", baseline_value=48, target_value=70, outcome_value=75)["impactStatus"], "target_met")
+        self.assertEqual(evaluate_impact(direction="higher_better", baseline_value=48, target_value=70, outcome_value=64)["impactStatus"], "improved_not_met")
+        self.assertEqual(evaluate_impact(direction="higher_better", baseline_value=48, target_value=70, outcome_value=48)["impactStatus"], "no_change")
+        self.assertEqual(evaluate_impact(direction="higher_better", baseline_value=48, target_value=70, outcome_value=42)["impactStatus"], "regressed")
+        self.assertEqual(evaluate_impact(direction="lower_better", baseline_value=12, target_value=5, outcome_value=4)["impactStatus"], "target_met")
+        self.assertEqual(evaluate_impact(direction="lower_better", baseline_value=12, target_value=5, outcome_value=8)["impactStatus"], "improved_not_met")
+        self.assertEqual(evaluate_impact(direction="lower_better", baseline_value=12, target_value=5, outcome_value=14)["impactStatus"], "regressed")
+
+    def test_achievement_action_impact_metric_lifecycle_and_attention(self):
+        created = self.client.post("/api/achievement/assessments", json={
+            "title": "تقويم قياس أثر اختباري", "assessmentType": "تقويم آخر",
+            "subject": "العلوم", "grade": "العاشر", "assessmentDate": "2026-10-01",
+            "term": "الفصل الأول", "academicYear": "2026/2027", "teacherId": 1,
+            "maxScore": 20, "studentCount": 20, "averageScore": 16,
+            "highestScore": 20, "lowestScore": 10, "masteryThresholdPct": 60, "masteryReferenceSource": "مرجع اختبار آلي فقط — ليس معيارًا تربويًا",
+            "masteredCount": 18, "nearMasteryCount": 2, "interventionCount": 0,
+            "notes": "سجل اختبار بنيوي فقط", "status": "reviewed",
+        })
+        self.assertEqual(created.status_code, 201)
+        assessment_id = created.json()["id"]
+        action = self.client.post(f"/api/achievement/assessments/{assessment_id}/actions", json={
+            "actionType": "enrichment", "title": "برنامج إثرائي اختباري",
+            "targetGroup": "فئة تجريبية", "responsibleTeacherId": 1,
+            "startDate": "2026-10-02", "dueDate": "2026-10-10", "status": "completed",
+            "baselineIndicator": "وصف محفوظ", "targetIndicator": "هدف محفوظ",
+            "outcomeIndicator": "", "notes": "اختبار دورة الأثر",
+        })
+        self.assertEqual(action.status_code, 201)
+        action_id = action.json()["id"]
+        self.assertIsNone(action.json()["metric"])
+
+        boot = self.client.get("/api/bootstrap").json()
+        attention = next(item for item in boot["achievementAttention"] if item["id"] == assessment_id)
+        self.assertEqual(attention["unmeasuredCompletedActionCount"], 1)
+
+        pending_payload = {
+            "metricName": "مؤشر داخلي اختباري", "unit": "نقطة", "direction": "higher_better",
+            "baselineValue": 10, "targetValue": 15, "outcomeValue": None, "measuredAt": None,
+            "referenceSource": "هدف داخلي للاختبار وليس معيارًا وزاريًا",
+            "referenceYear": "2026", "referenceNote": "اختبار تقني", "notes": "",
+        }
+        pending = self.client.put(f"/api/achievement/assessments/{assessment_id}/actions/{action_id}/metric", json=pending_payload)
+        self.assertEqual(pending.status_code, 200)
+        self.assertEqual(pending.json()["impactStatus"], "pending")
+
+        invalid = dict(pending_payload, outcomeValue=12, measuredAt=None)
+        self.assertEqual(self.client.put(f"/api/achievement/assessments/{assessment_id}/actions/{action_id}/metric", json=invalid).status_code, 422)
+
+        no_change = dict(pending_payload, outcomeValue=10, measuredAt="2026-10-11")
+        measured = self.client.put(f"/api/achievement/assessments/{assessment_id}/actions/{action_id}/metric", json=no_change)
+        self.assertEqual(measured.status_code, 200)
+        self.assertEqual(measured.json()["impactStatus"], "no_change")
+        boot = self.client.get("/api/bootstrap").json()
+        attention = next(item for item in boot["achievementAttention"] if item["id"] == assessment_id)
+        self.assertEqual(attention["impactReviewActionCount"], 1)
+        self.assertEqual(attention["measuredActionCount"], 1)
+
+        target_met = dict(pending_payload, outcomeValue=16, measuredAt="2026-10-11")
+        measured = self.client.put(f"/api/achievement/assessments/{assessment_id}/actions/{action_id}/metric", json=target_met)
+        self.assertEqual(measured.json()["impactStatus"], "target_met")
+        self.assertEqual(measured.json()["improvementValue"], 6.0)
+        detail = self.client.get(f"/api/achievement/assessments/{assessment_id}").json()
+        saved_action = next(item for item in detail["actions"] if item["id"] == action_id)
+        self.assertEqual(saved_action["metric"]["referenceSource"], "هدف داخلي للاختبار وليس معيارًا وزاريًا")
+        self.assertEqual(detail["targetMetActionCount"], 1)
+        boot = self.client.get("/api/bootstrap").json()
+        self.assertFalse(any(item["id"] == assessment_id for item in boot["achievementAttention"]))
+
+        search = self.client.get("/api/search", params={"q": "مؤشر داخلي اختباري", "section": "achievement"})
+        self.assertEqual(search.status_code, 200)
+        self.assertTrue(any(item["targetId"] == assessment_id for item in search.json()["results"]))
+
+        report = self.client.get("/api/reports/official", params={"reportType": "achievement", "academicYear": "2026/2027", "term": "الفصل الأول"})
+        self.assertEqual(report.status_code, 200)
+        intervention_section = next(section for section in report.json()["sections"] if section["id"] == "interventions")
+        self.assertTrue(any(row["title"] == "برنامج إثرائي اختباري" for row in intervention_section["rows"]))
+        self.assertTrue(any(metric["label"] == "تدخلات مقاسة" for metric in report.json()["metrics"]))
+
+        deleted_metric = self.client.delete(f"/api/achievement/assessments/{assessment_id}/actions/{action_id}/metric")
+        self.assertEqual(deleted_metric.status_code, 200)
+        detail = self.client.get(f"/api/achievement/assessments/{assessment_id}").json()
+        self.assertIsNone(next(item for item in detail["actions"] if item["id"] == action_id)["metric"])
+        boot = self.client.get("/api/bootstrap").json()
+        self.assertTrue(any(item["id"] == assessment_id and item["unmeasuredCompletedActionCount"] == 1 for item in boot["achievementAttention"]))
+
+        self.assertEqual(self.client.delete(f"/api/achievement/assessments/{assessment_id}/actions/{action_id}/metric").status_code, 404)
+        self.assertEqual(self.client.put(f"/api/achievement/assessments/{assessment_id}/actions/999999/metric", json=pending_payload).status_code, 404)
+        self.assertEqual(self.client.delete(f"/api/achievement/assessments/{assessment_id}/actions/999999/metric").status_code, 404)
+
     def test_achievement_validation_and_overdue_attention(self):
+        missing_reference = self.client.post("/api/achievement/assessments", json={
+            "title": "نتيجة بلا مرجع", "assessmentType": "اختبار", "subject": "العلوم",
+            "grade": "العاشر", "assessmentDate": "2026-09-20", "term": "الفصل الأول",
+            "academicYear": "2026/2027", "teacherId": 1, "maxScore": 40, "studentCount": 10,
+            "averageScore": 20, "highestScore": 35, "lowestScore": 5, "masteryThresholdPct": 60,
+            "masteredCount": 4, "nearMasteryCount": 3, "interventionCount": 3, "notes": "", "status": "recorded",
+        })
+        self.assertEqual(missing_reference.status_code, 422)
+
         bad_counts = self.client.post("/api/achievement/assessments", json={
             "title": "نتيجة غير صالحة", "assessmentType": "اختبار", "subject": "الكيمياء",
             "grade": "العاشر", "assessmentDate": "2026-09-20", "term": "الفصل الأول",
             "academicYear": "2026/2027", "teacherId": 1, "maxScore": 40, "studentCount": 10,
-            "averageScore": 25, "highestScore": 41, "lowestScore": 5, "masteryThresholdPct": 60,
+            "averageScore": 25, "highestScore": 41, "lowestScore": 5, "masteryThresholdPct": 60, "masteryReferenceSource": "مرجع اختبار آلي فقط — ليس معيارًا تربويًا",
             "masteredCount": 6, "nearMasteryCount": 4, "interventionCount": 2, "notes": "", "status": "recorded",
         })
         self.assertEqual(bad_counts.status_code, 422)
@@ -785,7 +887,7 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
             "title": "نتيجة بمعلم مفقود", "assessmentType": "اختبار", "subject": "الكيمياء",
             "grade": "العاشر", "assessmentDate": "2026-09-20", "term": "الفصل الأول",
             "academicYear": "2026/2027", "teacherId": 999999, "maxScore": 40, "studentCount": 10,
-            "averageScore": 20, "highestScore": 35, "lowestScore": 5, "masteryThresholdPct": 60,
+            "averageScore": 20, "highestScore": 35, "lowestScore": 5, "masteryThresholdPct": 60, "masteryReferenceSource": "مرجع اختبار آلي فقط — ليس معيارًا تربويًا",
             "masteredCount": 4, "nearMasteryCount": 3, "interventionCount": 3, "notes": "", "status": "recorded",
         })
         self.assertEqual(missing_teacher.status_code, 422)
@@ -797,7 +899,7 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
             "title": "نتيجة متابعة متأخرة", "assessmentType": "اختبار", "subject": "العلوم",
             "grade": "الثامن", "assessmentDate": yesterday, "term": "الفصل الأول",
             "academicYear": "2026/2027", "teacherId": 3, "maxScore": 20, "studentCount": 20,
-            "averageScore": 15, "highestScore": 20, "lowestScore": 8, "masteryThresholdPct": 60,
+            "averageScore": 15, "highestScore": 20, "lowestScore": 8, "masteryThresholdPct": 60, "masteryReferenceSource": "مرجع اختبار آلي فقط — ليس معيارًا تربويًا",
             "masteredCount": 15, "nearMasteryCount": 3, "interventionCount": 2, "notes": "", "status": "recorded",
         })
         self.assertEqual(created.status_code, 201)

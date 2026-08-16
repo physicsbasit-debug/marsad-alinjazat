@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from . import drive
 from .db import BASE_DIR, connect, init_db, row_to_dict, utc_now
+from .achievement_metrics import evaluate_impact
 from .search import run_search
 
 load_dotenv(BASE_DIR / ".env")
@@ -34,7 +35,7 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 EVENT_UPLOADS_DIR = Path(os.getenv("APP_EVENT_UPLOADS_DIR", BASE_DIR / "uploads" / "events"))
 EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="مرصد الإنجازات API", version="0.11.0")
+app = FastAPI(title="مرصد الإنجازات API", version="0.12.0")
 
 
 class CreateRequestPayload(BaseModel):
@@ -187,7 +188,10 @@ class AchievementAssessmentPayload(BaseModel):
     averageScore: float | None = Field(default=None, ge=0)
     highestScore: float | None = Field(default=None, ge=0)
     lowestScore: float | None = Field(default=None, ge=0)
-    masteryThresholdPct: float = Field(default=60, ge=0, le=100)
+    masteryThresholdPct: float = Field(ge=0, le=100)
+    masteryReferenceSource: str = Field(min_length=3, max_length=500)
+    masteryReferenceYear: str = Field(default="", max_length=100)
+    masteryReferenceNote: str = Field(default="", max_length=1200)
     masteredCount: int = Field(default=0, ge=0, le=10000)
     nearMasteryCount: int = Field(default=0, ge=0, le=10000)
     interventionCount: int = Field(default=0, ge=0, le=10000)
@@ -207,6 +211,20 @@ class AchievementActionPayload(BaseModel):
     targetIndicator: str = Field(default="", max_length=1000)
     outcomeIndicator: str = Field(default="", max_length=1000)
     notes: str = Field(default="", max_length=2500)
+
+
+class AchievementMetricPayload(BaseModel):
+    metricName: str = Field(min_length=2, max_length=300)
+    unit: str = Field(default="", max_length=80)
+    direction: Literal["higher_better", "lower_better"] = "higher_better"
+    baselineValue: float
+    targetValue: float
+    outcomeValue: float | None = None
+    measuredAt: str | None = None
+    referenceSource: str = Field(min_length=3, max_length=500)
+    referenceYear: str = Field(default="", max_length=100)
+    referenceNote: str = Field(default="", max_length=1200)
+    notes: str = Field(default="", max_length=2000)
 
 
 def _teacher_dict(row):
@@ -912,6 +930,48 @@ def _achievement_action_dict(row):
     return item
 
 
+def _achievement_metric_dict(row):
+    if row is None:
+        return None
+    item = dict(row)
+    for source, target in [
+        ("action_id", "actionId"),
+        ("metric_name", "metricName"),
+        ("baseline_value", "baselineValue"),
+        ("target_value", "targetValue"),
+        ("outcome_value", "outcomeValue"),
+        ("measured_at", "measuredAt"),
+        ("reference_source", "referenceSource"),
+        ("reference_year", "referenceYear"),
+        ("reference_note", "referenceNote"),
+        ("created_at", "createdAt"),
+        ("updated_at", "updatedAt"),
+    ]:
+        if source in item:
+            item[target] = item.pop(source)
+    item.update(evaluate_impact(
+        direction=item["direction"],
+        baseline_value=item["baselineValue"],
+        target_value=item["targetValue"],
+        outcome_value=item.get("outcomeValue"),
+    ))
+    return item
+
+
+def _achievement_action_with_metric(conn, action_id: int):
+    row = conn.execute(
+        """SELECT x.*, t.name AS responsible_name FROM achievement_actions x
+           LEFT JOIN teachers t ON t.id = x.responsible_teacher_id WHERE x.id = ?""",
+        (action_id,),
+    ).fetchone()
+    if row is None:
+        return None
+    item = _achievement_action_dict(row)
+    metric_row = conn.execute("SELECT * FROM achievement_action_metrics WHERE action_id = ?", (action_id,)).fetchone()
+    item["metric"] = _achievement_metric_dict(metric_row)
+    return item
+
+
 def _achievement_assessment_dict(row):
     item = dict(row)
     for source, target in [
@@ -926,17 +986,29 @@ def _achievement_assessment_dict(row):
         ("highest_score", "highestScore"),
         ("lowest_score", "lowestScore"),
         ("mastery_threshold_pct", "masteryThresholdPct"),
+        ("mastery_reference_source", "masteryReferenceSource"),
+        ("mastery_reference_year", "masteryReferenceYear"),
+        ("mastery_reference_note", "masteryReferenceNote"),
         ("mastered_count", "masteredCount"),
         ("near_mastery_count", "nearMasteryCount"),
         ("intervention_count", "interventionCount"),
         ("action_count", "actionCount"),
+        ("remedial_action_count", "remedialActionCount"),
+        ("enrichment_action_count", "enrichmentActionCount"),
         ("open_action_count", "openActionCount"),
         ("overdue_action_count", "overdueActionCount"),
+        ("measured_action_count", "measuredActionCount"),
+        ("target_met_action_count", "targetMetActionCount"),
+        ("unmeasured_completed_action_count", "unmeasuredCompletedActionCount"),
+        ("impact_review_action_count", "impactReviewActionCount"),
         ("created_at", "createdAt"),
         ("updated_at", "updatedAt"),
     ]:
         if source in item:
             item[target] = item.pop(source)
+    item["masteryReferenceSource"] = item.get("masteryReferenceSource") or ""
+    item["masteryReferenceYear"] = item.get("masteryReferenceYear") or ""
+    item["masteryReferenceNote"] = item.get("masteryReferenceNote") or ""
     student_count = int(item.get("studentCount") or 0)
     mastered = int(item.get("masteredCount") or 0)
     max_score = float(item.get("maxScore") or 0)
@@ -952,11 +1024,19 @@ def _achievement_summary_rows(conn, assessment_id: int | None = None):
     params: tuple = (today, assessment_id) if assessment_id is not None else (today,)
     return conn.execute(
         f"""SELECT a.*, t.name AS teacher_name,
+               s.mastery_reference_source, s.mastery_reference_year, s.mastery_reference_note,
                (SELECT COUNT(*) FROM achievement_actions x WHERE x.assessment_id = a.id) AS action_count,
+               (SELECT COUNT(*) FROM achievement_actions x WHERE x.assessment_id = a.id AND x.action_type = 'remedial') AS remedial_action_count,
+               (SELECT COUNT(*) FROM achievement_actions x WHERE x.assessment_id = a.id AND x.action_type = 'enrichment') AS enrichment_action_count,
                (SELECT COUNT(*) FROM achievement_actions x WHERE x.assessment_id = a.id AND x.status NOT IN ('completed','cancelled')) AS open_action_count,
-               (SELECT COUNT(*) FROM achievement_actions x WHERE x.assessment_id = a.id AND x.status NOT IN ('completed','cancelled') AND x.due_date IS NOT NULL AND x.due_date < ?) AS overdue_action_count
+               (SELECT COUNT(*) FROM achievement_actions x WHERE x.assessment_id = a.id AND x.status NOT IN ('completed','cancelled') AND x.due_date IS NOT NULL AND x.due_date < ?) AS overdue_action_count,
+               (SELECT COUNT(*) FROM achievement_actions x JOIN achievement_action_metrics m ON m.action_id = x.id WHERE x.assessment_id = a.id AND m.outcome_value IS NOT NULL) AS measured_action_count,
+               (SELECT COUNT(*) FROM achievement_actions x JOIN achievement_action_metrics m ON m.action_id = x.id WHERE x.assessment_id = a.id AND m.outcome_value IS NOT NULL AND ((m.direction = 'higher_better' AND m.outcome_value >= m.target_value) OR (m.direction = 'lower_better' AND m.outcome_value <= m.target_value))) AS target_met_action_count,
+               (SELECT COUNT(*) FROM achievement_actions x LEFT JOIN achievement_action_metrics m ON m.action_id = x.id WHERE x.assessment_id = a.id AND x.status = 'completed' AND (m.action_id IS NULL OR m.outcome_value IS NULL)) AS unmeasured_completed_action_count,
+               (SELECT COUNT(*) FROM achievement_actions x JOIN achievement_action_metrics m ON m.action_id = x.id WHERE x.assessment_id = a.id AND x.status = 'completed' AND m.outcome_value IS NOT NULL AND ((m.direction = 'higher_better' AND m.outcome_value <= m.baseline_value) OR (m.direction = 'lower_better' AND m.outcome_value >= m.baseline_value))) AS impact_review_action_count
            FROM achievement_assessments a
            LEFT JOIN teachers t ON t.id = a.teacher_id
+           LEFT JOIN achievement_assessment_standards s ON s.assessment_id = a.id
            {where}
            ORDER BY a.assessment_date DESC, a.id DESC""",
         params,
@@ -978,13 +1058,23 @@ def _achievement_detail(assessment_id: int):
                         CASE WHEN x.due_date IS NULL THEN 1 ELSE 0 END, x.due_date, x.id""",
             (assessment_id,),
         ).fetchall()
+        action_ids = [row["id"] for row in action_rows]
+        metric_rows = conn.execute(
+            f"SELECT * FROM achievement_action_metrics WHERE action_id IN ({','.join('?' for _ in action_ids)})",
+            action_ids,
+        ).fetchall() if action_ids else []
+        metrics = {row["action_id"]: _achievement_metric_dict(row) for row in metric_rows}
         timeline_rows = conn.execute(
             """SELECT id, activity_type, title, detail, created_at
                FROM activities WHERE entity_type = 'achievement_assessment' AND entity_id = ?
                ORDER BY created_at DESC, id DESC LIMIT 40""",
             (assessment_id,),
         ).fetchall()
-    assessment["actions"] = [_achievement_action_dict(row) for row in action_rows]
+    assessment["actions"] = []
+    for row in action_rows:
+        action = _achievement_action_dict(row)
+        action["metric"] = metrics.get(row["id"])
+        assessment["actions"].append(action)
     assessment["timeline"] = [dict(row) for row in timeline_rows]
     assessment["analysisReady"] = bool(
         assessment["status"] != "draft"
@@ -1001,15 +1091,22 @@ def _achievement_attention(conn, limit: int = 6):
         item for item in items
         if item["status"] != "draft" and (
             item["overdueActionCount"] > 0
+            or item.get("unmeasuredCompletedActionCount", 0) > 0
+            or item.get("impactReviewActionCount", 0) > 0
             or (item["studentCount"] > 0 and item["masteryPercent"] < item["masteryThresholdPct"])
         )
     ]
-    needs.sort(key=lambda item: (0 if item["overdueActionCount"] else 1, item["masteryPercent"], item["assessmentDate"], item["id"]))
+    needs.sort(key=lambda item: (
+        0 if item["overdueActionCount"] else 1 if item.get("impactReviewActionCount", 0) else 2 if item.get("unmeasuredCompletedActionCount", 0) else 3,
+        item["masteryPercent"], item["assessmentDate"], item["id"]
+    ))
     return needs[:limit]
 
 
 def _validate_achievement_payload(payload: AchievementAssessmentPayload) -> None:
     _validate_iso_date(payload.assessmentDate, "تاريخ التقويم")
+    if not payload.masteryReferenceSource.strip():
+        raise HTTPException(status_code=422, detail="وثّق مرجع حد الإتقان المستخدم. المرصد لا يعتمد حدًا تربويًا بلا مصدر عُماني معتمد.")
     if payload.teacherId is not None:
         with connect() as conn:
             if not conn.execute("SELECT 1 FROM teachers WHERE id = ?", (payload.teacherId,)).fetchone():
@@ -1044,8 +1141,30 @@ def _validate_achievement_action(payload: AchievementActionPayload) -> tuple[str
     return start, due
 
 
+def _validate_achievement_metric(payload: AchievementMetricPayload) -> str | None:
+    if not payload.referenceSource.strip():
+        raise HTTPException(status_code=422, detail="وثّق مصدر الهدف أو المعيار المستخدم في قياس الأثر.")
+    measured_at = _validate_iso_date(payload.measuredAt, "تاريخ القياس النهائي") if payload.measuredAt else None
+    if payload.outcomeValue is not None and measured_at is None:
+        raise HTTPException(status_code=422, detail="أدخل تاريخ القياس النهائي عند تسجيل النتيجة الفعلية.")
+    if payload.outcomeValue is None and measured_at is not None:
+        raise HTTPException(status_code=422, detail="لا يمكن تسجيل تاريخ قياس نهائي دون قيمة نتيجة فعلية.")
+    return measured_at
+
+
 
 REPORT_TYPES = {"department", "teacher", "planning", "achievement", "supervision", "meetings", "events"}
+
+
+def _impact_status_label(value: str | None) -> str:
+    labels = {
+        "pending": "لم يُقَس بعد",
+        "target_met": "حقق الهدف المسجل",
+        "improved_not_met": "تحسن ولم يبلغ الهدف المسجل",
+        "no_change": "لم يحدث تغير",
+        "regressed": "تراجع المؤشر",
+    }
+    return labels.get(value or "", value or "—")
 
 
 def _report_status_label(value: str | None) -> str:
@@ -1154,7 +1273,7 @@ def _official_report(report_type: str, academic_year: str, term: str, teacher_id
                 "metrics": [
                     _report_metric("المعلمون", len(teachers), "إجمالي السجلات المهنية الحالية"),
                     _report_metric("تقدم الخطط", f"{int(round(sum(x['progressPercent'] for x in active_plans)/len(active_plans))) if active_plans else 0}%", "متوسط الخطط النشطة في النطاق"),
-                    _report_metric("الإتقان المجمع", f"{_report_pct(mastered_students, assessment_students)}%", f"{mastered_students} من {assessment_students} طالبًا في التقويمات المسجلة"),
+                    _report_metric("نسبة الفئة المحققة للحدود المسجلة", f"{_report_pct(mastered_students, assessment_students)}%", f"{mastered_students} من {assessment_students} طالبًا في التقويمات المسجلة"),
                     _report_metric("إغلاق الزيارات", f"{_report_pct(sum(1 for x in visits_scope if x['status']=='closed'), len(visits_scope))}%", "نسبة الزيارات المغلقة من إجمالي الزيارات"),
                     _report_metric("تنفيذ القرارات", f"{_report_pct(decisions_done, decisions_total)}%", f"{decisions_done} قرارًا مكتملًا من {decisions_total}"),
                     _report_metric("اكتمال الطلبات", f"{_report_pct(request_done, request_den)}%", f"{request_done} طلبات معتمدة من {request_den}"),
@@ -1166,7 +1285,7 @@ def _official_report(report_type: str, academic_year: str, term: str, teacher_id
                     _report_section("planning", "التخطيط والمنهج", [("title","الخطة"),("scope","النطاق"),("owner","المسؤول"),("progress","الإنجاز"),("overdue","متأخر")], [
                         {"title":x["title"],"scope":f"{x['subject']} • {x['grade']}","owner":x.get("ownerName") or "—","progress":f"{x['progressPercent']}%","overdue":x["overdueUnitCount"]} for x in plans_scope
                     ]),
-                    _report_section("achievement", "التحصيل والنتائج", [("title","التقويم"),("scope","النطاق"),("mastery","الإتقان"),("average","المتوسط"),("actions","تدخلات مفتوحة")], [
+                    _report_section("achievement", "التحصيل والنتائج", [("title","التقويم"),("scope","النطاق"),("mastery","وفق الحد المسجل"),("average","المتوسط"),("actions","تدخلات مفتوحة")], [
                         {"title":x["title"],"scope":f"{x['subject']} • {x['grade']}","mastery":f"{x['masteryPercent']}%","average":f"{x['averagePercent']}%","actions":x["openActionCount"]} for x in assessments_scope if x["status"] != "draft"
                     ]),
                     _report_section("supervision", "الإشراف الفني", [("teacher","المعلم"),("date","التاريخ"),("type","الزيارة"),("status","الحالة"),("followup","متابعات مفتوحة")], [
@@ -1215,7 +1334,7 @@ def _official_report(report_type: str, academic_year: str, term: str, teacher_id
                     _report_section("visits", "الزيارات والإشراف", [("date","التاريخ"),("type","النوع"),("lesson","الدرس"),("status","الحالة"),("followup","متابعة")], [
                         {"date":x["visitDate"],"type":x["visitType"],"lesson":x.get("lessonTitle") or "—","status":_report_status_label(x["effectiveStatus"]),"followup":x["openActionCount"]} for x in teacher_visits
                     ]),
-                    _report_section("assessments", "التحصيل", [("title","التقويم"),("scope","النطاق"),("mastery","الإتقان"),("average","المتوسط")], [
+                    _report_section("assessments", "التحصيل", [("title","التقويم"),("scope","النطاق"),("mastery","وفق الحد المسجل"),("average","المتوسط")], [
                         {"title":x["title"],"scope":f"{x['subject']} • {x['grade']}","mastery":f"{x['masteryPercent']}%","average":f"{x['averagePercent']}%"} for x in teacher_assessments
                     ]),
                     _report_section("events", "المشاركات والفعاليات", [("title","الفعالية"),("date","التاريخ"),("type","النوع"),("role","الدور")], [
@@ -1239,12 +1358,34 @@ def _official_report(report_type: str, academic_year: str, term: str, teacher_id
         if report_type == "achievement":
             rows=[x for x in assessments_scope if x["status"]!="draft"]
             students=sum(x["studentCount"] for x in rows); mastered=sum(x["masteredCount"] for x in rows)
+            action_rows = []
+            for assessment in rows:
+                detail = _achievement_detail(assessment["id"])
+                if not detail:
+                    continue
+                for action in detail["actions"]:
+                    metric = action.get("metric")
+                    action_rows.append({
+                        "title": action["title"],
+                        "type": {"remedial": "علاجي", "enrichment": "إثرائي", "followup": "متابعة"}.get(action["actionType"], action["actionType"]),
+                        "targetGroup": action.get("targetGroup") or "—",
+                        "metric": metric.get("metricName") if metric else "—",
+                        "baseline": f"{metric['baselineValue']} {metric.get('unit') or ''}".strip() if metric else "—",
+                        "target": f"{metric['targetValue']} {metric.get('unit') or ''}".strip() if metric else "—",
+                        "outcome": f"{metric['outcomeValue']} {metric.get('unit') or ''}".strip() if metric and metric.get("outcomeValue") is not None else "—",
+                        "impact": _impact_status_label(metric.get("impactStatus")) if metric else "لم يُسجل مقياس",
+                        "reference": (metric.get("referenceSource") or "هدف برنامج داخلي غير منسوب لمرجع") if metric else "—",
+                    })
+            measured=sum(x["measuredActionCount"] for x in rows); target_met=sum(x["targetMetActionCount"] for x in rows)
             base.update({
                 "title":"تقرير التحصيل والنتائج","subtitle":f"{term} • {academic_year}",
-                "summary":"يجمع التقرير نتائج التقويمات المسجلة والتدخلات المرتبطة بها. لا يحول الدرجة الكلية إلى تشخيص مهاري غير موجود في البيانات.",
-                "metrics":[_report_metric("التقويمات",len(rows)),_report_metric("الطلبة",students),_report_metric("الإتقان المجمع",f"{_report_pct(mastered,students)}%"),_report_metric("تدخلات مفتوحة",sum(x["openActionCount"] for x in rows)),_report_metric("تدخلات متأخرة",sum(x["overdueActionCount"] for x in rows))],
-                "sections":[_report_section("assessments","التقويمات",[("title","التقويم"),("scope","النطاق"),("teacher","المعلم"),("average","المتوسط"),("mastery","الإتقان"),("actions","المتابعة")],[{"title":x["title"],"scope":f"{x['subject']} • {x['grade']}","teacher":x.get("teacherName") or "—","average":f"{x['averagePercent']}%","mastery":f"{x['masteryPercent']}%","actions":x["openActionCount"]} for x in rows])],
-                "sourceCounts":{"assessments":len(rows)},
+                "summary":"يجمع التقرير نتائج التقويمات والتدخلات وقياس أثرها كما سُجلت. لا يضع حدًا تربويًا من عنده ولا يحول الدرجة الكلية إلى تشخيص مهاري غير موجود في البيانات.",
+                "metrics":[_report_metric("التقويمات",len(rows)),_report_metric("الطلبة",students),_report_metric("نسبة فئة الإتقان وفق الحدود المسجلة",f"{_report_pct(mastered,students)}%"),_report_metric("تدخلات مفتوحة",sum(x["openActionCount"] for x in rows)),_report_metric("تدخلات مقاسة",measured),_report_metric("حققت الهدف المسجل",target_met, f"{_report_pct(target_met, measured)}% من التدخلات المقاسة" if measured else "لا توجد قياسات نهائية")],
+                "sections":[
+                    _report_section("assessments","التقويمات",[("title","التقويم"),("scope","النطاق"),("teacher","المعلم"),("average","المتوسط"),("mastery","الفئة المحققة للحد المسجل"),("reference","مرجع الحد"),("actions","المتابعة")],[{"title":x["title"],"scope":f"{x['subject']} • {x['grade']}","teacher":x.get("teacherName") or "—","average":f"{x['averagePercent']}%","mastery":f"{x['masteryPercent']}% وفق {x['masteryThresholdPct']}%","reference":x.get("masteryReferenceSource") or "سجل سابق بلا مرجع موثق","actions":x["openActionCount"]} for x in rows]),
+                    _report_section("interventions","التدخلات والمتابعات وقياس الأثر",[("title","التدخل"),("type","النوع"),("targetGroup","الفئة المستهدفة"),("metric","المؤشر"),("baseline","خط الأساس"),("target","الهدف المسجل"),("outcome","النتيجة"),("impact","الأثر الحسابي"),("reference","مصدر المعيار/الهدف")], action_rows, "الحكم هنا حسابي بالنسبة للهدف المسجل فقط، ولا يعني اعتماد معيار تربوي ما لم يكن مصدره موثقًا.")
+                ],
+                "sourceCounts":{"assessments":len(rows),"interventions":len(action_rows),"measuredInterventions":measured},
             }); return base
 
         if report_type == "supervision":
@@ -1443,7 +1584,7 @@ def _archive_scope(conn, academic_year: str) -> dict:
 
     coverage = [
         {"id": "planning", "label": "التخطيط والمنهج", "count": len(plans_scope), "detail": f"{sum(int(item.get('unitCount') or 0) for item in plans_scope)} وحدة منهج"},
-        {"id": "achievement", "label": "التحصيل والنتائج", "count": len(assessments_scope), "detail": f"{sum(int(item.get('openActionCount') or 0) for item in assessments_scope)} تدخلات مفتوحة"},
+        {"id": "achievement", "label": "التحصيل والنتائج", "count": len(assessments_scope), "detail": f"{sum(int(item.get('openActionCount') or 0) for item in assessments_scope)} تدخلات مفتوحة • {sum(int(item.get('measuredActionCount') or 0) for item in assessments_scope)} مقاسة"},
         {"id": "supervision", "label": "الإشراف والمتابعة", "count": len(visits_scope), "detail": f"{sum(int(item.get('openActionCount') or 0) for item in visits_scope)} متابعات مفتوحة"},
         {"id": "meetings", "label": "الاجتماعات والقرارات", "count": len(meetings_scope), "detail": f"{decisions} قرارًا"},
         {"id": "events", "label": "الفعاليات والتوثيق", "count": len(events_scope), "detail": f"{sum(int(item.get('mediaCount') or 0) for item in events_scope)} أدلة"},
@@ -1454,8 +1595,8 @@ def _archive_scope(conn, academic_year: str) -> dict:
         _report_section("planning", "التخطيط والمنهج", [("title","الخطة"),("scope","النطاق"),("term","الفصل"),("owner","المسؤول"),("progress","الإنجاز"),("status","الحالة")], [
             {"title": item["title"], "scope": f"{item['subject']} • {item['grade']}", "term": item["term"], "owner": item.get("ownerName") or "—", "progress": f"{item['progressPercent']}%", "status": _report_status_label(item.get("status"))} for item in plans_scope
         ]),
-        _report_section("achievement", "التحصيل والنتائج", [("title","التقويم"),("scope","النطاق"),("term","الفصل"),("teacher","المعلم"),("mastery","الإتقان"),("actions","تدخلات مفتوحة")], [
-            {"title": item["title"], "scope": f"{item['subject']} • {item['grade']}", "term": item["term"], "teacher": item.get("teacherName") or "—", "mastery": f"{item['masteryPercent']}%", "actions": item.get("openActionCount", 0)} for item in assessments_scope
+        _report_section("achievement", "التحصيل والنتائج", [("title","التقويم"),("scope","النطاق"),("term","الفصل"),("teacher","المعلم"),("mastery","الفئة المحققة للحد المسجل"),("actions","تدخلات مفتوحة"),("measured","تدخلات مقاسة")], [
+            {"title": item["title"], "scope": f"{item['subject']} • {item['grade']}", "term": item["term"], "teacher": item.get("teacherName") or "—", "mastery": f"{item['masteryPercent']}%", "actions": item.get("openActionCount", 0), "measured": item.get("measuredActionCount", 0)} for item in assessments_scope
         ]),
         _report_section("supervision", "الإشراف والمتابعة", [("teacher","المعلم"),("date","التاريخ"),("type","النوع"),("lesson","الدرس"),("status","الحالة"),("followup","متابعة")], [
             {"teacher": item.get("teacherName") or "—", "date": item["visitDate"], "type": item["visitType"], "lesson": item.get("lessonTitle") or "—", "status": _report_status_label(item.get("effectiveStatus")), "followup": item.get("openActionCount", 0)} for item in visits_scope
@@ -1522,7 +1663,7 @@ def _resolve_event_local_path(storage_path: str) -> Path:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "0.11.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
+    return {"ok": True, "version": "0.12.0", "storageMode": os.getenv("STORAGE_MODE", "auto")}
 
 
 @app.get("/api/bootstrap")
@@ -2464,6 +2605,13 @@ def create_achievement_assessment(payload: AchievementAssessmentPayload):
              payload.nearMasteryCount, payload.interventionCount, payload.notes, payload.status, now, now),
         )
         conn.execute(
+            """INSERT INTO achievement_assessment_standards
+               (assessment_id, mastery_reference_source, mastery_reference_year, mastery_reference_note, created_at, updated_at)
+               VALUES (?,?,?,?,?,?)""",
+            (cursor.lastrowid, payload.masteryReferenceSource.strip(), payload.masteryReferenceYear.strip(),
+             payload.masteryReferenceNote.strip(), now, now),
+        )
+        conn.execute(
             "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?,?,?,?,?,?)",
             ("achievement", f"تسجيل نتيجة: {payload.title}", f"{payload.subject} • {payload.grade}", "achievement_assessment", cursor.lastrowid, now),
         )
@@ -2497,6 +2645,18 @@ def update_achievement_assessment(assessment_id: int, payload: AchievementAssess
              payload.nearMasteryCount, payload.interventionCount, payload.notes, payload.status, now, assessment_id),
         )
         conn.execute(
+            """INSERT INTO achievement_assessment_standards
+               (assessment_id, mastery_reference_source, mastery_reference_year, mastery_reference_note, created_at, updated_at)
+               VALUES (?,?,?,?,?,?)
+               ON CONFLICT(assessment_id) DO UPDATE SET
+                 mastery_reference_source=excluded.mastery_reference_source,
+                 mastery_reference_year=excluded.mastery_reference_year,
+                 mastery_reference_note=excluded.mastery_reference_note,
+                 updated_at=excluded.updated_at""",
+            (assessment_id, payload.masteryReferenceSource.strip(), payload.masteryReferenceYear.strip(),
+             payload.masteryReferenceNote.strip(), now, now),
+        )
+        conn.execute(
             "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?,?,?,?,?,?)",
             ("achievement", f"تحديث نتيجة: {payload.title}", f"{payload.subject} • {payload.grade}", "achievement_assessment", assessment_id, now),
         )
@@ -2525,12 +2685,8 @@ def create_achievement_action(assessment_id: int, payload: AchievementActionPayl
             "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?,?,?,?,?,?)",
             ("achievement", f"إجراء تحصيلي: {payload.title}", assessment["title"], "achievement_assessment", assessment_id, now),
         )
-        row = conn.execute(
-            """SELECT x.*, t.name AS responsible_name FROM achievement_actions x
-               LEFT JOIN teachers t ON t.id = x.responsible_teacher_id WHERE x.id = ?""",
-            (cursor.lastrowid,),
-        ).fetchone()
-    return _achievement_action_dict(row)
+        created_action = _achievement_action_with_metric(conn, cursor.lastrowid)
+    return created_action
 
 
 @app.patch("/api/achievement/assessments/{assessment_id}/actions/{action_id}")
@@ -2557,12 +2713,65 @@ def update_achievement_action(assessment_id: int, action_id: int, payload: Achie
             "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?,?,?,?,?,?)",
             ("achievement", f"تحديث إجراء تحصيلي: {payload.title}", payload.status, "achievement_assessment", assessment_id, now),
         )
-        updated = conn.execute(
-            """SELECT x.*, t.name AS responsible_name FROM achievement_actions x
-               LEFT JOIN teachers t ON t.id = x.responsible_teacher_id WHERE x.id = ?""",
-            (action_id,),
+        updated_action = _achievement_action_with_metric(conn, action_id)
+    return updated_action
+
+
+@app.put("/api/achievement/assessments/{assessment_id}/actions/{action_id}/metric")
+def upsert_achievement_action_metric(assessment_id: int, action_id: int, payload: AchievementMetricPayload):
+    measured_at = _validate_achievement_metric(payload)
+    now = utc_now()
+    with connect() as conn:
+        action = conn.execute(
+            "SELECT id, title FROM achievement_actions WHERE id = ? AND assessment_id = ?",
+            (action_id, assessment_id),
         ).fetchone()
-    return _achievement_action_dict(updated)
+        if not action:
+            raise HTTPException(status_code=404, detail="الإجراء التحصيلي غير موجود.")
+        existing = conn.execute("SELECT created_at FROM achievement_action_metrics WHERE action_id = ?", (action_id,)).fetchone()
+        if existing:
+            conn.execute(
+                """UPDATE achievement_action_metrics SET metric_name=?, unit=?, direction=?, baseline_value=?, target_value=?,
+                   outcome_value=?, measured_at=?, reference_source=?, reference_year=?, reference_note=?, notes=?, updated_at=?
+                   WHERE action_id=?""",
+                (payload.metricName, payload.unit, payload.direction, payload.baselineValue, payload.targetValue, payload.outcomeValue,
+                 measured_at, payload.referenceSource, payload.referenceYear, payload.referenceNote, payload.notes, now, action_id),
+            )
+        else:
+            conn.execute(
+                """INSERT INTO achievement_action_metrics
+                   (action_id, metric_name, unit, direction, baseline_value, target_value, outcome_value, measured_at,
+                    reference_source, reference_year, reference_note, notes, created_at, updated_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (action_id, payload.metricName, payload.unit, payload.direction, payload.baselineValue, payload.targetValue, payload.outcomeValue,
+                 measured_at, payload.referenceSource, payload.referenceYear, payload.referenceNote, payload.notes, now, now),
+            )
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?,?,?,?,?,?)",
+            ("achievement", f"تحديث قياس أثر: {action['title']}", payload.metricName, "achievement_assessment", assessment_id, now),
+        )
+        metric = conn.execute("SELECT * FROM achievement_action_metrics WHERE action_id = ?", (action_id,)).fetchone()
+    return _achievement_metric_dict(metric)
+
+
+@app.delete("/api/achievement/assessments/{assessment_id}/actions/{action_id}/metric")
+def delete_achievement_action_metric(assessment_id: int, action_id: int):
+    with connect() as conn:
+        action = conn.execute(
+            "SELECT id, title FROM achievement_actions WHERE id = ? AND assessment_id = ?",
+            (action_id, assessment_id),
+        ).fetchone()
+        if not action:
+            raise HTTPException(status_code=404, detail="الإجراء التحصيلي غير موجود.")
+        existing = conn.execute("SELECT 1 FROM achievement_action_metrics WHERE action_id = ?", (action_id,)).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="لا يوجد قياس أثر لهذا الإجراء.")
+        conn.execute("DELETE FROM achievement_action_metrics WHERE action_id = ?", (action_id,))
+        conn.execute(
+            "INSERT INTO activities (activity_type, title, detail, entity_type, entity_id, created_at) VALUES (?,?,?,?,?,?)",
+            ("achievement", f"حذف قياس أثر: {action['title']}", "", "achievement_assessment", assessment_id, utc_now()),
+        )
+    return {"ok": True}
 
 
 @app.delete("/api/achievement/assessments/{assessment_id}/actions/{action_id}")

@@ -353,6 +353,8 @@ export type AchievementAssessmentStatus = 'draft' | 'recorded' | 'reviewed';
 export type AchievementActionType = 'remedial' | 'enrichment' | 'followup';
 export type AchievementActionBaseStatus = 'new' | 'in_progress' | 'completed' | 'cancelled';
 export type AchievementActionStatus = AchievementActionBaseStatus | 'overdue';
+export type AchievementImpactDirection = 'higher_better' | 'lower_better';
+export type AchievementImpactStatus = 'pending' | 'target_met' | 'improved_not_met' | 'no_change' | 'regressed';
 
 export type AchievementAssessmentRecord = {
   id: number;
@@ -371,6 +373,9 @@ export type AchievementAssessmentRecord = {
   highestScore?: number | null;
   lowestScore?: number | null;
   masteryThresholdPct: number;
+  masteryReferenceSource: string;
+  masteryReferenceYear: string;
+  masteryReferenceNote: string;
   masteredCount: number;
   nearMasteryCount: number;
   interventionCount: number;
@@ -379,10 +384,51 @@ export type AchievementAssessmentRecord = {
   masteryPercent: number;
   averagePercent: number;
   actionCount: number;
+  remedialActionCount: number;
+  enrichmentActionCount: number;
   openActionCount: number;
   overdueActionCount: number;
+  measuredActionCount: number;
+  targetMetActionCount: number;
+  unmeasuredCompletedActionCount: number;
+  impactReviewActionCount: number;
   createdAt: string;
   updatedAt: string;
+};
+
+export type AchievementImpactMetric = {
+  actionId: number;
+  metricName: string;
+  unit: string;
+  direction: AchievementImpactDirection;
+  baselineValue: number;
+  targetValue: number;
+  outcomeValue?: number | null;
+  measuredAt?: string | null;
+  referenceSource: string;
+  referenceYear: string;
+  referenceNote: string;
+  notes: string;
+  impactStatus: AchievementImpactStatus;
+  impactDelta?: number | null;
+  improvementValue?: number | null;
+  targetGap?: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AchievementImpactMetricInput = {
+  metricName: string;
+  unit: string;
+  direction: AchievementImpactDirection;
+  baselineValue: number;
+  targetValue: number;
+  outcomeValue?: number | null;
+  measuredAt?: string | null;
+  referenceSource: string;
+  referenceYear: string;
+  referenceNote: string;
+  notes: string;
 };
 
 export type AchievementAction = {
@@ -404,6 +450,7 @@ export type AchievementAction = {
   completedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  metric?: AchievementImpactMetric | null;
 };
 
 export type AchievementAssessmentDetails = AchievementAssessmentRecord & {
@@ -427,6 +474,9 @@ export type AchievementAssessmentInput = {
   highestScore?: number | null;
   lowestScore?: number | null;
   masteryThresholdPct: number;
+  masteryReferenceSource: string;
+  masteryReferenceYear: string;
+  masteryReferenceNote: string;
   masteredCount: number;
   nearMasteryCount: number;
   interventionCount: number;

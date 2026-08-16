@@ -335,18 +335,19 @@ def run_search(conn, *, q: str, section: str = "all", academic_year: str = "all"
             ))
         rows = conn.execute(
             f"""SELECT x.*, a.title AS assessment_title, a.subject, a.grade, a.academic_year, a.assessment_date,
-                       t.name AS responsible_name
+                       t.name AS responsible_name, m.metric_name, m.unit, m.reference_source, m.reference_year, m.reference_note, m.notes AS metric_notes
                 FROM achievement_actions x JOIN achievement_assessments a ON a.id = x.assessment_id
-                LEFT JOIN teachers t ON t.id = x.responsible_teacher_id {where}
+                LEFT JOIN teachers t ON t.id = x.responsible_teacher_id
+                LEFT JOIN achievement_action_metrics m ON m.action_id = x.id {where}
                 ORDER BY x.updated_at DESC""", params
         ).fetchall()
         for row in rows:
             status = _effective_status(row["status"], row["due_date"])
-            searchable = " ".join(str(row[key] or "") for key in ["title", "assessment_title", "action_type", "target_group", "baseline_indicator", "target_indicator", "outcome_indicator", "notes", "responsible_name", "subject", "grade", "status"])
+            searchable = " ".join(str(row[key] or "") for key in ["title", "assessment_title", "action_type", "target_group", "baseline_indicator", "target_indicator", "outcome_indicator", "notes", "responsible_name", "subject", "grade", "status", "metric_name", "unit", "reference_source", "reference_year", "reference_note", "metric_notes"])
             _add(results, _result(
                 query_norm=query_norm, section="achievement", entity_type="achievement_action", entity_id=row["id"], target_id=row["assessment_id"],
                 title=row["title"], subtitle=_clean_excerpt("تدخل تحصيلي", row["assessment_title"], row["target_group"], row["responsible_name"]), searchable=searchable,
-                excerpt=_clean_excerpt(row["baseline_indicator"], row["target_indicator"], row["outcome_indicator"], row["notes"]),
+                excerpt=_clean_excerpt(row["metric_name"], row["reference_source"], row["baseline_indicator"], row["target_indicator"], row["outcome_indicator"], row["notes"]),
                 academic_year=row["academic_year"], date_value=row["due_date"] or row["start_date"] or row["assessment_date"], status=status,
                 subject=row["subject"], grade=row["grade"], teacher_name=row["responsible_name"],
             ))

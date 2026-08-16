@@ -28,6 +28,8 @@ import type {
   AchievementAssessmentDetails,
   AchievementActionInput,
   AchievementAction,
+  AchievementImpactMetric,
+  AchievementImpactMetricInput,
   OfficialReport,
   OfficialReportQuery,
   ArchiveYearsIndex,
@@ -435,6 +437,16 @@ export async function createAchievementAction(assessmentId: number, input: Achie
 export async function updateAchievementAction(assessmentId: number, actionId: number, input: AchievementActionInput): Promise<AchievementAction> {
   requireBackend();
   return parseResponse(await fetch(`/api/achievement/assessments/${assessmentId}/actions/${actionId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
+}
+
+export async function upsertAchievementActionMetric(assessmentId: number, actionId: number, input: AchievementImpactMetricInput): Promise<AchievementImpactMetric> {
+  requireBackend();
+  return parseResponse(await fetch(`/api/achievement/assessments/${assessmentId}/actions/${actionId}/metric`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
+}
+
+export async function deleteAchievementActionMetric(assessmentId: number, actionId: number): Promise<void> {
+  requireBackend();
+  await parseResponse(await fetch(`/api/achievement/assessments/${assessmentId}/actions/${actionId}/metric`, { method: 'DELETE' }));
 }
 
 export async function deleteAchievementAction(assessmentId: number, actionId: number): Promise<void> {
