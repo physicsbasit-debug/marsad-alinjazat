@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Icon } from '../components/Icon';
 import { Modal } from '../components/Modal';
-import { deleteEventMedia, getEventDetails, reorderEventMedia, updateEvent, updateEventMedia, uploadEventMedia } from '../lib/api';
+import { deleteEventMedia, getEventDetails, reorderEventMedia, resolveApiUrl, updateEvent, updateEventMedia, uploadEventMedia } from '../lib/api';
 import type { EventDetails, EventMediaRecord, EventRecord, Teacher } from '../types';
 import { PageHeader } from './Teachers';
 
@@ -60,7 +60,7 @@ export function Events({ events, teachers, onAddEvent, onRefresh, initialOpenId 
     </div>
 
     <div className="event-grid">{visible.map((event) => <article className="event-card" key={event.id}>
-      <button className={`event-cover ${event.coverTone} ${event.coverMediaUrl ? 'has-image' : ''}`} style={event.coverMediaUrl ? { backgroundImage: `linear-gradient(180deg, rgba(11,31,42,.05), rgba(11,31,42,.48)), url(${event.coverMediaUrl})` } : undefined} onClick={() => setSelectedId(event.id)}>
+      <button className={`event-cover ${event.coverTone} ${event.coverMediaUrl ? 'has-image' : ''}`} style={event.coverMediaUrl ? { backgroundImage: `linear-gradient(180deg, rgba(11,31,42,.05), rgba(11,31,42,.48)), url(${resolveApiUrl(event.coverMediaUrl)})` } : undefined} onClick={() => setSelectedId(event.id)}>
         <span className="event-date"><Icon name="calendar" size={15}/>{formatDate(event.eventDate)}</span><span className="event-type">{event.eventType}</span>
       </button>
       <div className="event-body"><h3>{event.title}</h3><p>{event.summary || event.goals || 'فعالية موثقة ضمن سجل المادة.'}</p>
@@ -145,7 +145,7 @@ function EventDetail({ detail, allTeachers, onReload, onClose, onMessage }: { de
   }
 
   return <div className="event-detail-shell">
-    <div className={`event-detail-hero ${detail.coverTone}`} style={cover?.contentUrl ? { backgroundImage: `linear-gradient(180deg, rgba(7,25,35,.18), rgba(7,25,35,.68)), url(${cover.contentUrl})` } : undefined}>
+    <div className={`event-detail-hero ${detail.coverTone}`} style={cover?.contentUrl ? { backgroundImage: `linear-gradient(180deg, rgba(7,25,35,.18), rgba(7,25,35,.68)), url(${resolveApiUrl(cover.contentUrl)})` } : undefined}>
       <div className="event-detail-hero-copy"><span className="event-type floating">{detail.eventType}</span><h2>{detail.title}</h2><div className="event-detail-meta"><span><Icon name="calendar" size={16}/>{detail.academicYear ? `${detail.academicYear} • ` : ''}{formatDate(detail.eventDate)}</span><span><Icon name="teachers" size={16}/>{detail.participantCount} مشاركًا</span><span><Icon name="image" size={16}/>{detail.media.length} دليلًا</span></div></div>
       <div className="event-detail-hero-actions"><div className={`report-readiness ${reportReady ? 'ready' : ''}`}><Icon name={reportReady ? 'check' : 'clock'} size={17}/><div><strong>{reportReady ? 'جاهز لبناء تقرير فعالية' : 'التوثيق يحتاج استكمالًا'}</strong><small>{reportReady ? 'البيانات والأدلة الأساسية متوفرة' : 'أكمل المخرجات وأضف دليلًا واحدًا على الأقل'}</small></div></div><button className="event-edit-button" onClick={() => { setTab('overview'); setEditing((value) => !value); }}><Icon name={editing ? 'close' : 'planning'} size={16}/>{editing ? 'إلغاء التحرير' : 'تحرير البيانات'}</button></div>
     </div>
@@ -247,8 +247,8 @@ function MediaCard({ eventId, media, onReload, onMessage, canMoveEarlier, canMov
   }
 
   return <article className={`event-media-card ${media.isCover ? 'cover' : ''}`}>
-    <div className="event-media-preview">{image && media.contentUrl ? <img src={media.contentUrl} alt={caption || media.originalName}/> : <div className="file-preview"><Icon name="document" size={30}/><strong>{fileExtension(media.originalName)}</strong></div>}{media.isCover && <span className="cover-badge"><Icon name="check" size={13}/> الغلاف</span>}</div>
-    <div className="event-media-body"><strong title={media.originalName}>{media.originalName}</strong><small>{formatBytes(media.sizeBytes)} • {formatDateTime(media.createdAt)}</small><textarea value={caption} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setCaption(event.target.value)} rows={2} placeholder="وصف مختصر للدليل..."/><div className="event-media-actions"><button className="soft-button tiny" onClick={() => void update()} disabled={busy}>حفظ الوصف</button>{image && !media.isCover && <button className="soft-button tiny" onClick={() => void update(true)} disabled={busy}>اجعله الغلاف</button>}{canMoveEarlier && <button className="soft-button tiny" onClick={() => onMove(-1)} disabled={busy}>تقديم</button>}{canMoveLater && <button className="soft-button tiny" onClick={() => onMove(1)} disabled={busy}>تأخير</button>}{(media.webViewLink || media.contentUrl) && <a className="text-button" href={media.webViewLink || media.contentUrl || '#'} target="_blank" rel="noreferrer">فتح</a>}<button className="text-button danger" onClick={() => void remove()} disabled={busy}>حذف</button></div></div>
+    <div className="event-media-preview">{image && media.contentUrl ? <img src={resolveApiUrl(media.contentUrl)} alt={caption || media.originalName}/> : <div className="file-preview"><Icon name="document" size={30}/><strong>{fileExtension(media.originalName)}</strong></div>}{media.isCover && <span className="cover-badge"><Icon name="check" size={13}/> الغلاف</span>}</div>
+    <div className="event-media-body"><strong title={media.originalName}>{media.originalName}</strong><small>{formatBytes(media.sizeBytes)} • {formatDateTime(media.createdAt)}</small><textarea value={caption} onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setCaption(event.target.value)} rows={2} placeholder="وصف مختصر للدليل..."/><div className="event-media-actions"><button className="soft-button tiny" onClick={() => void update()} disabled={busy}>حفظ الوصف</button>{image && !media.isCover && <button className="soft-button tiny" onClick={() => void update(true)} disabled={busy}>اجعله الغلاف</button>}{canMoveEarlier && <button className="soft-button tiny" onClick={() => onMove(-1)} disabled={busy}>تقديم</button>}{canMoveLater && <button className="soft-button tiny" onClick={() => onMove(1)} disabled={busy}>تأخير</button>}{(media.webViewLink || media.contentUrl) && <a className="text-button" href={media.webViewLink || resolveApiUrl(media.contentUrl || '') || '#'} target="_blank" rel="noreferrer">فتح</a>}<button className="text-button danger" onClick={() => void remove()} disabled={busy}>حذف</button></div></div>
   </article>;
 }
 

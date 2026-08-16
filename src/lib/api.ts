@@ -44,6 +44,18 @@ import { getPreviewGlobalSearch } from './previewSearch';
 
 const PREVIEW_MODE = import.meta.env.VITE_PREVIEW_MODE === 'true';
 const PREVIEW_MESSAGE = 'هذه معاينة GitHub Pages فقط. الحفظ والرفع الفعليان يعملان عند تشغيل خادم مرصد الإنجازات.';
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim().replace(/\/+$/, '');
+
+export function resolveApiUrl(path: string): string {
+  if (!path) return path;
+  if (/^https?:\/\//i.test(path) || path.startsWith('data:') || path.startsWith('blob:')) return path;
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return `${API_BASE_URL}${normalized}`;
+}
+
+function apiFetch(path: string, init?: RequestInit): Promise<Response> {
+  return window.fetch(resolveApiUrl(path), init);
+}
 
 async function parseResponse<T>(response: Response): Promise<T> {
   if (response.ok) return response.json() as Promise<T>;
@@ -64,7 +76,7 @@ function requireBackend(): void {
 export async function getBootstrap(academicYear?: string): Promise<BootstrapData> {
   if (PREVIEW_MODE) return getPreviewBootstrap(academicYear);
   const params = academicYear ? `?${new URLSearchParams({ academicYear }).toString()}` : '';
-  return parseResponse(await fetch(`/api/bootstrap${params}`));
+  return parseResponse(await apiFetch(`/api/bootstrap${params}`));
 }
 
 
@@ -72,19 +84,19 @@ export async function getOfficialReport(input: OfficialReportQuery): Promise<Off
   if (PREVIEW_MODE) return getPreviewOfficialReport(input);
   const params = new URLSearchParams({ reportType: input.reportType, academicYear: input.academicYear, term: input.term });
   if (input.teacherId) params.set('teacherId', String(input.teacherId));
-  return parseResponse(await fetch(`/api/reports/official?${params.toString()}`));
+  return parseResponse(await apiFetch(`/api/reports/official?${params.toString()}`));
 }
 
 
 export async function getArchiveYears(): Promise<ArchiveYearsIndex> {
   if (PREVIEW_MODE) return getPreviewArchiveYears();
-  return parseResponse(await fetch('/api/archive/years'));
+  return parseResponse(await apiFetch('/api/archive/years'));
 }
 
 export async function getArchiveYear(academicYear: string): Promise<ArchiveYearDetail> {
   if (PREVIEW_MODE) return getPreviewArchiveYear(academicYear);
   const params = new URLSearchParams({ academicYear });
-  return parseResponse(await fetch(`/api/archive/year?${params.toString()}`));
+  return parseResponse(await apiFetch(`/api/archive/year?${params.toString()}`));
 }
 
 export async function searchGlobal(input: SearchQuery): Promise<SearchResponse> {
@@ -95,13 +107,13 @@ export async function searchGlobal(input: SearchQuery): Promise<SearchResponse> 
     academicYear: input.academicYear || 'all',
     limit: String(input.limit || 40),
   });
-  return parseResponse(await fetch(`/api/search?${params.toString()}`));
+  return parseResponse(await apiFetch(`/api/search?${params.toString()}`));
 }
 
 export async function createUploadRequest(input: CreateRequestInput): Promise<{ id: number; uploadUrl: string; expiresAt: string }> {
   requireBackend();
   return parseResponse(
-    await fetch('/api/requests', {
+    await apiFetch('/api/requests', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -112,7 +124,7 @@ export async function createUploadRequest(input: CreateRequestInput): Promise<{ 
 export async function updateRequestStatus(id: number, status: RequestStatus): Promise<void> {
   requireBackend();
   await parseResponse(
-    await fetch(`/api/requests/${id}/status`, {
+    await apiFetch(`/api/requests/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),
@@ -122,7 +134,7 @@ export async function updateRequestStatus(id: number, status: RequestStatus): Pr
 
 export async function getPublicUploadInfo(token: string): Promise<PublicUploadInfo> {
   requireBackend();
-  return parseResponse(await fetch(`/api/public/upload/${encodeURIComponent(token)}`));
+  return parseResponse(await apiFetch(`/api/public/upload/${encodeURIComponent(token)}`));
 }
 
 export async function uploadPublicFile(token: string, file: File): Promise<{ ok: boolean; storageProvider: string }> {
@@ -130,7 +142,7 @@ export async function uploadPublicFile(token: string, file: File): Promise<{ ok:
   const form = new FormData();
   form.append('file', file);
   return parseResponse(
-    await fetch(`/api/public/upload/${encodeURIComponent(token)}`, {
+    await apiFetch(`/api/public/upload/${encodeURIComponent(token)}`, {
       method: 'POST',
       body: form,
     }),
@@ -139,14 +151,14 @@ export async function uploadPublicFile(token: string, file: File): Promise<{ ok:
 
 export async function getDriveAuthUrl(): Promise<string> {
   requireBackend();
-  const data = await parseResponse<{ url: string }>(await fetch('/api/integrations/google-drive/auth-url'));
+  const data = await parseResponse<{ url: string }>(await apiFetch('/api/integrations/google-drive/auth-url'));
   return data.url;
 }
 
 export async function createTeacher(input: CreateTeacherInput): Promise<{ id: number }> {
   requireBackend();
   return parseResponse(
-    await fetch('/api/teachers', {
+    await apiFetch('/api/teachers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -164,14 +176,14 @@ export async function uploadDirectDocument(input: DirectDocumentInput, file: Fil
   if (input.teacherId) form.append('teacherId', String(input.teacherId));
   form.append('subject', input.subject);
   form.append('grade', input.grade);
-  return parseResponse(await fetch('/api/documents', { method: 'POST', body: form }));
+  return parseResponse(await apiFetch('/api/documents', { method: 'POST', body: form }));
 }
 
 
 export async function createEvent(input: CreateEventInput): Promise<{ id: number }> {
   requireBackend();
   return parseResponse(
-    await fetch('/api/events', {
+    await apiFetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -182,13 +194,13 @@ export async function createEvent(input: CreateEventInput): Promise<{ id: number
 
 export async function getEventDetails(id: number): Promise<EventDetails> {
   if (PREVIEW_MODE) return getPreviewEventDetails(id);
-  return parseResponse(await fetch(`/api/events/${id}`));
+  return parseResponse(await apiFetch(`/api/events/${id}`));
 }
 
 export async function updateEvent(id: number, input: UpdateEventInput): Promise<EventDetails> {
   requireBackend();
   return parseResponse(
-    await fetch(`/api/events/${id}`, {
+    await apiFetch(`/api/events/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -202,7 +214,7 @@ export async function uploadEventMedia(id: number, files: File[]): Promise<Event
   for (const file of files) {
     const form = new FormData();
     form.append('file', file);
-    uploaded.push(await parseResponse<EventMediaRecord>(await fetch(`/api/events/${id}/media`, { method: 'POST', body: form })));
+    uploaded.push(await parseResponse<EventMediaRecord>(await apiFetch(`/api/events/${id}/media`, { method: 'POST', body: form })));
   }
   return uploaded;
 }
@@ -210,7 +222,7 @@ export async function uploadEventMedia(id: number, files: File[]): Promise<Event
 export async function updateEventMedia(eventId: number, mediaId: number, input: EventMediaMetaInput): Promise<EventDetails> {
   requireBackend();
   return parseResponse(
-    await fetch(`/api/events/${eventId}/media/${mediaId}`, {
+    await apiFetch(`/api/events/${eventId}/media/${mediaId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -221,7 +233,7 @@ export async function updateEventMedia(eventId: number, mediaId: number, input: 
 export async function reorderEventMedia(eventId: number, mediaIds: number[]): Promise<EventDetails> {
   requireBackend();
   return parseResponse(
-    await fetch(`/api/events/${eventId}/media-order`, {
+    await apiFetch(`/api/events/${eventId}/media-order`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mediaIds }),
@@ -231,19 +243,19 @@ export async function reorderEventMedia(eventId: number, mediaIds: number[]): Pr
 
 export async function deleteEventMedia(eventId: number, mediaId: number): Promise<void> {
   requireBackend();
-  await parseResponse(await fetch(`/api/events/${eventId}/media/${mediaId}`, { method: 'DELETE' }));
+  await parseResponse(await apiFetch(`/api/events/${eventId}/media/${mediaId}`, { method: 'DELETE' }));
 }
 
 
 export async function getTeacherProfile(id: number): Promise<TeacherProfileDetails> {
   if (PREVIEW_MODE) return getPreviewTeacherProfile(id);
-  return parseResponse(await fetch(`/api/teachers/${id}/profile`));
+  return parseResponse(await apiFetch(`/api/teachers/${id}/profile`));
 }
 
 export async function updateTeacherProfile(id: number, input: UpdateTeacherProfileInput): Promise<void> {
   requireBackend();
   await parseResponse(
-    await fetch(`/api/teachers/${id}/profile`, {
+    await apiFetch(`/api/teachers/${id}/profile`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -254,7 +266,7 @@ export async function updateTeacherProfile(id: number, input: UpdateTeacherProfi
 export async function createTeacherCvItem(id: number, input: CreateTeacherCvItemInput): Promise<{ id: number }> {
   requireBackend();
   return parseResponse(
-    await fetch(`/api/teachers/${id}/cv-items`, {
+    await apiFetch(`/api/teachers/${id}/cv-items`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -265,14 +277,14 @@ export async function createTeacherCvItem(id: number, input: CreateTeacherCvItem
 export async function deleteTeacherCvItem(teacherId: number, itemId: number): Promise<void> {
   requireBackend();
   await parseResponse(
-    await fetch(`/api/teachers/${teacherId}/cv-items/${itemId}`, { method: 'DELETE' }),
+    await apiFetch(`/api/teachers/${teacherId}/cv-items/${itemId}`, { method: 'DELETE' }),
   );
 }
 
 export async function createMeeting(input: CreateMeetingInput): Promise<{ id: number }> {
   requireBackend();
   return parseResponse(
-    await fetch('/api/meetings', {
+    await apiFetch('/api/meetings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -282,13 +294,13 @@ export async function createMeeting(input: CreateMeetingInput): Promise<{ id: nu
 
 export async function getMeetingDetails(id: number): Promise<MeetingDetails> {
   if (PREVIEW_MODE) return getPreviewMeetingDetails(id);
-  return parseResponse(await fetch(`/api/meetings/${id}`));
+  return parseResponse(await apiFetch(`/api/meetings/${id}`));
 }
 
 export async function updateMeeting(id: number, input: CreateMeetingInput): Promise<MeetingDetails> {
   requireBackend();
   return parseResponse(
-    await fetch(`/api/meetings/${id}`, {
+    await apiFetch(`/api/meetings/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -299,7 +311,7 @@ export async function updateMeeting(id: number, input: CreateMeetingInput): Prom
 export async function createMeetingDecision(meetingId: number, input: MeetingDecisionInput): Promise<MeetingDecision> {
   requireBackend();
   return parseResponse(
-    await fetch(`/api/meetings/${meetingId}/decisions`, {
+    await apiFetch(`/api/meetings/${meetingId}/decisions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -310,7 +322,7 @@ export async function createMeetingDecision(meetingId: number, input: MeetingDec
 export async function updateMeetingDecision(meetingId: number, decisionId: number, input: MeetingDecisionInput): Promise<MeetingDecision> {
   requireBackend();
   return parseResponse(
-    await fetch(`/api/meetings/${meetingId}/decisions/${decisionId}`, {
+    await apiFetch(`/api/meetings/${meetingId}/decisions/${decisionId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -320,13 +332,13 @@ export async function updateMeetingDecision(meetingId: number, decisionId: numbe
 
 export async function deleteMeetingDecision(meetingId: number, decisionId: number): Promise<void> {
   requireBackend();
-  await parseResponse(await fetch(`/api/meetings/${meetingId}/decisions/${decisionId}`, { method: 'DELETE' }));
+  await parseResponse(await apiFetch(`/api/meetings/${meetingId}/decisions/${decisionId}`, { method: 'DELETE' }));
 }
 
 export async function createCurriculumPlan(input: CurriculumPlanInput): Promise<{ id: number }> {
   requireBackend();
   return parseResponse(
-    await fetch('/api/plans', {
+    await apiFetch('/api/plans', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -336,13 +348,13 @@ export async function createCurriculumPlan(input: CurriculumPlanInput): Promise<
 
 export async function getCurriculumPlan(id: number): Promise<CurriculumPlanDetails> {
   if (PREVIEW_MODE) return getPreviewPlanDetails(id);
-  return parseResponse(await fetch(`/api/plans/${id}`));
+  return parseResponse(await apiFetch(`/api/plans/${id}`));
 }
 
 export async function updateCurriculumPlan(id: number, input: CurriculumPlanInput): Promise<CurriculumPlanDetails> {
   requireBackend();
   return parseResponse(
-    await fetch(`/api/plans/${id}`, {
+    await apiFetch(`/api/plans/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -353,7 +365,7 @@ export async function updateCurriculumPlan(id: number, input: CurriculumPlanInpu
 export async function createCurriculumUnit(planId: number, input: CurriculumUnitInput): Promise<CurriculumUnit> {
   requireBackend();
   return parseResponse(
-    await fetch(`/api/plans/${planId}/units`, {
+    await apiFetch(`/api/plans/${planId}/units`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -364,7 +376,7 @@ export async function createCurriculumUnit(planId: number, input: CurriculumUnit
 export async function updateCurriculumUnit(planId: number, unitId: number, input: CurriculumUnitInput): Promise<CurriculumUnit> {
   requireBackend();
   return parseResponse(
-    await fetch(`/api/plans/${planId}/units/${unitId}`, {
+    await apiFetch(`/api/plans/${planId}/units/${unitId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -374,13 +386,13 @@ export async function updateCurriculumUnit(planId: number, unitId: number, input
 
 export async function deleteCurriculumUnit(planId: number, unitId: number): Promise<void> {
   requireBackend();
-  await parseResponse(await fetch(`/api/plans/${planId}/units/${unitId}`, { method: 'DELETE' }));
+  await parseResponse(await apiFetch(`/api/plans/${planId}/units/${unitId}`, { method: 'DELETE' }));
 }
 
 export async function createSupervisionVisit(input: SupervisionVisitInput): Promise<{ id: number }> {
   requireBackend();
   return parseResponse(
-    await fetch('/api/supervision/visits', {
+    await apiFetch('/api/supervision/visits', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -390,13 +402,13 @@ export async function createSupervisionVisit(input: SupervisionVisitInput): Prom
 
 export async function getSupervisionVisit(id: number): Promise<SupervisionVisitDetails> {
   if (PREVIEW_MODE) return getPreviewSupervisionVisit(id);
-  return parseResponse(await fetch(`/api/supervision/visits/${id}`));
+  return parseResponse(await apiFetch(`/api/supervision/visits/${id}`));
 }
 
 export async function updateSupervisionVisit(id: number, input: SupervisionVisitInput): Promise<SupervisionVisitDetails> {
   requireBackend();
   return parseResponse(
-    await fetch(`/api/supervision/visits/${id}`, {
+    await apiFetch(`/api/supervision/visits/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -407,7 +419,7 @@ export async function updateSupervisionVisit(id: number, input: SupervisionVisit
 export async function createSupervisionAction(visitId: number, input: SupervisionActionInput): Promise<SupervisionAction> {
   requireBackend();
   return parseResponse(
-    await fetch(`/api/supervision/visits/${visitId}/actions`, {
+    await apiFetch(`/api/supervision/visits/${visitId}/actions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -418,7 +430,7 @@ export async function createSupervisionAction(visitId: number, input: Supervisio
 export async function updateSupervisionAction(visitId: number, actionId: number, input: SupervisionActionInput): Promise<SupervisionAction> {
   requireBackend();
   return parseResponse(
-    await fetch(`/api/supervision/visits/${visitId}/actions/${actionId}`, {
+    await apiFetch(`/api/supervision/visits/${visitId}/actions/${actionId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
@@ -428,46 +440,46 @@ export async function updateSupervisionAction(visitId: number, actionId: number,
 
 export async function deleteSupervisionAction(visitId: number, actionId: number): Promise<void> {
   requireBackend();
-  await parseResponse(await fetch(`/api/supervision/visits/${visitId}/actions/${actionId}`, { method: 'DELETE' }));
+  await parseResponse(await apiFetch(`/api/supervision/visits/${visitId}/actions/${actionId}`, { method: 'DELETE' }));
 }
 
 export async function createAchievementAssessment(input: AchievementAssessmentInput): Promise<AchievementAssessmentDetails> {
   requireBackend();
-  return parseResponse(await fetch('/api/achievement/assessments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
+  return parseResponse(await apiFetch('/api/achievement/assessments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
 }
 
 export async function getAchievementAssessment(id: number): Promise<AchievementAssessmentDetails> {
   if (PREVIEW_MODE) return getPreviewAssessmentDetails(id);
-  return parseResponse(await fetch(`/api/achievement/assessments/${id}`));
+  return parseResponse(await apiFetch(`/api/achievement/assessments/${id}`));
 }
 
 export async function updateAchievementAssessment(id: number, input: AchievementAssessmentInput): Promise<AchievementAssessmentDetails> {
   requireBackend();
-  return parseResponse(await fetch(`/api/achievement/assessments/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
+  return parseResponse(await apiFetch(`/api/achievement/assessments/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
 }
 
 export async function createAchievementAction(assessmentId: number, input: AchievementActionInput): Promise<AchievementAction> {
   requireBackend();
-  return parseResponse(await fetch(`/api/achievement/assessments/${assessmentId}/actions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
+  return parseResponse(await apiFetch(`/api/achievement/assessments/${assessmentId}/actions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
 }
 
 export async function updateAchievementAction(assessmentId: number, actionId: number, input: AchievementActionInput): Promise<AchievementAction> {
   requireBackend();
-  return parseResponse(await fetch(`/api/achievement/assessments/${assessmentId}/actions/${actionId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
+  return parseResponse(await apiFetch(`/api/achievement/assessments/${assessmentId}/actions/${actionId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
 }
 
 export async function upsertAchievementActionMetric(assessmentId: number, actionId: number, input: AchievementImpactMetricInput): Promise<AchievementImpactMetric> {
   requireBackend();
-  return parseResponse(await fetch(`/api/achievement/assessments/${assessmentId}/actions/${actionId}/metric`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
+  return parseResponse(await apiFetch(`/api/achievement/assessments/${assessmentId}/actions/${actionId}/metric`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
 }
 
 export async function deleteAchievementActionMetric(assessmentId: number, actionId: number): Promise<void> {
   requireBackend();
-  await parseResponse(await fetch(`/api/achievement/assessments/${assessmentId}/actions/${actionId}/metric`, { method: 'DELETE' }));
+  await parseResponse(await apiFetch(`/api/achievement/assessments/${assessmentId}/actions/${actionId}/metric`, { method: 'DELETE' }));
 }
 
 export async function deleteAchievementAction(assessmentId: number, actionId: number): Promise<void> {
   requireBackend();
-  await parseResponse(await fetch(`/api/achievement/assessments/${assessmentId}/actions/${actionId}`, { method: 'DELETE' }));
+  await parseResponse(await apiFetch(`/api/achievement/assessments/${assessmentId}/actions/${actionId}`, { method: 'DELETE' }));
 }
 

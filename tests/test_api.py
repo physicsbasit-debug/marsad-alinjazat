@@ -10,6 +10,9 @@ os.environ["APP_EVENT_UPLOADS_DIR"] = tempfile.mkdtemp(prefix="marsad-test-event
 os.environ["STORAGE_MODE"] = "local"
 os.environ["APP_PUBLIC_URL"] = "http://testserver"
 os.environ["APP_FRONTEND_URL"] = "http://testserver"
+os.environ["APP_ENV"] = "testing"
+os.environ["APP_BACKUP_DIR"] = tempfile.mkdtemp(prefix="marsad-test-backups-")
+os.environ["APP_CORS_ORIGINS"] = "https://frontend.example"
 
 from fastapi.testclient import TestClient
 from server.main import app
@@ -35,7 +38,70 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         self.assertIn("supervisionAttention", boot.json())
         self.assertIn("assessments", boot.json())
         self.assertIn("achievementAttention", boot.json())
-        self.assertEqual(health.json()["version"], "0.13.1")
+        self.assertEqual(health.json()["version"], "0.14.0")
+
+    def test_ready_and_cors_contract(self):
+        ready = self.client.get("/api/ready")
+        self.assertEqual(ready.status_code, 200)
+        payload = ready.json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["version"], "0.14.0")
+        self.assertTrue(payload["checks"]["database"])
+        self.assertTrue(payload["checks"]["dataDirWritable"])
+        self.assertTrue(payload["checks"]["backupDirWritable"])
+        self.assertTrue(payload["checks"]["uploadsDirWritable"])
+
+        preflight = self.client.options(
+            "/api/health",
+            headers={
+                "Origin": "https://frontend.example",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+        self.assertEqual(preflight.status_code, 200)
+        self.assertEqual(preflight.headers.get("access-control-allow-origin"), "https://frontend.example")
+
+    def test_cors_origin_normalizes_frontend_subpath(self):
+        import server.main as main_module
+        self.assertEqual(
+            main_module._origin_from_url("https://example.edu/marsad/"),
+            "https://example.edu",
+        )
+
+    def test_production_readiness_requires_explicit_persistent_paths(self):
+        from unittest.mock import patch
+        import server.main as main_module
+
+        with patch.object(main_module, "APP_ENV", "production"), patch.dict(
+            os.environ,
+            {"APP_DATA_DIR": "", "APP_BACKUP_DIR": ""},
+            clear=False,
+        ):
+            response = self.client.get("/api/ready")
+        self.assertEqual(response.status_code, 503)
+        payload = response.json()
+        self.assertFalse(payload["ok"])
+        self.assertFalse(payload["checks"]["persistentDataConfigured"])
+        self.assertFalse(payload["checks"]["backupDirConfigured"])
+
+    def test_production_local_storage_requires_explicit_upload_paths(self):
+        from unittest.mock import patch
+        import server.main as main_module
+
+        with patch.object(main_module, "APP_ENV", "production"), patch.dict(
+            os.environ,
+            {
+                "APP_DATA_DIR": TEST_DATA_DIR,
+                "APP_BACKUP_DIR": os.environ["APP_BACKUP_DIR"],
+                "APP_UPLOADS_DIR": "",
+                "APP_EVENT_UPLOADS_DIR": "",
+                "STORAGE_MODE": "local",
+            },
+            clear=False,
+        ):
+            response = self.client.get("/api/ready")
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response.json()["checks"]["persistentUploadsConfigured"])
 
     def test_create_teacher_and_event(self):
         teacher = self.client.post("/api/teachers", json={

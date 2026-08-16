@@ -10,21 +10,32 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import drive
-from .db import BASE_DIR, connect, init_db, row_to_dict, utc_now
+from .db import BASE_DIR, DATA_DIR, DB_PATH, connect, init_db, row_to_dict, utc_now
+from .backup import get_backup_dir, maybe_create_startup_backup
 from .achievement_metrics import evaluate_impact
 from .search import run_search
 
 load_dotenv(BASE_DIR / ".env")
+STARTUP_BACKUP_ERROR: str | None = None
+try:
+    maybe_create_startup_backup()
+except Exception as exc:
+    # Keep liveness available so /api/ready can report the failed backup guard
+    # instead of crashing the whole service before diagnostics are reachable.
+    STARTUP_BACKUP_ERROR = str(exc)
 init_db()
 
+APP_ENV = os.getenv("APP_ENV", "development").strip().lower() or "development"
 APP_PUBLIC_URL = os.getenv("APP_PUBLIC_URL", "http://localhost:8000").rstrip("/")
 APP_FRONTEND_URL = os.getenv("APP_FRONTEND_URL", APP_PUBLIC_URL).rstrip("/")
 ACADEMIC_YEAR = os.getenv("ACADEMIC_YEAR", "2026/2027")
@@ -35,7 +46,81 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 EVENT_UPLOADS_DIR = Path(os.getenv("APP_EVENT_UPLOADS_DIR", BASE_DIR / "uploads" / "events"))
 EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
-app = FastAPI(title="مرصد الإنجازات API", version="0.13.1")
+app = FastAPI(title="مرصد الإنجازات API", version="0.14.0")
+
+
+def _origin_from_url(value: str) -> str | None:
+    candidate = value.strip().rstrip("/")
+    if candidate == "*":
+        return "*"
+    parsed = urlsplit(candidate)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _cors_origins() -> list[str]:
+    raw = os.getenv("APP_CORS_ORIGINS", "")
+    values: list[str] = []
+    for item in raw.split(","):
+        origin = _origin_from_url(item)
+        if origin:
+            values.append(origin)
+    frontend_origin = _origin_from_url(APP_FRONTEND_URL)
+    if frontend_origin:
+        values.append(frontend_origin)
+    # Preserve order while removing duplicates. A wildcard is accepted only when
+    # explicitly configured; production docs recommend exact origins.
+    return list(dict.fromkeys(values))
+
+
+CORS_ORIGINS = _cors_origins()
+if CORS_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=CORS_ORIGINS,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Accept", "Authorization"],
+        max_age=600,
+    )
+
+
+def _directory_writable(path: Path) -> bool:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / f".marsad-write-check-{secrets.token_hex(6)}"
+        probe.write_bytes(b"ok")
+        probe.unlink(missing_ok=True)
+        return True
+    except OSError:
+        return False
+
+
+def _readiness_snapshot() -> tuple[bool, dict[str, bool]]:
+    checks: dict[str, bool] = {}
+    try:
+        with connect() as conn:
+            checks["database"] = conn.execute("SELECT 1").fetchone()[0] == 1
+    except Exception:
+        checks["database"] = False
+    checks["dataDirWritable"] = _directory_writable(DATA_DIR)
+    checks["backupDirWritable"] = _directory_writable(get_backup_dir())
+    checks["startupBackupGuard"] = STARTUP_BACKUP_ERROR is None
+    checks["uploadsDirWritable"] = _directory_writable(UPLOADS_DIR) and _directory_writable(EVENT_UPLOADS_DIR)
+    storage_mode = os.getenv("STORAGE_MODE", "auto").strip().lower()
+    if APP_ENV == "production":
+        checks["persistentDataConfigured"] = bool(os.getenv("APP_DATA_DIR", "").strip())
+        checks["backupDirConfigured"] = bool(os.getenv("APP_BACKUP_DIR", "").strip())
+        if storage_mode in {"local", "auto"}:
+            checks["persistentUploadsConfigured"] = bool(os.getenv("APP_UPLOADS_DIR", "").strip()) and bool(os.getenv("APP_EVENT_UPLOADS_DIR", "").strip())
+    if storage_mode == "drive":
+        try:
+            drive_state = drive.status()
+            checks["driveReady"] = bool(drive_state.get("configured") and drive_state.get("connected"))
+        except Exception:
+            checks["driveReady"] = False
+    return all(checks.values()), checks
 
 
 class CreateRequestPayload(BaseModel):
@@ -1821,7 +1906,19 @@ def _activities_for_year(conn, academic_year: str, limit: int = 8) -> list[dict]
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": "0.13.1", "storageMode": os.getenv("STORAGE_MODE", "auto")}
+    return {"ok": True, "version": "0.14.0", "environment": APP_ENV, "storageMode": os.getenv("STORAGE_MODE", "auto")}
+
+
+@app.get("/api/ready")
+def ready():
+    is_ready, checks = _readiness_snapshot()
+    payload = {
+        "ok": is_ready,
+        "version": "0.14.0",
+        "environment": APP_ENV,
+        "checks": checks,
+    }
+    return JSONResponse(payload, status_code=200 if is_ready else 503)
 
 
 @app.get("/api/bootstrap")
@@ -3084,7 +3181,7 @@ def create_request(payload: CreateRequestPayload):
 
     return {
         "id": request_id,
-        "uploadUrl": f"{APP_PUBLIC_URL}/upload/{token}",
+        "uploadUrl": f"{APP_FRONTEND_URL}/upload/{token}",
         "expiresAt": expiry.replace(microsecond=0).isoformat(),
     }
 

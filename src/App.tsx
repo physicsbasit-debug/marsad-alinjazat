@@ -24,7 +24,14 @@ const nav = [
 type View = typeof nav[number][0];
 
 export default function App() {
-  const publicToken = useMemo(()=>window.location.pathname.match(/^\/upload\/([^/]+)$/)?.[1]||null,[]);
+  const publicToken = useMemo(() => {
+    const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+    const pathname = window.location.pathname;
+    const relativePath = basePath && basePath !== '/' && pathname.startsWith(basePath)
+      ? pathname.slice(basePath.length)
+      : pathname;
+    return relativePath.match(/^\/?upload\/([^/]+)$/)?.[1] || null;
+  }, []);
   if(publicToken) return <PublicUpload token={publicToken}/>;
   return <AdminApp/>;
 }
@@ -62,7 +69,7 @@ function AdminApp(){
     }catch(e){const message=e instanceof Error?e.message:'تعذر تحميل بيانات العام الدراسي.';if(data){setToast(message);}else{setError(message);}return false;}
   }
   useEffect(()=>{void refresh();},[]);
-  useEffect(()=>{if(new URLSearchParams(window.location.search).get('drive')==='connected'){setToast('تم ربط Google Drive بنجاح');window.history.replaceState({},'', '/');void refresh();}},[]);
+  useEffect(()=>{if(new URLSearchParams(window.location.search).get('drive')==='connected'){setToast('تم ربط Google Drive بنجاح');window.history.replaceState({},'', import.meta.env.BASE_URL || '/');void refresh();}},[]);
   useEffect(()=>{if(!toast)return;const timer=setTimeout(()=>setToast(''),2600);return()=>clearTimeout(timer)},[toast]);
 
   async function changeStatus(id:number,status:RequestStatus){try{await updateRequestStatus(id,status);setToast('تم تحديث حالة الطلب');await refresh();}catch(e){setToast(e instanceof Error?e.message:'تعذر تحديث الطلب');}}

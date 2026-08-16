@@ -1,0 +1,44 @@
+# مرصد الإنجازات — قالب متغيرات بيئة الإنتاج v0.14-A
+# انسخ القيم المناسبة إلى بيئة الاستضافة أو ملف .env محلي غير مرفوع إلى GitHub.
+
+# --- وضع التشغيل ---
+APP_ENV=production
+ACADEMIC_YEAR=2026/2027
+
+# --- العناوين العامة ---
+# عنوان الواجهة الذي يراه المستخدم. يستخدم كذلك لإنشاء روابط الرفع الخارجية وعودة OAuth.
+APP_FRONTEND_URL=https://marsad.example.com
+# متغير توافق خلفي؛ اجعله مساويًا لعنوان الواجهة ما لم توجد حاجة خاصة.
+APP_PUBLIC_URL=https://marsad.example.com
+# Origins فقط، بدون مسارات. افصل أكثر من Origin بفاصلة.
+APP_CORS_ORIGINS=https://marsad.example.com
+
+# --- التخزين الدائم ---
+# يجب أن تشير هذه المسارات في الإنتاج إلى Volume/Persistent Disk حقيقي.
+APP_DATA_DIR=/var/lib/marsad/data
+APP_BACKUP_DIR=/var/lib/marsad/backups
+APP_UPLOADS_DIR=/var/lib/marsad/uploads/inbox
+APP_EVENT_UPLOADS_DIR=/var/lib/marsad/uploads/events
+
+# --- النسخ الاحتياطي ---
+APP_AUTO_BACKUP_ON_STARTUP=true
+APP_STARTUP_BACKUP_MIN_INTERVAL_MINUTES=60
+APP_BACKUP_KEEP=14
+
+# --- الملفات ---
+MAX_UPLOAD_MB=25
+STORAGE_MODE=local
+# القيم الممكنة: local أو auto أو drive
+
+# --- Google Drive (اختياري) ---
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=
+# GOOGLE_REDIRECT_URI=https://api.example.com/api/integrations/google-drive/oauth/callback
+# APP_ENCRYPTION_KEY=
+
+# --- متغيرات بناء الواجهة ---
+# إذا كانت الواجهة والخادم على نفس النطاق اترك VITE_API_BASE_URL فارغًا.
+# إذا كانا منفصلين ضع عنوان FastAPI العام مثل https://api.example.com
+VITE_API_BASE_URL=
+VITE_BASE_PATH=/
+VITE_PREVIEW_MODE=false
