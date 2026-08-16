@@ -1,0 +1,21 @@
+# مرصد الإنجازات — Railway v0.14-B
+# انسخ هذه القيم في Railway > Service > Variables > RAW Editor.
+# لا تضف APP_DATA_DIR أو APP_BACKUP_DIR أو APP_UPLOADS_DIR عند استخدام Volume؛
+# v0.14-B يكتشف RAILWAY_VOLUME_MOUNT_PATH ويضع كل البيانات تحته تلقائيًا.
+
+APP_ENV=production
+# استخدم كلمة مرور قوية ولا ترفعها إلى GitHub.
+APP_ACCESS_PASSWORD=CHANGE_ME_TO_A_STRONG_PASSWORD
+ACADEMIC_YEAR=2026/2027
+APP_AUTO_BACKUP_ON_STARTUP=true
+APP_STARTUP_BACKUP_MIN_INTERVAL_MINUTES=60
+APP_BACKUP_KEEP=14
+MAX_UPLOAD_MB=25
+STORAGE_MODE=local
+
+# اختياري لاحقًا عند تفعيل Google Drive:
+# STORAGE_MODE=google_drive
+# GOOGLE_CLIENT_ID=
+# GOOGLE_CLIENT_SECRET=
+# GOOGLE_REDIRECT_URI=https://YOUR_DOMAIN/api/integrations/google-drive/oauth/callback
+# APP_ENCRYPTION_KEY=

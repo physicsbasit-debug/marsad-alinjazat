@@ -1,8 +1,9 @@
-# مرصد الإنجازات — قالب متغيرات بيئة الإنتاج v0.14-A
+# مرصد الإنجازات — قالب متغيرات بيئة الإنتاج v0.14-B
 # انسخ القيم المناسبة إلى بيئة الاستضافة أو ملف .env محلي غير مرفوع إلى GitHub.
 
 # --- وضع التشغيل ---
 APP_ENV=production
+APP_ACCESS_PASSWORD=CHANGE_ME_TO_A_STRONG_PASSWORD
 ACADEMIC_YEAR=2026/2027
 
 # --- العناوين العامة ---
@@ -28,7 +29,7 @@ APP_BACKUP_KEEP=14
 # --- الملفات ---
 MAX_UPLOAD_MB=25
 STORAGE_MODE=local
-# القيم الممكنة: local أو auto أو drive
+# القيم الممكنة: local أو auto أو google_drive
 
 # --- Google Drive (اختياري) ---
 # GOOGLE_CLIENT_ID=

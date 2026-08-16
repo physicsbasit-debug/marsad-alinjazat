@@ -11,9 +11,11 @@ from typing import Any, Iterator
 
 from dotenv import load_dotenv
 
+from .runtime_platform import persistent_default
+
 BASE_DIR = Path(__file__).resolve().parents[1]
 load_dotenv(BASE_DIR / '.env')
-DATA_DIR = Path(os.getenv("APP_DATA_DIR", BASE_DIR / "data"))
+DATA_DIR = Path(os.getenv("APP_DATA_DIR", "").strip() or persistent_default("data", BASE_DIR / "data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "marsad_alinjazat.sqlite3"
 

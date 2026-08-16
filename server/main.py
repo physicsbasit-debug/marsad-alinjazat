@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
+import html
 import mimetypes
 import os
 import re
@@ -10,7 +12,7 @@ import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -24,6 +26,7 @@ from .db import BASE_DIR, DATA_DIR, DB_PATH, connect, init_db, row_to_dict, utc_
 from .backup import get_backup_dir, maybe_create_startup_backup
 from .achievement_metrics import evaluate_impact
 from .search import run_search
+from .runtime_platform import persistent_configured, persistent_default, public_url_default, storage_mode
 
 load_dotenv(BASE_DIR / ".env")
 STARTUP_BACKUP_ERROR: str | None = None
@@ -36,17 +39,116 @@ except Exception as exc:
 init_db()
 
 APP_ENV = os.getenv("APP_ENV", "development").strip().lower() or "development"
-APP_PUBLIC_URL = os.getenv("APP_PUBLIC_URL", "http://localhost:8000").rstrip("/")
-APP_FRONTEND_URL = os.getenv("APP_FRONTEND_URL", APP_PUBLIC_URL).rstrip("/")
+APP_ACCESS_PASSWORD = os.getenv("APP_ACCESS_PASSWORD", "").strip()
+APP_PUBLIC_URL = public_url_default()
+APP_FRONTEND_URL = (os.getenv("APP_FRONTEND_URL", "").strip() or APP_PUBLIC_URL).rstrip("/")
 ACADEMIC_YEAR = os.getenv("ACADEMIC_YEAR", "2026/2027")
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "25"))
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
-UPLOADS_DIR = Path(os.getenv("APP_UPLOADS_DIR", BASE_DIR / "uploads" / "inbox"))
+UPLOADS_DIR = Path(os.getenv("APP_UPLOADS_DIR", "").strip() or persistent_default("uploads/inbox", BASE_DIR / "uploads" / "inbox"))
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-EVENT_UPLOADS_DIR = Path(os.getenv("APP_EVENT_UPLOADS_DIR", BASE_DIR / "uploads" / "events"))
+EVENT_UPLOADS_DIR = Path(os.getenv("APP_EVENT_UPLOADS_DIR", "").strip() or persistent_default("uploads/events", BASE_DIR / "uploads" / "events"))
 EVENT_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 
 app = FastAPI(title="مرصد الإنجازات API", version="0.14.0")
+
+
+SESSION_COOKIE_NAME = "marsad_session"
+SESSION_MAX_AGE_SECONDS = 12 * 60 * 60
+
+
+def _access_gate_configured() -> bool:
+    return len(APP_ACCESS_PASSWORD) >= 12 and "CHANGE_ME" not in APP_ACCESS_PASSWORD.upper()
+
+
+def _session_cookie_value() -> str:
+    if not _access_gate_configured():
+        return ""
+    key = hashlib.sha256(("marsad-session:" + APP_ACCESS_PASSWORD).encode("utf-8")).digest()
+    return hmac.new(key, b"authenticated-v1", hashlib.sha256).hexdigest()
+
+
+def _session_valid(request: Request) -> bool:
+    expected = _session_cookie_value()
+    received = request.cookies.get(SESSION_COOKIE_NAME, "")
+    return bool(expected and received and secrets.compare_digest(expected, received))
+
+
+def _public_without_admin_session(path: str) -> bool:
+    if path in {"/login", "/logout", "/api/health", "/api/ready"}:
+        return True
+    return path.startswith(("/assets/", "/upload/", "/api/public/upload/", "/api/integrations/google-drive/oauth/callback"))
+
+
+@app.middleware("http")
+async def production_access_guard(request: Request, call_next):
+    if APP_ENV != "production" or _public_without_admin_session(request.url.path):
+        return await call_next(request)
+    if not _access_gate_configured():
+        if request.url.path.startswith("/api/"):
+            return JSONResponse(status_code=503, content={"detail": "بوابة الدخول الإنتاجية غير مهيأة."})
+        return HTMLResponse(
+            "<h1>مرصد الإنجازات غير جاهز للدخول</h1><p>اضبط APP_ACCESS_PASSWORD في بيئة التشغيل ثم أعد النشر.</p>",
+            status_code=503,
+        )
+    if _session_valid(request):
+        return await call_next(request)
+    if request.url.path.startswith("/api/"):
+        return JSONResponse(status_code=401, content={"detail": "يلزم تسجيل الدخول."})
+    target = request.url.path
+    if request.url.query:
+        target += "?" + request.url.query
+    return RedirectResponse(url=f"/login?next={quote(target, safe='')}", status_code=303)
+
+
+def _safe_next(value: str) -> str:
+    return value if value.startswith("/") and not value.startswith("//") else "/"
+
+
+@app.get("/login", response_class=HTMLResponse)
+def production_login_page(next: str = "/", error: str = ""):
+    if APP_ENV != "production":
+        return RedirectResponse(url="/", status_code=303)
+    safe_next = _safe_next(next)
+    safe_next_html = html.escape(safe_next, quote=True)
+    error_html = "<p class='error'>كلمة المرور غير صحيحة.</p>" if error else ""
+    return HTMLResponse(f"""<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>دخول مرصد الإنجازات</title><style>
+*{{box-sizing:border-box}}body{{margin:0;font-family:Tahoma,Arial,sans-serif;background:#f4f8f9;color:#123246;display:grid;place-items:center;min-height:100vh}}
+.card{{width:min(420px,calc(100% - 32px));background:white;border:1px solid #dbe6e9;border-radius:22px;padding:30px;box-shadow:0 18px 48px rgba(22,60,75,.10)}}
+.brand{{width:52px;height:52px;border-radius:16px;background:#123f56;color:#fff;display:grid;place-items:center;font-weight:800;font-size:22px;margin-bottom:18px}}
+h1{{font-size:24px;margin:0 0 8px}}p{{color:#66808e;line-height:1.7}}label{{display:block;font-weight:700;margin:22px 0 8px}}input{{width:100%;padding:13px 15px;border:1px solid #cfdde2;border-radius:12px;font-size:16px}}button{{width:100%;margin-top:16px;padding:13px;border:0;border-radius:12px;background:#123f56;color:#fff;font-size:16px;font-weight:800;cursor:pointer}}.error{{color:#b42318;background:#fff1f0;padding:10px 12px;border-radius:10px}}small{{display:block;margin-top:16px;color:#82949d}}
+</style></head><body><form class="card" method="post" action="/login"><div class="brand">م</div><h1>مرصد الإنجازات</h1><p>دخول إدارة أعمال المادة</p>{error_html}<input type="hidden" name="next" value="{safe_next_html}"><label>كلمة المرور</label><input name="password" type="password" autocomplete="current-password" required autofocus><button type="submit">دخول</button><small>بوابة مؤقتة للإنتاج حتى اكتمال نظام الحسابات والصلاحيات.</small></form></body></html>""")
+
+
+@app.post("/login")
+def production_login(password: str = Form(...), next: str = Form("/")):
+    if APP_ENV != "production":
+        return RedirectResponse(url="/", status_code=303)
+    if not _access_gate_configured():
+        raise HTTPException(status_code=503, detail="بوابة الدخول الإنتاجية تتطلب كلمة مرور من 12 محرفًا على الأقل.")
+    safe_next = _safe_next(next)
+    if not secrets.compare_digest(password, APP_ACCESS_PASSWORD):
+        return RedirectResponse(url=f"/login?next={quote(safe_next, safe='')}&error=1", status_code=303)
+    response = RedirectResponse(url=safe_next, status_code=303)
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        _session_cookie_value(),
+        max_age=SESSION_MAX_AGE_SECONDS,
+        httponly=True,
+        secure=APP_PUBLIC_URL.startswith("https://"),
+        samesite="lax",
+        path="/",
+    )
+    return response
+
+
+@app.get("/logout")
+def production_logout():
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+    return response
 
 
 def _origin_from_url(value: str) -> str | None:
@@ -108,13 +210,14 @@ def _readiness_snapshot() -> tuple[bool, dict[str, bool]]:
     checks["backupDirWritable"] = _directory_writable(get_backup_dir())
     checks["startupBackupGuard"] = STARTUP_BACKUP_ERROR is None
     checks["uploadsDirWritable"] = _directory_writable(UPLOADS_DIR) and _directory_writable(EVENT_UPLOADS_DIR)
-    storage_mode = os.getenv("STORAGE_MODE", "auto").strip().lower()
+    current_storage_mode = storage_mode()
     if APP_ENV == "production":
-        checks["persistentDataConfigured"] = bool(os.getenv("APP_DATA_DIR", "").strip())
-        checks["backupDirConfigured"] = bool(os.getenv("APP_BACKUP_DIR", "").strip())
-        if storage_mode in {"local", "auto"}:
-            checks["persistentUploadsConfigured"] = bool(os.getenv("APP_UPLOADS_DIR", "").strip()) and bool(os.getenv("APP_EVENT_UPLOADS_DIR", "").strip())
-    if storage_mode == "drive":
+        checks["persistentDataConfigured"] = persistent_configured("APP_DATA_DIR")
+        checks["backupDirConfigured"] = persistent_configured("APP_BACKUP_DIR")
+        checks["accessGateConfigured"] = _access_gate_configured()
+        if current_storage_mode in {"local", "auto"}:
+            checks["persistentUploadsConfigured"] = persistent_configured("APP_UPLOADS_DIR") and persistent_configured("APP_EVENT_UPLOADS_DIR")
+    if current_storage_mode == "google_drive":
         try:
             drive_state = drive.status()
             checks["driveReady"] = bool(drive_state.get("configured") and drive_state.get("connected"))
@@ -2267,14 +2370,14 @@ async def upload_event_media(event_id: int, file: UploadFile = File(...), captio
             temp.write(chunk)
 
     mime_type = mimetypes.guess_type(safe_name)[0] or file.content_type or "application/octet-stream"
-    storage_mode = os.getenv("STORAGE_MODE", "auto")
+    current_storage_mode = storage_mode()
     storage_provider = "local"
     storage_file_id = None
     storage_path = None
     web_view_link = None
 
     try:
-        use_drive = storage_mode == "google_drive" or (storage_mode == "auto" and drive.is_connected())
+        use_drive = current_storage_mode == "google_drive" or (current_storage_mode == "auto" and drive.is_connected())
         if use_drive:
             if not drive.is_connected():
                 raise HTTPException(status_code=503, detail="Google Drive غير مربوط بعد.")
@@ -3254,14 +3357,14 @@ async def public_upload_file(token: str, file: UploadFile = File(...)):
             temp.write(chunk)
 
     mime_type = file.content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
-    storage_mode = os.getenv("STORAGE_MODE", "auto")
+    current_storage_mode = storage_mode()
     storage_provider = "local"
     storage_file_id = None
     storage_path = None
     web_view_link = None
 
     try:
-        use_drive = storage_mode == "google_drive" or (storage_mode == "auto" and drive.is_connected())
+        use_drive = current_storage_mode == "google_drive" or (current_storage_mode == "auto" and drive.is_connected())
         if use_drive:
             if not drive.is_connected():
                 raise HTTPException(status_code=503, detail="Google Drive غير مربوط بعد.")
@@ -3342,14 +3445,14 @@ async def upload_direct_document(
             temp.write(chunk)
 
     mime_type = file.content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
-    storage_mode = os.getenv("STORAGE_MODE", "auto")
+    current_storage_mode = storage_mode()
     storage_provider = "local"
     storage_file_id = None
     storage_path = None
     web_view_link = None
 
     try:
-        use_drive = storage_mode == "google_drive" or (storage_mode == "auto" and drive.is_connected())
+        use_drive = current_storage_mode == "google_drive" or (current_storage_mode == "auto" and drive.is_connected())
         if use_drive:
             if not drive.is_connected():
                 raise HTTPException(status_code=503, detail="Google Drive غير مربوط بعد.")

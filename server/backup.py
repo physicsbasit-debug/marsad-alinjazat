@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .db import DATA_DIR, DB_PATH
+from .runtime_platform import persistent_default
 
 MARSAD_MARKER_TABLES = {"teachers", "events", "upload_requests", "documents", "curriculum_plans", "achievement_assessments"}
 
@@ -23,7 +24,7 @@ def _safe_label(value: str) -> str:
 
 
 def get_backup_dir() -> Path:
-    return Path(os.getenv("APP_BACKUP_DIR", DATA_DIR / "backups"))
+    return Path(os.getenv("APP_BACKUP_DIR", "").strip() or persistent_default("backups", DATA_DIR / "backups"))
 
 
 def get_backup_keep() -> int:

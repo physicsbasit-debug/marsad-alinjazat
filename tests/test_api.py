@@ -103,6 +103,86 @@ class MarsadAlInjazatApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertFalse(response.json()["checks"]["persistentUploadsConfigured"])
 
+    def test_production_access_gate_rejects_placeholder_password(self):
+        from unittest.mock import patch
+        import server.main as main_module
+
+        with patch.object(main_module, "APP_ENV", "production"), patch.object(
+            main_module, "APP_ACCESS_PASSWORD", "CHANGE_ME_TO_A_STRONG_PASSWORD"
+        ):
+            response = self.client.get("/api/ready")
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response.json()["checks"]["accessGateConfigured"])
+
+    def test_railway_volume_satisfies_production_persistence_contract(self):
+        from unittest.mock import patch
+        import server.main as main_module
+
+        with patch.object(main_module, "APP_ENV", "production"), patch.object(
+            main_module, "APP_ACCESS_PASSWORD", "Strong-Test-Password-123"
+        ), patch.dict(
+            os.environ,
+            {
+                "APP_DATA_DIR": "",
+                "APP_BACKUP_DIR": "",
+                "APP_UPLOADS_DIR": "",
+                "APP_EVENT_UPLOADS_DIR": "",
+                "RAILWAY_VOLUME_MOUNT_PATH": TEST_DATA_DIR,
+                "STORAGE_MODE": "local",
+            },
+            clear=False,
+        ):
+            response = self.client.get("/api/ready")
+        self.assertEqual(response.status_code, 200)
+        checks = response.json()["checks"]
+        self.assertTrue(checks["persistentDataConfigured"])
+        self.assertTrue(checks["backupDirConfigured"])
+        self.assertTrue(checks["persistentUploadsConfigured"])
+        self.assertTrue(checks["accessGateConfigured"])
+
+    def test_production_access_gate_protects_admin_api_and_login_unlocks_it(self):
+        from unittest.mock import patch
+        import server.main as main_module
+
+        client = TestClient(app)
+        with patch.object(main_module, "APP_ENV", "production"), patch.object(
+            main_module, "APP_ACCESS_PASSWORD", "Strong-Test-Password-123"
+        ):
+            denied = client.get("/api/bootstrap")
+            self.assertEqual(denied.status_code, 401)
+
+            wrong = client.post(
+                "/login",
+                data={"password": "wrong", "next": "/"},
+                follow_redirects=False,
+            )
+            self.assertEqual(wrong.status_code, 303)
+
+            login = client.post(
+                "/login",
+                data={"password": "Strong-Test-Password-123", "next": "/"},
+                follow_redirects=False,
+            )
+            self.assertEqual(login.status_code, 303)
+            self.assertIn("marsad_session", login.headers.get("set-cookie", ""))
+
+            allowed = client.get("/api/bootstrap")
+            self.assertEqual(allowed.status_code, 200)
+
+        client.close()
+
+    def test_login_next_value_is_html_escaped(self):
+        from unittest.mock import patch
+        import server.main as main_module
+
+        with patch.object(main_module, "APP_ENV", "production"), patch.object(
+            main_module, "APP_ACCESS_PASSWORD", "Strong-Test-Password-123"
+        ):
+            response = self.client.get('/login?next=/%22%3E%3Cscript%3Ealert(1)%3C/script%3E')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('<script>alert(1)</script>', response.text)
+        self.assertIn('&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;', response.text)
+
     def test_create_teacher_and_event(self):
         teacher = self.client.post("/api/teachers", json={
             "name": "معلم اختبار التكامل",
