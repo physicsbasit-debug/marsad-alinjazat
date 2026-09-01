@@ -1,0 +1,2 @@
+-- Phase S1 intentionally has no Supabase application seed data yet.
+-- Seed rows will be introduced only with the domain migration that owns them.

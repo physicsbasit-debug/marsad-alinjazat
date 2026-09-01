@@ -1,0 +1,12 @@
+# مرصد الإنجازات — متغيرات الواجهة المحلية
+# انسخ هذا الملف إلى .env.local عند ربط مشروع Supabase فعلي.
+
+VITE_PREVIEW_MODE=false
+VITE_BASE_PATH=/
+VITE_API_BASE_URL=
+
+# Supabase browser-safe values only.
+# Project URL: https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_URL=
+# Use the current publishable key (sb_publishable_...). Never put a secret/service-role key here.
+VITE_SUPABASE_PUBLISHABLE_KEY=

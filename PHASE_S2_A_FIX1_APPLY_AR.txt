@@ -1,0 +1,18 @@
+مرصد الإنجازات — Phase S2-A Fix 1
+استعادة ملفات S1 Supabase Foundation المفقودة من GitHub main
+
+سبب الإصلاح:
+حالة main تحتوي فحوص S1 وS2-A ووثائقهما، لكنها تفتقد أربع ملفات S1 الأصلية:
+- src/lib/supabase.ts
+- .env.example
+- supabase/config.toml
+- supabase/seed.sql
+
+طريقة التطبيق:
+1) ارفع محتويات هذه الحزمة إلى جذر المستودع مع الحفاظ على المسارات.
+2) تأكد خصوصًا من رفع الملف المخفي .env.example.
+3) ENV_EXAMPLE_VISIBLE.txt نسخة مرئية احتياطية فقط لتسهيل رؤيته على الهاتف؛ لا تحل محل .env.example في الاختبار.
+4) لا تعدل أي محتوى يدويًا ولا تستخدم VITE_SUPABASE_ANON_KEY.
+5) انتظر GitHub Actions. يجب أن ينجح S1 ثم S2-A.
+
+هذه الحزمة لا تضيف SQL migration ولا تغير React runtime ولا FastAPI/SQLite.
