@@ -1,0 +1,30 @@
+مرصد الإنجازات — Phase S0 Supabase Migration Baseline
+
+الهدف:
+إضافة شبكة أمان للهجرة إلى Supabase دون تغيير منطق التطبيق أو تشغيل Supabase بعد.
+
+الملفات الجديدة:
+- .gitignore
+- SUPABASE_MIGRATION_BASELINE_AR.md
+- PHASE_S0_APPLY_AR.txt
+- scripts/check_marsad_baseline.py
+- scripts/marsad_e2e_regression.py
+
+الملفات المعدلة:
+- .github/workflows/quality-pages.yml
+- GITHUB_WORKFLOW_VISIBLE/quality-pages.yml
+
+التحقق المحلي:
+1) python -m pytest -q
+2) python scripts/check_marsad_baseline.py
+3) python scripts/marsad_e2e_regression.py
+
+لا يلزم:
+- Supabase SQL
+- Supabase secrets
+- Railway
+- Google Drive changes
+- أي تغيير في قاعدة البيانات الفعلية
+
+ملاحظة:
+package-lock.json غير موجود في الأصل ولم يتم اختلاقه يدويًا. توليده وتحويل CI إلى npm ci بند مفتوح قبل S1.
