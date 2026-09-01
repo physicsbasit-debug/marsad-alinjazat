@@ -1,9 +1,20 @@
 # مرصد الإنجازات
 
+## Phase S2-A — PostgreSQL schema design freeze
+
+The Supabase target schema is now frozen as a machine-checked design contract: **25 legacy SQLite tables map to 26 target PostgreSQL tables**. S2-A adds no application SQL migration and does not switch the runtime; React still uses FastAPI/SQLite. The authoritative contract is `supabase/schema/target_schema_v1.json` and the Arabic design note is `SUPABASE_SCHEMA_FREEZE_AR.md`.
+
+> Railway was prepared in earlier repository files but was never used as a production runtime or data source.
+
+## Phase S1 — Supabase foundation (runtime unchanged)
+
+The repository now contains the browser client boundary, local CLI configuration, safe environment-variable contract, and versioned folders for future migrations/functions/tests. S1 intentionally ships **no application SQL migration and no runtime Supabase consumer**; React still uses the verified FastAPI/SQLite path until a later domain parity gate passes. See `SUPABASE_FOUNDATION_AR.md` for the authoritative migration note.
+
+
 **مرصد الإنجازات** منصة عربية RTL لإدارة العمل التربوي وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. تجمع أعمال القسم والمعلمين والطلبات والوثائق والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في سجلات مترابطة قابلة للمتابعة بدل توزيعها بين ملفات ومجلدات منفصلة.
 
-> الإصدار الجاري: **v0.14.0-B — النشر الحقيقي على Railway واختبار الاستمرارية**
-> آخر نقطة استقرار خضراء قبل هذا الإصدار: **v0.14-A**
+> الإصدار الجاري: **v0.16.0 — Phase S2-A PostgreSQL Schema Design Freeze**
+> آخر نقطة استقرار خضراء: **v0.15.0 — Phase S1 Supabase Foundation**
 > المعاينة الحية: **https://physicsbasit-debug.github.io/marsad-alinjazat/**
 
 ## الفكرة

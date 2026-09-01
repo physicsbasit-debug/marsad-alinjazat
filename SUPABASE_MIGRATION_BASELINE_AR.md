@@ -167,19 +167,21 @@ health / ready
 ## 6. ترتيب الهجرة المعتمد بعد S0
 
 ```text
-S1  Supabase Foundation
-S2  PostgreSQL schema + migrations + RLS skeleton
-S3  Auth / profiles / ownership model
-S4  Teachers vertical slice
-S5  Meetings
-S6  Planning
-S7  Supervision
-S8  Achievement
-S9  Events + Storage
-S10 Documents + public upload Edge Function
-S11 Reports + archive + search
-S12 SQLite migration + parity audit
-S13 Legacy FastAPI/SQLite retirement
+S1    Supabase Foundation
+S2-A  PostgreSQL Schema Design Freeze
+S2-B  Core PostgreSQL Migration
+S2-C  Auth + RLS Baseline
+S2-D  Database Acceptance Tests
+S3    Teachers vertical slice
+S4    Meetings
+S5    Planning
+S6    Supervision
+S7    Achievement
+S8    Events + Storage
+S9    Documents + public upload Edge Function
+S10   Reports + archive + search
+S11   SQLite migration + parity audit
+S12   Legacy FastAPI/SQLite retirement
 ```
 
 قد تقسم أي مرحلة إلى A/B إذا أظهر فحص End-to-End أن نطاقها أكبر من تغيير آمن واحد.

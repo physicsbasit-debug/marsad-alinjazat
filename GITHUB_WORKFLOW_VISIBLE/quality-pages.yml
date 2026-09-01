@@ -47,6 +47,12 @@ jobs:
       - name: S0 baseline contract
         run: python scripts/check_marsad_baseline.py
 
+      - name: S1 Supabase foundation contract
+        run: python scripts/check_supabase_foundation.py
+
+      - name: S2-A PostgreSQL schema design freeze
+        run: python scripts/check_supabase_schema_freeze.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 

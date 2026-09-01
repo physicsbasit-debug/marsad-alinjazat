@@ -1,24 +1,33 @@
 {
   "name": "marsad-alinjazat",
   "private": true,
-  "version": "0.14.0",
+  "version": "0.16.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "check": "tsc -b && vite build",
-    "build:pages": "tsc -b && vite build"
+    "build:pages": "tsc -b && vite build",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
+    "supabase:db-reset": "supabase db reset --local"
   },
   "dependencies": {
     "react": "19.2.0",
-    "react-dom": "19.2.0"
+    "react-dom": "19.2.0",
+    "@supabase/supabase-js": "2.112.4"
   },
   "devDependencies": {
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
     "@vitejs/plugin-react": "6.0.4",
     "typescript": "5.9.2",
-    "vite": "8.1.0"
+    "vite": "8.1.0",
+    "supabase": "2.116.0"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

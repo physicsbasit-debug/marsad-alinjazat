@@ -1,0 +1,19 @@
+مرصد الإنجازات — Phase S2-A PostgreSQL Schema Design Freeze
+
+هذه الحزمة تُرفع فوق Phase S1 الخضراء.
+
+ما تفعله:
+- ترفع الإصدار إلى v0.16.0.
+- تضيف عقد PostgreSQL المستهدف في supabase/schema/target_schema_v1.json.
+- تضيف SUPABASE_SCHEMA_FREEZE_AR.md.
+- تضيف scripts/check_supabase_schema_freeze.py.
+- تضيف فحص S2-A إلى GitHub Actions.
+
+ما لا تفعله:
+- لا تنشئ SQL migration.
+- لا تغير قاعدة SQLite.
+- لا تغير React runtime.
+- لا تفعل Auth/RLS.
+- لا تنقل بيانات أو ملفات.
+
+بعد الرفع يجب أن تصبح GitHub Actions خضراء قبل بدء S2-B.
