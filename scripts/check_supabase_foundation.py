@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_FILE = ROOT / "package.json"
 CLIENT_FILE = ROOT / "src" / "lib" / "supabase.ts"
 ENV_EXAMPLE = ROOT / ".env.example"
+ENV_EXAMPLE_VISIBLE = ROOT / "ENV_EXAMPLE_VISIBLE.txt"
 CONFIG_FILE = ROOT / "supabase" / "config.toml"
 SEED_FILE = ROOT / "supabase" / "seed.sql"
 LEGACY_API_FILE = ROOT / "src" / "lib" / "api.ts"
@@ -19,10 +20,24 @@ def fail(message: str) -> None:
 
 
 def main() -> None:
-    required = [PACKAGE_FILE, CLIENT_FILE, ENV_EXAMPLE, CONFIG_FILE, SEED_FILE]
+    required = [PACKAGE_FILE, CLIENT_FILE, CONFIG_FILE, SEED_FILE]
     missing = [str(path.relative_to(ROOT)) for path in required if not path.exists()]
     if missing:
         fail(f"S1 foundation files are missing: {missing}")
+
+    if ENV_EXAMPLE.exists():
+        env_contract_file = ENV_EXAMPLE
+        if ENV_EXAMPLE_VISIBLE.exists():
+            hidden_text = ENV_EXAMPLE.read_text(encoding="utf-8")
+            visible_text = ENV_EXAMPLE_VISIBLE.read_text(encoding="utf-8")
+            if hidden_text != visible_text:
+                fail(".env.example and ENV_EXAMPLE_VISIBLE.txt must stay identical when both exist")
+    elif ENV_EXAMPLE_VISIBLE.exists():
+        # Mobile/browser uploads may omit dotfiles. The visible mirror is an approved
+        # source-of-truth fallback and must satisfy the exact same security contract.
+        env_contract_file = ENV_EXAMPLE_VISIBLE
+    else:
+        fail("S1 foundation environment template is missing: expected .env.example or ENV_EXAMPLE_VISIBLE.txt")
 
     package = json.loads(PACKAGE_FILE.read_text(encoding="utf-8"))
     version = package.get("version", "0.0.0")
@@ -45,9 +60,13 @@ def main() -> None:
     if "createClient" not in client_text or "SUPABASE_CONFIGURED" not in client_text:
         fail("Supabase client helper contract is incomplete")
 
-    env_text = ENV_EXAMPLE.read_text(encoding="utf-8")
+    env_text = env_contract_file.read_text(encoding="utf-8")
     if "VITE_SUPABASE_URL=" not in env_text or "VITE_SUPABASE_PUBLISHABLE_KEY=" not in env_text:
-        fail(".env.example does not document the browser-safe Supabase variables")
+        fail(f"{env_contract_file.name} does not document the browser-safe Supabase variables")
+    active_env_lines = [line for line in env_text.splitlines() if line.strip() and not line.lstrip().startswith("#")]
+    for line in active_env_lines:
+        if re.search(r"(?:SERVICE[_-]?ROLE|SUPABASE[_-]?SECRET|sb_secret_)", line, re.IGNORECASE):
+            fail(f"{env_contract_file.name} must not define server-only Supabase secrets")
 
     forbidden_patterns = {
         "service-role": r"service[_-]?role",
@@ -89,6 +108,7 @@ def main() -> None:
     print("PASS: Marsad Phase S1 Supabase foundation contract")
     print("INFO: runtime_source=FastAPI/SQLite supabase_runtime_consumers=0 migrations=0")
     print("INFO: browser_key=VITE_SUPABASE_PUBLISHABLE_KEY forbidden_frontend_secrets=0")
+    print(f"INFO: env_template_source={env_contract_file.name}")
 
 
 if __name__ == "__main__":
