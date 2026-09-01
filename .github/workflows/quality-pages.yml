@@ -44,6 +44,12 @@ jobs:
       - name: API tests
         run: python -m pytest -q
 
+      - name: S0 baseline contract
+        run: python scripts/check_marsad_baseline.py
+
+      - name: Real HTTP E2E regression
+        run: python scripts/marsad_e2e_regression.py
+
   build-preview:
     needs: quality
     runs-on: ubuntu-latest
