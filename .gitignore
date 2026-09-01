@@ -1,0 +1,34 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Node / Vite
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Runtime data
+*.sqlite3
+*.sqlite3-*
+data/
+uploads/
+backups/
+
+# Supabase local/runtime artifacts (future migration)
+.supabase/
+supabase/.temp/
+supabase/.branches/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
