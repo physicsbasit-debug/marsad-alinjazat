@@ -1,0 +1,8 @@
+مرصد الإنجازات — Phase S2-B2 Teachers Domain Migration
+
+ارفع changed-files-only فوق v0.17.0 / S2-B1 GREEN.
+
+تضيف المرحلة migration ثانية لأربعة جداول معلمين وتكمل FK العضوية إلى المعلم داخل نفس المدرسة.
+لا تربط React بـSupabase، لا تنقل SQLite، ولا تفعل RLS.
+
+بعد الرفع: انتظر GitHub Actions الأخضر. بعده فقط شغّل migration الثانية ثم ملف supabase/tests/s2_b2_live_acceptance.sql في Supabase SQL Editor.

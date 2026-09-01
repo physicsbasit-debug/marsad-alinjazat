@@ -16,6 +16,7 @@ VISIBLE_WORKFLOW_FILE = ROOT / "GITHUB_WORKFLOW_VISIBLE" / "quality-pages.yml"
 EXPECTED_MIGRATION = "20260901120000_s2_b1_core_identity_tenancy.sql"
 EXPECTED_TABLES = {"schools", "profiles", "school_memberships", "academic_years"}
 EXPECTED_TARGET_SHA256 = "84ba44b8104d09d62095c4af00a40d413ddc78fb1b2b251af1487d439368ecda"
+EXPECTED_B1_SHA256 = "53a20ade59193cc37ce9aa5935fb6739e76262df6cf9fc2350c6399d6a3a0de2"
 
 
 def fail(message: str) -> None:
@@ -50,8 +51,13 @@ def main() -> None:
             fail(f"required S2-B1 file is missing: {path.relative_to(ROOT)}")
 
     package = json.loads(PACKAGE_FILE.read_text(encoding="utf-8"))
-    if package.get("version") != "0.17.0":
-        fail("S2-B1 package version must be 0.17.0")
+    version = package.get("version", "0.0.0")
+    try:
+        version_tuple = tuple(int(part) for part in version.split(".")[:3])
+    except ValueError:
+        fail(f"invalid package version: {version}")
+    if version_tuple < (0, 17, 0):
+        fail("S2-B1 requires package version >= 0.17.0")
 
     target_sha = hashlib.sha256(TARGET_CONTRACT.read_bytes()).hexdigest()
     if target_sha != EXPECTED_TARGET_SHA256:
@@ -74,12 +80,14 @@ def main() -> None:
         fail("S2-B1 must be deny-by-default until RLS arrives")
 
     migrations = sorted(p.name for p in MIGRATIONS_DIR.glob("*.sql") if p.is_file())
-    if migrations != [EXPECTED_MIGRATION]:
-        fail(f"S2-B1 expects exactly one approved migration; got {migrations}")
+    if EXPECTED_MIGRATION not in migrations:
+        fail(f"approved S2-B1 migration is missing; got {migrations}")
     if phase_contract.get("migration") != EXPECTED_MIGRATION:
         fail("S2-B1 phase contract migration filename changed")
 
     migration_path = MIGRATIONS_DIR / EXPECTED_MIGRATION
+    if hashlib.sha256(migration_path.read_bytes()).hexdigest() != EXPECTED_B1_SHA256:
+        fail("approved S2-B1 migration changed after its live acceptance")
     raw_sql = migration_path.read_text(encoding="utf-8")
     sql = compact(raw_sql)
 
@@ -190,8 +198,8 @@ def main() -> None:
         fail("CI does not execute the S2-B1 migration contract")
 
     print("PASS: Marsad Phase S2-B1 core identity and tenancy migration contract")
-    print("INFO: migration_files=1 created_tables=4 runtime_switch=0 data_migration=0 rls=0")
-    print("INFO: deny_by_default=PASS deferred_teacher_fk=S2-B2 frozen_schema=PASS")
+    print(f"INFO: migration_files={len(migrations)} s2_b1_created_tables=4 runtime_switch=0 data_migration=0 rls=0")
+    print("INFO: deny_by_default=PASS teacher_fk_contract=S2-B2 frozen_schema=PASS")
 
 
 if __name__ == "__main__":

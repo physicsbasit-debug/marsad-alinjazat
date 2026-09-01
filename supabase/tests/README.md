@@ -1,5 +1,5 @@
 # Supabase acceptance tests
 
-تضاف هنا اختبارات PostgreSQL/RLS الحية مع تقدم مراحل النقل.
-
-في S2-B1 يوجد فحص بنيوي آلي في `scripts/check_supabase_s2_b1.py`. اختبار تطبيق migration داخل PostgreSQL/Supabase فعلي يبقى بوابة إغلاق تشغيلية إلزامية قبل الانتقال من S2-B إلى الاعتماد على القاعدة الجديدة. اختبارات RLS نفسها تبدأ في S2-C/S2-D.
+- S2-B1 تم قبوله حيًا على مشروع Supabase التطويري: الجداول الأربعة، deny-by-default، قيود السنة، والتنظيف بعد rollback.
+- S2-B2 يضيف `s2_b2_live_acceptance.sql` ويُشغل **بعد** نجاح GitHub Actions وتطبيق migration الثانية.
+- اختبارات RLS نفسها تبدأ في S2-C/S2-D.

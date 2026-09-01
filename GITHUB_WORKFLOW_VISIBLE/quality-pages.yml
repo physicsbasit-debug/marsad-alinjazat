@@ -56,6 +56,9 @@ jobs:
       - name: S2-B1 core identity and tenancy migration
         run: python scripts/check_supabase_s2_b1.py
 
+      - name: S2-B2 teachers domain migration
+        run: python scripts/check_supabase_s2_b2.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 

@@ -114,7 +114,7 @@ python scripts/marsad_e2e_regression.py
 `check_supabase_s2_b1.py` يثبت آليًا أن:
 
 - عقد S2-A لم يتغير.
-- توجد migration واحدة فقط في S2-B1.
+- migration S2-B1 الأصلية ثابتة ولم تتغير؛ المراحل اللاحقة قد تضيف migrations جديدة فوقها.
 - لا تُنشأ إلا الجداول الأربعة.
 - `profiles.id` مرتبط بـ`auth.users`.
 - قيود الدور والحالة صحيحة.
@@ -123,16 +123,20 @@ python scripts/marsad_e2e_regression.py
 - الجداول مقفلة عن أدوار المتصفح إلى حين S2-C.
 - لا RLS ولا DML ولا Runtime Switch في هذه المرحلة.
 
-## اختبار PostgreSQL الحقيقي
+## اختبار PostgreSQL الحقيقي — مغلق بنجاح
 
-بيئة تجهيز الحزمة لا تملك PostgreSQL/Supabase local stack، لذلك الاختبارات المحلية هنا تثبت العقد البنيوي والـRegression ولا تدّعي تنفيذ migration داخل PostgreSQL فعلي.
+تم تطبيق migration S2-B1 فعليًا على مشروع Supabase التطويري، ثم تحقق يدويًا من:
 
-بعد أخضر GitHub Actions، يجب تطبيق migration على بيئة Supabase تطويرية أو Local Supabase وتشغيل `db reset`/قبول PostgreSQL الحقيقي قبل إغلاق S2-B1 تشغيليًا. لا تعتبر مجرد نجاح الفحص النصي بديلًا عن تطبيق قاعدة البيانات.
+- وجود الجداول الأربعة.
+- عدم وجود Grants لـ`anon` أو `authenticated`.
+- رفض عام دراسي غير متتالٍ بواسطة `academic_years_end_year_check`.
+- رفض وجود عامين حاليين لنفس المدرسة بواسطة `uq_academic_years_one_current_per_school`.
+- عدم بقاء بيانات الاختبار بعد rollback (`0 rows`).
+
+بذلك أصبحت S2-B1 نقطة أساس PostgreSQL حية مقبولة، وليس مجرد عقد بنيوي.
 
 ## التالي
 
-بعد تطبيق S2-B1 بنجاح على PostgreSQL واختبارها:
-
-**Phase S2-B2 — Teachers Core**
+**Phase S2-B2 — Teachers Domain Migration**
 
 وتنشئ `teachers`, `teacher_profiles`, `teacher_years`, `teacher_cv_items` ثم تكمل FK المؤجل في `school_memberships.teacher_id`.

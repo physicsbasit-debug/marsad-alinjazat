@@ -1,0 +1,56 @@
+{
+  "contract_version": "1.0.0",
+  "phase": "S2-B2",
+  "project_version": "0.18.0",
+  "frozen_schema_contract_sha256": "84ba44b8104d09d62095c4af00a40d413ddc78fb1b2b251af1487d439368ecda",
+  "required_prior_migration": {
+    "filename": "20260901120000_s2_b1_core_identity_tenancy.sql",
+    "sha256": "53a20ade59193cc37ce9aa5935fb6739e76262df6cf9fc2350c6399d6a3a0de2"
+  },
+  "migration": "20260901190000_s2_b2_teachers_domain.sql",
+  "runtime_switch_allowed": false,
+  "data_migration_allowed": false,
+  "rls_allowed": false,
+  "deny_by_default_until_s2_c": true,
+  "created_tables": [
+    "teachers",
+    "teacher_profiles",
+    "teacher_years",
+    "teacher_cv_items"
+  ],
+  "teacher_identity_policy": {
+    "teachers": "persistent professional identity",
+    "teacher_years": "year-scoped subject/experience/workload/grades/responsibilities",
+    "no_legacy_attribute_invention": true
+  },
+  "tenant_fk_policy": {
+    "membership_teacher_fk": [
+      "school_id",
+      "teacher_id"
+    ],
+    "teacher_year_teacher_fk": [
+      "school_id",
+      "teacher_id"
+    ],
+    "teacher_year_academic_year_fk": [
+      "school_id",
+      "academic_year_id"
+    ],
+    "teacher_profile_teacher_fk": [
+      "school_id",
+      "teacher_id"
+    ],
+    "teacher_cv_teacher_fk": [
+      "school_id",
+      "teacher_id"
+    ]
+  },
+  "security": {
+    "browser_roles_revoked": [
+      "public",
+      "anon",
+      "authenticated"
+    ],
+    "rls_phase": "S2-C"
+  }
+}
