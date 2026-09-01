@@ -53,6 +53,9 @@ jobs:
       - name: S2-A PostgreSQL schema design freeze
         run: python scripts/check_supabase_schema_freeze.py
 
+      - name: S2-B1 core identity and tenancy migration
+        run: python scripts/check_supabase_s2_b1.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 
