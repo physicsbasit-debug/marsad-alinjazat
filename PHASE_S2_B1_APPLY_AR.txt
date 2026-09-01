@@ -1,0 +1,20 @@
+مرصد الإنجازات — Phase S2-B1 Core Identity & Tenancy
+
+الإصدار: v0.17.0
+
+ارفع محتويات changed-files-only إلى جذر المستودع مع الاستبدال.
+
+هذه المرحلة تضيف أول migration PostgreSQL فقط للجداول:
+- schools
+- profiles
+- school_memberships
+- academic_years
+
+لا تربط React بـSupabase، لا تنقل SQLite، ولا تفعل RLS.
+
+بعد الرفع:
+1) يجب أن تصبح GitHub Actions خضراء بالكامل.
+2) لا تبدأ S2-B2 قبل نجاح فحص S2-B1.
+3) بعد CI الأخضر طبّق migration على بيئة Supabase تطويرية/محلية لاختبار PostgreSQL الحقيقي قبل اعتبار S2-B1 مغلقة تشغيليًا.
+
+ملاحظة: teacher_id في school_memberships بلا FK في هذه الدفعة عمدًا؛ يكتمل FK المركب في S2-B2 بعد إنشاء teachers.

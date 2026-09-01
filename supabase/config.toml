@@ -1,4 +1,4 @@
-# Phase S1 foundation only. No production schema is migrated in this phase.
+# Supabase local development configuration. S2-B migrations exist, but the application runtime has not switched from FastAPI/SQLite yet.
 project_id = "marsad-alinjazat"
 
 [auth]

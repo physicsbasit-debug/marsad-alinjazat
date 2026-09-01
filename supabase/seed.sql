@@ -1,2 +1,2 @@
--- Phase S1 intentionally has no Supabase application seed data yet.
--- Seed rows will be introduced only with the domain migration that owns them.
+-- No application seed data through Phase S2-B1.
+-- Domain seed rows are introduced only when their migration owns the schema and acceptance contract.

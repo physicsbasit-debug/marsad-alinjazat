@@ -101,12 +101,15 @@ def main() -> None:
     if 'project_id = "marsad-alinjazat"' not in config_text:
         fail("supabase/config.toml project_id is missing")
 
-    migration_files = [p for p in (ROOT / "supabase" / "migrations").glob("*.sql") if p.is_file()]
-    if migration_files:
-        fail(f"S1 must not migrate application tables yet: {[p.name for p in migration_files]}")
+    migration_files = sorted(p.name for p in (ROOT / "supabase" / "migrations").glob("*.sql") if p.is_file())
+    # S1 itself shipped with zero migrations. Later phases are allowed to add
+    # migrations while this historical foundation check continues to verify
+    # client boundaries and secret hygiene.
+    if version_tuple < (0, 17, 0) and migration_files:
+        fail(f"pre-S2-B projects must not contain application migrations yet: {migration_files}")
 
     print("PASS: Marsad Phase S1 Supabase foundation contract")
-    print("INFO: runtime_source=FastAPI/SQLite supabase_runtime_consumers=0 migrations=0")
+    print(f"INFO: runtime_source=FastAPI/SQLite supabase_runtime_consumers=0 migrations={len(migration_files)}")
     print("INFO: browser_key=VITE_SUPABASE_PUBLISHABLE_KEY forbidden_frontend_secrets=0")
     print(f"INFO: env_template_source={env_contract_file.name}")
 

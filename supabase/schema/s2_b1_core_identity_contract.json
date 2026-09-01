@@ -1,0 +1,35 @@
+{
+  "contract_version": "1.0.0",
+  "phase": "S2-B1",
+  "project_version": "0.17.0",
+  "frozen_schema_contract_sha256": "84ba44b8104d09d62095c4af00a40d413ddc78fb1b2b251af1487d439368ecda",
+  "migration": "20260901120000_s2_b1_core_identity_tenancy.sql",
+  "runtime_switch_allowed": false,
+  "data_migration_allowed": false,
+  "rls_allowed": false,
+  "deny_by_default_until_s2_c": true,
+  "tables": {
+    "schools": {
+      "primary_key": "id uuid",
+      "required_columns": ["id", "name", "is_active", "created_at", "updated_at"]
+    },
+    "profiles": {
+      "primary_key": "id uuid -> auth.users.id",
+      "required_columns": ["id", "display_name", "created_at", "updated_at"]
+    },
+    "school_memberships": {
+      "primary_key": ["school_id", "user_id"],
+      "required_columns": ["school_id", "user_id", "teacher_id", "role", "status", "created_at", "updated_at"],
+      "teacher_fk_phase": "S2-B2"
+    },
+    "academic_years": {
+      "primary_key": "id bigint identity",
+      "required_columns": ["id", "school_id", "label", "start_year", "end_year", "is_current", "created_at", "updated_at"],
+      "one_current_year_per_school": true
+    }
+  },
+  "security": {
+    "browser_roles_revoked": ["public", "anon", "authenticated"],
+    "rls_phase": "S2-C"
+  }
+}

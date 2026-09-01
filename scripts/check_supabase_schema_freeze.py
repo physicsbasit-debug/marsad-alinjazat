@@ -103,8 +103,14 @@ def main() -> None:
         fail("S2-A schema contract_version must be 1.0.0")
     if contract.get("phase") != "S2-A":
         fail("schema contract must identify Phase S2-A")
-    if package.get("version") != "0.16.0" or contract.get("project_version") != "0.16.0":
-        fail("package and schema contract must both be v0.16.0")
+    if contract.get("project_version") != "0.16.0":
+        fail("frozen S2-A schema contract must remain stamped v0.16.0")
+    try:
+        current_version = tuple(int(part) for part in package.get("version", "0.0.0").split(".")[:3])
+    except ValueError:
+        fail("package version is invalid")
+    if current_version < (0, 16, 0):
+        fail("current package cannot predate the frozen S2-A contract")
 
     tables = contract.get("tables") or []
     table_names = {item.get("name") for item in tables}
@@ -184,8 +190,11 @@ def main() -> None:
         fail("public-settings secret exclusion rule is missing")
 
     migration_files = sorted(p.name for p in MIGRATIONS_DIR.glob("*.sql") if p.is_file())
-    if migration_files:
-        fail(f"S2-A is design freeze only; SQL migrations found: {migration_files}")
+    # S2-A itself had no migrations. Once the package advances to S2-B, this
+    # checker becomes a historical freeze guard: it keeps the target contract
+    # immutable while later phase-specific checks validate the migrations.
+    if current_version < (0, 17, 0) and migration_files:
+        fail(f"S2-A package must remain migration-free: {migration_files}")
 
     # Legacy schema must still exist untouched as the parity oracle during S2-A.
     legacy_text = LEGACY_DB_FILE.read_text(encoding="utf-8")
@@ -202,7 +211,7 @@ def main() -> None:
 
     print("PASS: Marsad Phase S2-A PostgreSQL schema design freeze")
     print("INFO: legacy_tables=25 target_tables=26 mapped_legacy_tables=25")
-    print("INFO: runtime=FastAPI/SQLite sql_migrations=0 supabase_runtime_switch=0")
+    print(f"INFO: runtime=FastAPI/SQLite sql_migrations={len(migration_files)} supabase_runtime_switch=0")
     print("INFO: tenant_boundary=school_id year_dimension=academic_years teacher_identity_split=PASS")
 
 

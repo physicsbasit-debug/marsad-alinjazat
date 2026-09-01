@@ -1,5 +1,9 @@
 # مرصد الإنجازات
 
+## Phase S2-B1 — Core identity and tenancy migration
+
+The first real PostgreSQL migration now creates only `schools`, `profiles`, `school_memberships`, and `academic_years`, pinned to the frozen S2-A schema. The application runtime still uses FastAPI/SQLite; there is no data migration or RLS yet. Browser roles are explicitly denied until S2-C installs the authorization model. See `SUPABASE_CORE_MIGRATION_AR.md`.
+
 ## Phase S2-A — PostgreSQL schema design freeze
 
 The Supabase target schema is now frozen as a machine-checked design contract: **25 legacy SQLite tables map to 26 target PostgreSQL tables**. S2-A adds no application SQL migration and does not switch the runtime; React still uses FastAPI/SQLite. The authoritative contract is `supabase/schema/target_schema_v1.json` and the Arabic design note is `SUPABASE_SCHEMA_FREEZE_AR.md`.
@@ -13,8 +17,8 @@ The repository now contains the browser client boundary, local CLI configuration
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة العمل التربوي وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. تجمع أعمال القسم والمعلمين والطلبات والوثائق والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في سجلات مترابطة قابلة للمتابعة بدل توزيعها بين ملفات ومجلدات منفصلة.
 
-> الإصدار الجاري: **v0.16.0 — Phase S2-A PostgreSQL Schema Design Freeze**
-> آخر نقطة استقرار خضراء: **v0.15.0 — Phase S1 Supabase Foundation**
+> الإصدار الجاري: **v0.17.0 — Phase S2-B1 Core Identity & Tenancy**
+> آخر نقطة استقرار خضراء: **v0.16.0 — Phase S2-A PostgreSQL Schema Design Freeze**
 > المعاينة الحية: **https://physicsbasit-debug.github.io/marsad-alinjazat/**
 
 ## الفكرة

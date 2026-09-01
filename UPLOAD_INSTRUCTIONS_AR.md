@@ -1,42 +1,34 @@
-# تعليمات رفع مرصد الإنجازات v0.14-B — Railway والتشغيل الحقيقي
+# تعليمات رفع مرصد الإنجازات v0.17.0 — Phase S2-B1
 
-هذه الحزمة مبنية فوق آخر نقطة استقرار خضراء في `main`:
-
-```text
-6cf297f2bff620f79719cadce48a17f2cc544397
-```
+هذه الحزمة تُرفع فوق **v0.16.0 / S2-A GREEN**.
 
 ## ما الذي ترفعه؟
 
-ارفع **محتويات Changed Files Only** إلى جذر المستودع مع الاستبدال. لا ترفع المجلد الأب.
+ارفع محتويات حزمة `changed-files-only` إلى جذر المستودع مع الاستبدال. لا ترفع المجلد الأب.
 
 ## ما الذي تضيفه المرحلة؟
 
-- `Dockerfile` يبني React ثم يشغّل FastAPI في صورة واحدة.
-- `railway.json` يستخدم Dockerfile ويضع Healthcheck على `/api/ready`.
-- `.dockerignore` يمنع دخول الأسرار وقواعد البيانات والملفات التشغيلية إلى صورة Docker.
-- دعم تلقائي لـ`RAILWAY_VOLUME_MOUNT_PATH` كجذر دائم للبيانات والنسخ والملفات المحلية.
-- دعم تلقائي لـ`RAILWAY_PUBLIC_DOMAIN` عندما لا يُحدد `APP_PUBLIC_URL` يدويًا.
-- بوابة دخول إنتاجية مؤقتة بكلمة مرور من `APP_ACCESS_PASSWORD`.
-- حماية الواجهة والـAPI الإداريين بالجلسة، مع إبقاء مسارات رفع المعلمين العامة ذات token متاحة.
-- وثيقة `RAILWAY_DEPLOYMENT_AR.md` وقالب `RAILWAY_ENV_TEMPLATE.txt`.
+- أول migration PostgreSQL في `supabase/migrations/`.
+- الجداول: `schools`, `profiles`, `school_memberships`, `academic_years`.
+- عقد آلي خاص بـS2-B1.
+- فحص CI جديد لـS2-B1.
+- تحديث الإصدار إلى `0.17.0`.
 
-## ما الذي لم يتغير؟
+## ما الذي لا يتغير؟
 
-- لا جدول SQLite جديد.
-- لا SQL يدوي.
-- لا تغيير في منطق التحصيل أو الإتقان أو أي معيار تربوي.
-- لا تغيير في Google Drive أو OAuth.
-- GitHub Pages تبقى Preview فقط.
+- React runtime يبقى على FastAPI/SQLite.
+- لا نقل لبيانات SQLite.
+- لا RLS ولا Auth UI.
+- لا Storage ولا Edge Functions.
+- لا جدول `teachers` بعد.
 
 ## بعد الرفع
 
-1. انتظر GitHub Actions حتى تصبح خضراء.
-2. لا تدخل بيانات حقيقية في GitHub Pages.
-3. بعدها اتبع `RAILWAY_DEPLOYMENT_AR.md` خطوة بخطوة لإنشاء خدمة Railway وربط Volume على `/app/persist`.
-4. ضع كلمة مرور قوية بدل قيمة `APP_ACCESS_PASSWORD` النموذجية.
-5. لا تعتبر المرحلة مغلقة حتى ينجح اختبار: إنشاء اجتماع وحضور → Restart → بقاء الاجتماع والحضور.
+1. انتظر GitHub Actions حتى تصبح خضراء بالكامل.
+2. تحقق من نجاح: S0, S1, S2-A, S2-B1, Pytest, HTTP E2E.
+3. لا تبدأ S2-B2 قبل نجاح CI.
+4. بعد CI الأخضر نحتاج اختبار PostgreSQL فعلي للمigration على Supabase Development/Local قبل الإغلاق التشغيلي النهائي لـS2-B1.
 
-## تنبيه
+## الملفات المخفية
 
-لا ترفع `RAILWAY_ENV_TEMPLATE.txt` بعد ملئه بأسرارك. الملف الموجود في المستودع قالب فقط؛ القيم الحقيقية توضع في Railway Variables.
+الـworkflow الحقيقي موجود في `.github/workflows/quality-pages.yml`، وتوجد نسخة مرئية مطابقة في `GITHUB_WORKFLOW_VISIBLE/quality-pages.yml`. يجب أن يبقيا متطابقين.
