@@ -66,8 +66,13 @@ def main() -> None:
             fail(f"required S2-B3 file missing: {path.relative_to(ROOT)}")
 
     package = json.loads(PACKAGE_FILE.read_text(encoding="utf-8"))
-    if package.get("version") != "0.19.0":
-        fail("S2-B3 package version must be 0.19.0")
+    version = package.get("version", "0.0.0")
+    try:
+        version_tuple = tuple(int(part) for part in version.split(".")[:3])
+    except ValueError:
+        fail(f"invalid package version: {version}")
+    if version_tuple < (0, 19, 0):
+        fail("S2-B3 requires package version >= 0.19.0")
 
     if hashlib.sha256(TARGET_CONTRACT.read_bytes()).hexdigest() != EXPECTED_TARGET_SHA256:
         fail("S2-A frozen target schema changed during S2-B3")
@@ -80,8 +85,8 @@ def main() -> None:
         if hashlib.sha256(path.read_bytes()).hexdigest() != expected_hash:
             fail(f"migration changed unexpectedly: {path.name}")
     migrations = sorted(p.name for p in MIGRATIONS_DIR.glob("*.sql") if p.is_file())
-    if migrations != [B1_MIGRATION, B2_MIGRATION, B3_MIGRATION]:
-        fail(f"unexpected migration set for S2-B3: {migrations}")
+    if len(migrations) < 3 or migrations[:3] != [B1_MIGRATION, B2_MIGRATION, B3_MIGRATION]:
+        fail(f"S2-B1/B2/B3 migration history changed unexpectedly: {migrations}")
 
     contract = json.loads(PHASE_CONTRACT.read_text(encoding="utf-8"))
     if contract.get("phase") != "S2-B3" or contract.get("project_version") != "0.19.0":
@@ -199,7 +204,8 @@ def main() -> None:
     acceptance = compact(LIVE_ACCEPTANCE.read_text(encoding="utf-8"))
     for fragment in [
         "pass: s2-b3 live acceptance", "rollback;", "grantee in ('anon','authenticated')",
-        "c.relrowsecurity", "exception when foreign_key_violation", "exception when check_violation",
+        "c.relrowsecurity", "from pg_policies", "v_count not in (0, 11)",
+        "exception when foreign_key_violation", "exception when check_violation",
         "on delete set null (responsible_teacher_id)",
     ]:
         require(acceptance, fragment, "S2-B3 live acceptance")
@@ -220,7 +226,7 @@ def main() -> None:
         fail("CI does not execute S2-B3 contract")
 
     print("PASS: Marsad Phase S2-B3 operational domains migration contract")
-    print("INFO: migrations=3 new_tables=11 domains=4 same_school_fk=PASS")
+    print(f"INFO: migration_files={len(migrations)} s2_b3_new_tables=11 domains=4 same_school_fk=PASS")
     print("INFO: runtime_switch=0 data_migration=0 rls=0 deny_by_default=PASS frozen_schema=PASS")
 
 

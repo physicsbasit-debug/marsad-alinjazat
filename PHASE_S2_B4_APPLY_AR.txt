@@ -1,0 +1,16 @@
+مرصد الإنجازات — Phase S2-B4 Events / Documents / Requests / Activities
+الإصدار: v0.20.0
+
+1) ارفع changed_files_only فوق main الحالي بعد S2-B3 GREEN + Live Acceptance PASS.
+2) انتظر GitHub Actions وتأكد من نجاح S0/S1/S2-A/S2-B1/S2-B2/S2-B3/S2-B4 وpytest وHTTP E2E.
+3) لا تشغّل SQL على Supabase قبل أخضر GitHub.
+4) بعد الأخضر شغّل في SQL Editor:
+   supabase/migrations/20260902080000_s2_b4_content_intake_domains.sql
+5) ثم شغّل:
+   supabase/tests/s2_b4_live_acceptance.sql
+6) النتيجة المطلوبة: PASS: S2-B4 live acceptance
+
+مهم:
+- لا تعِد تشغيل migrations S2-B1/S2-B2/S2-B3.
+- لا تعطل RLS يدويًا إذا فعّله مشروع Supabase تلقائيًا.
+- لا توجد Policies ولا تحويل React ولا نقل بيانات SQLite أو ملفات Storage في S2-B4.

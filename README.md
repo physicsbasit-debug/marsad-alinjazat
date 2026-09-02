@@ -1,3 +1,7 @@
+## Phase S2-B4 — Events / Documents / Requests / Activities
+
+PostgreSQL now includes the seven remaining frozen target tables: `school_settings`, `upload_requests`, `documents`, `events`, `event_media`, `event_teacher_links`, and `activities`. Legacy year-link/meta tables are folded into the normalized target instead of being recreated. Runtime remains FastAPI/SQLite; no application data or storage bytes move yet.
+
 ## Phase S2-B3 — Operational domains migration
 
 PostgreSQL now has a third versioned migration for meetings, curriculum planning, supervision, and achievement: 11 new operational tables with same-school composite foreign keys and academic-year isolation. Browser roles remain denied and runtime remains FastAPI/SQLite until later parity gates.
@@ -25,8 +29,8 @@ The repository now contains the browser client boundary, local CLI configuration
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة العمل التربوي وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. تجمع أعمال القسم والمعلمين والطلبات والوثائق والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في سجلات مترابطة قابلة للمتابعة بدل توزيعها بين ملفات ومجلدات منفصلة.
 
-> الإصدار الجاري: **v0.19.0 — Phase S2-B3 Operational Domains Migration**
-> آخر نقطة استقرار خضراء: **v0.18.0 — Phase S2-B2 Teachers Domain + Live Supabase Acceptance**
+> الإصدار الجاري: **v0.20.0 — Phase S2-B4 Events / Documents / Requests / Activities**
+> آخر نقطة استقرار خضراء: **v0.19.0 — Phase S2-B3 Operational Domains + Live Supabase Acceptance**
 > المعاينة الحية: **https://physicsbasit-debug.github.io/marsad-alinjazat/**
 
 ## الفكرة

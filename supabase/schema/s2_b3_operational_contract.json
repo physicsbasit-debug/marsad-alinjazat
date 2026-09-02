@@ -48,5 +48,6 @@
     "achievement_assessments"
   ],
   "live_acceptance_file": "supabase/tests/s2_b3_live_acceptance.sql",
-  "live_acceptance_status": "pending_after_github_green"
+  "live_acceptance_status": "passed_live_2026-09-02",
+  "live_acceptance_note": "Supabase auto-RLS detected on all 11 S2-B3 tables; zero policies and zero anon/authenticated grants verified by acceptance v2."
 }

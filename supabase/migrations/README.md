@@ -7,9 +7,13 @@
 ```text
 20260901120000_s2_b1_core_identity_tenancy.sql
 20260901190000_s2_b2_teachers_domain.sql
+20260901210000_s2_b3_operational_domains.sql
+20260902080000_s2_b4_content_intake_domains.sql
 ```
 
-- S2-B1 ينشئ `schools`, `profiles`, `school_memberships`, و`academic_years`.
-- S2-B2 ينشئ `teachers`, `teacher_profiles`, `teacher_years`, و`teacher_cv_items` ويكمل FK العضوية إلى المعلم داخل المدرسة نفسها.
+- S2-B1: `schools`, `profiles`, `school_memberships`, `academic_years`.
+- S2-B2: مجال المعلمين وإكمال same-school FK للعضوية.
+- S2-B3: الاجتماعات والتخطيط والإشراف والتحصيل، 11 جدولًا.
+- S2-B4: الإعدادات غير السرية والطلبات والوثائق والفعاليات والوسائط وروابط المعلمين وسجل النشاط، 7 جداول.
 
-لا تنقل هذه migrations بيانات SQLite ولا تفعل RLS؛ سياسات RLS مؤجلة إلى S2-C.
+بعد S2-B4 أصبحت كل **الجداول الـ26** في عقد S2-A ممثلة في سلسلة migrations. لا تنقل هذه migrations بيانات SQLite أو bytes التخزين، ولا تنشئ RLS policies؛ سياسات التفويض تبدأ في S2-C. مشروع Supabase قد يفعّل RLS تلقائيًا عبر إعداد خارجي، ويُتعامل مع ذلك في اختبارات القبول دون تعطيله.

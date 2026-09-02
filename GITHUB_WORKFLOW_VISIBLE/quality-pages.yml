@@ -62,6 +62,9 @@ jobs:
       - name: S2-B3 operational domains migration
         run: python scripts/check_supabase_s2_b3.py
 
+      - name: S2-B4 content and intake domains migration
+        run: python scripts/check_supabase_s2_b4.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 

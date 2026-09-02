@@ -1,0 +1,80 @@
+{
+  "contract_version": "1.0.0",
+  "phase": "S2-B4",
+  "project_version": "0.20.0",
+  "frozen_schema_contract_sha256": "84ba44b8104d09d62095c4af00a40d413ddc78fb1b2b251af1487d439368ecda",
+  "required_prior_migrations": [
+    {
+      "filename": "20260901120000_s2_b1_core_identity_tenancy.sql",
+      "sha256": "53a20ade59193cc37ce9aa5935fb6739e76262df6cf9fc2350c6399d6a3a0de2",
+      "live_accepted": true
+    },
+    {
+      "filename": "20260901190000_s2_b2_teachers_domain.sql",
+      "sha256": "65030ee568719c5da6a010522c401e52b7b56b362a2547e02ed0f311c4d5e78b",
+      "live_accepted": true
+    },
+    {
+      "filename": "20260901210000_s2_b3_operational_domains.sql",
+      "sha256": "b4f444fa180d38688566261f3c124317ed4217b00cc3e760a0d53d5b45c70ae0",
+      "live_accepted": true,
+      "live_acceptance_note": "Supabase auto-RLS was detected on all 11 new tables; zero policies and zero browser grants were verified."
+    }
+  ],
+  "migration": "20260902080000_s2_b4_content_intake_domains.sql",
+  "migration_sha256": "33e094422f5fc78ddd12ab16572b4ac4817372bd745b63c2e67b214f159b6d91",
+  "domains": [
+    "school_settings",
+    "upload_requests",
+    "documents",
+    "events",
+    "event_media",
+    "event_teacher_links",
+    "activities"
+  ],
+  "new_tables": [
+    "school_settings",
+    "upload_requests",
+    "documents",
+    "events",
+    "event_media",
+    "event_teacher_links",
+    "activities"
+  ],
+  "legacy_tables_folded_not_recreated": {
+    "request_record_years": "upload_requests.academic_year_id",
+    "event_record_years": "events.academic_year_id",
+    "event_media_meta": "event_media.caption/position/is_cover",
+    "teacher_record_years": "teacher_years",
+    "settings": "school_settings; secrets/OAuth state excluded from public schema"
+  },
+  "runtime_switch_allowed": false,
+  "data_migration_allowed": false,
+  "storage_bytes_migration_allowed": false,
+  "public_upload_edge_function_allowed": false,
+  "rls_ddl_allowed_in_migration": false,
+  "deny_by_default_until_s2_c": true,
+  "same_school_foreign_keys_required": true,
+  "storage_provider_contract": [
+    "supabase",
+    "google_drive",
+    "legacy_local"
+  ],
+  "public_upload_security_contract": {
+    "token_hash_unique": true,
+    "expires_at_required": true,
+    "status_allowlist_required": true,
+    "raw_token_column_forbidden": true,
+    "edge_function_phase": "later public-upload cutover phase"
+  },
+  "live_rls_acceptance": {
+    "migration_does_not_enable_rls": true,
+    "external_auto_rls_may_be_present": true,
+    "allowed_new_table_rls_counts": [0, 7],
+    "policies_before_s2_c": 0,
+    "browser_grants_before_s2_c": 0
+  },
+  "remaining_target_tables_after_s2_b4": [],
+  "live_acceptance_file": "supabase/tests/s2_b4_live_acceptance.sql",
+  "live_acceptance_status": "pending_after_github_green"
+}

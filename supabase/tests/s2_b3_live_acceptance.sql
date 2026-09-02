@@ -37,6 +37,10 @@ begin
         raise exception 'S2-B3 acceptance failed: browser roles still have % grants', v_count;
     end if;
 
+    -- Supabase projects may auto-enable RLS on newly created public tables via
+    -- dashboard defaults or an event trigger. That is safe here because S2-B3
+    -- explicitly revokes browser grants and installs no policies yet.
+    -- Accept either all-disabled (0) or all-enabled (11), but reject a mixed state.
     select count(*) into v_count
     from pg_class c
     join pg_namespace n on n.oid = c.relnamespace
@@ -49,8 +53,22 @@ begin
         'achievement_actions','achievement_action_metrics'
       )
       and c.relrowsecurity;
+    if v_count not in (0, 11) then
+        raise exception 'S2-B3 acceptance failed: inconsistent RLS state on operational tables: % of 11 enabled', v_count;
+    end if;
+
+    select count(*) into v_count
+    from pg_policies
+    where schemaname = 'public'
+      and tablename in (
+        'meetings','meeting_attendees','meeting_decisions',
+        'curriculum_plans','curriculum_units',
+        'supervision_visits','supervision_actions',
+        'achievement_assessments','achievement_assessment_standards',
+        'achievement_actions','achievement_action_metrics'
+      );
     if v_count <> 0 then
-        raise exception 'S2-B3 acceptance failed: RLS was enabled before S2-C on % tables', v_count;
+        raise exception 'S2-B3 acceptance failed: policies exist before S2-C: %', v_count;
     end if;
 
     select pg_get_constraintdef(oid) into v_def
