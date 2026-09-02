@@ -1,0 +1,13 @@
+مرصد الإنجازات — Phase S2-B3 Operational Domains Migration
+الإصدار: v0.19.0
+
+1) ارفع changed_files_only فوق main الحالي بعد S2-B2 GREEN + Live Acceptance PASS.
+2) انتظر GitHub Actions وتأكد من نجاح S0/S1/S2-A/S2-B1/S2-B2/S2-B3 وpytest وHTTP E2E.
+3) لا تشغّل SQL على Supabase قبل أخضر GitHub.
+4) بعد الأخضر شغّل في SQL Editor:
+   supabase/migrations/20260901210000_s2_b3_operational_domains.sql
+5) ثم شغّل:
+   supabase/tests/s2_b3_live_acceptance.sql
+6) النتيجة المطلوبة: PASS: S2-B3 live acceptance
+
+لا RLS ولا ربط React ولا نقل بيانات SQLite في هذه المرحلة.

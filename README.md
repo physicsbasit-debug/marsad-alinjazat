@@ -1,3 +1,7 @@
+## Phase S2-B3 — Operational domains migration
+
+PostgreSQL now has a third versioned migration for meetings, curriculum planning, supervision, and achievement: 11 new operational tables with same-school composite foreign keys and academic-year isolation. Browser roles remain denied and runtime remains FastAPI/SQLite until later parity gates.
+
 ## Phase S2-B2 — Teachers domain migration
 
 PostgreSQL now has a second versioned migration for the teacher domain: `teachers`, `teacher_profiles`, `teacher_years`, and `teacher_cv_items`. The deferred `school_memberships.teacher_id` link is completed with a same-school composite foreign key. Runtime remains FastAPI/SQLite and RLS remains deferred to S2-C.
@@ -21,8 +25,8 @@ The repository now contains the browser client boundary, local CLI configuration
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة العمل التربوي وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. تجمع أعمال القسم والمعلمين والطلبات والوثائق والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في سجلات مترابطة قابلة للمتابعة بدل توزيعها بين ملفات ومجلدات منفصلة.
 
-> الإصدار الجاري: **v0.18.0 — Phase S2-B2 Teachers Domain Migration**
-> آخر نقطة استقرار خضراء: **v0.17.0 — Phase S2-B1 Core Identity & Tenancy + Live Supabase Acceptance**
+> الإصدار الجاري: **v0.19.0 — Phase S2-B3 Operational Domains Migration**
+> آخر نقطة استقرار خضراء: **v0.18.0 — Phase S2-B2 Teachers Domain + Live Supabase Acceptance**
 > المعاينة الحية: **https://physicsbasit-debug.github.io/marsad-alinjazat/**
 
 ## الفكرة

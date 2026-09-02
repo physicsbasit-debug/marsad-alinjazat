@@ -18,6 +18,7 @@ B1_MIGRATION = "20260901120000_s2_b1_core_identity_tenancy.sql"
 B2_MIGRATION = "20260901190000_s2_b2_teachers_domain.sql"
 EXPECTED_TARGET_SHA256 = "84ba44b8104d09d62095c4af00a40d413ddc78fb1b2b251af1487d439368ecda"
 EXPECTED_B1_SHA256 = "53a20ade59193cc37ce9aa5935fb6739e76262df6cf9fc2350c6399d6a3a0de2"
+EXPECTED_B2_SHA256 = "65030ee568719c5da6a010522c401e52b7b56b362a2547e02ed0f311c4d5e78b"
 EXPECTED_TABLES = {"teachers", "teacher_profiles", "teacher_years", "teacher_cv_items"}
 
 
@@ -48,7 +49,12 @@ def main() -> None:
         if not path.exists(): fail(f"required S2-B2 file missing: {path.relative_to(ROOT)}")
 
     package = json.loads(PACKAGE_FILE.read_text(encoding="utf-8"))
-    if package.get("version") != "0.18.0": fail("S2-B2 package version must be 0.18.0")
+    version = package.get("version", "0.0.0")
+    try:
+        version_tuple = tuple(int(part) for part in version.split(".")[:3])
+    except ValueError:
+        fail(f"invalid package version: {version}")
+    if version_tuple < (0, 18, 0): fail("S2-B2 requires package version >= 0.18.0")
 
     if hashlib.sha256(TARGET_CONTRACT.read_bytes()).hexdigest() != EXPECTED_TARGET_SHA256:
         fail("S2-A frozen target schema changed during S2-B2")
@@ -57,9 +63,12 @@ def main() -> None:
     b2 = MIGRATIONS_DIR / B2_MIGRATION
     if not b1.exists() or not b2.exists(): fail("S2-B1 and S2-B2 migrations must both exist")
     if hashlib.sha256(b1.read_bytes()).hexdigest() != EXPECTED_B1_SHA256:
-        fail("approved S2-B1 migration changed during S2-B2")
+        fail("approved S2-B1 migration changed after S2-B2")
+    if hashlib.sha256(b2.read_bytes()).hexdigest() != EXPECTED_B2_SHA256:
+        fail("approved S2-B2 migration changed after its live acceptance")
     migrations = sorted(p.name for p in MIGRATIONS_DIR.glob("*.sql") if p.is_file())
-    if migrations != [B1_MIGRATION, B2_MIGRATION]: fail(f"unexpected migration set: {migrations}")
+    if len(migrations) < 2 or migrations[:2] != [B1_MIGRATION, B2_MIGRATION]:
+        fail(f"S2-B1/B2 migration history changed unexpectedly: {migrations}")
 
     contract = json.loads(PHASE_CONTRACT.read_text(encoding="utf-8"))
     if contract.get("phase") != "S2-B2" or contract.get("project_version") != "0.18.0": fail("invalid S2-B2 contract identity")
@@ -159,7 +168,7 @@ def main() -> None:
     if "python scripts/check_supabase_s2_b2.py" not in workflow: fail("CI does not execute S2-B2 contract")
 
     print("PASS: Marsad Phase S2-B2 teachers domain migration contract")
-    print("INFO: migrations=2 new_tables=4 same_school_fk=PASS runtime_switch=0 data_migration=0 rls=0")
+    print(f"INFO: migration_files={len(migrations)} s2_b2_new_tables=4 same_school_fk=PASS runtime_switch=0 data_migration=0 rls=0")
     print("INFO: annual_teacher_attributes=teacher_years deny_by_default=PASS frozen_schema=PASS")
 
 
