@@ -355,3 +355,7 @@ STORAGE_MODE
 ## حدود المشروع
 
 إدارة المختبرات والأجهزة والمواد الكيميائية ليست ضمن نطاق «مرصد الإنجازات». تركيز المشروع على الإدارة التربوية، المتابعة المهنية، التوثيق، التحصيل، والذاكرة المؤسسية للقسم.
+
+
+### S2-B5 Fix 1 — updated_at clock semantics
+Live Supabase acceptance exposed that `statement_timestamp()` remains constant for an entire SQL statement. Version 0.21.1 adds a corrective migration that replaces only `public.set_row_updated_at()` with `clock_timestamp()` while preserving the already-applied S2-B5 migration and all 22 triggers.

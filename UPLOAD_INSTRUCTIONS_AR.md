@@ -9,3 +9,7 @@
 7. النتيجة المطلوبة: `PASS: S2-B5 final schema acceptance`.
 
 S2-B5 لا تنقل بيانات ولا تفعل Auth أو Policies. auto-RLS الموجود من Supabase لا يحتاج تعطيلًا؛ الاختبار يطلب فقط أن تبقى browser grants والسياسات صفرًا قبل S2-C.
+
+
+### S2-B5 Fix 1 — تصحيح updated_at
+كشف اختبار Supabase الحي أن `statement_timestamp()` ثابت طوال SQL statement واحد، لذلك قد لا يتقدم `updated_at` عند تنفيذ أكثر من عملية داخل statement واحد. الإصدار 0.21.1 يضيف Migration تصحيحية جديدة تستبدل الدالة فقط لتستخدم `clock_timestamp()`، مع إبقاء Migration S2-B5 الأصلية والـ22 Trigger دون تعديل.

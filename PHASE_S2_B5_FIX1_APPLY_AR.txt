@@ -1,0 +1,8 @@
+مرصد الإنجازات — S2-B5 Fix 1
+
+الإصدار: 0.21.1
+السبب: اختبار Supabase الحي كشف أن statement_timestamp() ثابت طوال SQL statement واحد، لذلك لم يتقدم updated_at داخل DO block.
+الإصلاح: Migration جديدة تستبدل دالة public.set_row_updated_at() فقط لتستخدم clock_timestamp().
+لا تعدّل Migration S2-B5 الأصلية لأنها مطبقة فعليًا.
+بعد GitHub Actions الأخضر: شغّل ملف SQL الخاص بـFix 1، ثم أعد تشغيل s2_b5_live_acceptance.sql.
+النتيجة المطلوبة: PASS: S2-B5 final schema acceptance

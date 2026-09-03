@@ -1,0 +1,23 @@
+{
+  "phase": "S2-B5-Fix1",
+  "project_version": "0.21.1",
+  "base_phase": "S2-B5",
+  "base_version": "0.21.0",
+  "migration": "20260903080000_s2_b5_fix1_updated_at_clock.sql",
+  "migration_sha256": "1d3b9b341b3e24741bcb928e6fe56c68709d924581f55e687fa929b6ffc5f32b",
+  "problem": "statement_timestamp() is constant for the duration of a SQL statement, so INSERT and UPDATE inside one DO statement can receive the same updated_at value.",
+  "resolution": "Replace only public.set_row_updated_at() to use clock_timestamp(). Existing 22 triggers remain attached and automatically call the replaced function.",
+  "new_tables": [],
+  "new_triggers": [],
+  "new_indexes": [],
+  "table_changes": [],
+  "runtime_switch_allowed": false,
+  "data_migration_allowed": false,
+  "storage_bytes_migration_allowed": false,
+  "auth_user_creation_allowed": false,
+  "rls_policy_creation_allowed": false,
+  "browser_grants_before_s2_c": 0,
+  "policies_before_s2_c": 0,
+  "function_clock": "clock_timestamp()",
+  "historical_s2_b5_migration_mutated": false
+}

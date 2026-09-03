@@ -19,3 +19,9 @@
 - S2-B5: إغلاق المخطط، 22 trigger لـ`updated_at` وثلاثة فهارس نهائية واختبار قبول شامل. لا ينشئ جدول مجال جديدًا.
 
 سلسلة S2-B تمثل كل **الجداول الـ26** و**299 عمودًا** في عقد S2-A. لا تنقل هذه migrations بيانات SQLite أو bytes التخزين، ولا تنشئ RLS policies؛ سياسات التفويض تبدأ في S2-C. مشروع Supabase قد يفعّل RLS تلقائيًا عبر إعداد خارجي، ولا يُعطّل ذلك هنا ما دامت browser grants والسياسات صفرًا.
+
+### S2-B5 Fix 1 — updated_at clock semantics
+
+- `20260903080000_s2_b5_fix1_updated_at_clock.sql` replaces only `public.set_row_updated_at()` so it uses `clock_timestamp()` rather than `statement_timestamp()`.
+- The original S2-B5 migration remains unchanged because it has already been applied to the live Supabase project.
+- The 22 existing triggers are reused; no trigger/table/index is recreated.

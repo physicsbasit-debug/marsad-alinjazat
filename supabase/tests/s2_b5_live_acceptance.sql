@@ -204,9 +204,10 @@ begin
     where n.nspname = 'public'
       and p.proname = 'set_row_updated_at'
       and p.prorettype = 'trigger'::regtype
-      and not p.prosecdef;
+      and not p.prosecdef
+      and position('clock_timestamp()' in p.prosrc) > 0;
     if v_function_count <> 1 then
-        raise exception 'S2-B5 acceptance failed: updated_at trigger helper is missing or unsafe';
+        raise exception 'S2-B5 acceptance failed: updated_at trigger helper is missing, unsafe, or not using clock_timestamp()';
     end if;
 
     select count(*) into v_function_grant_count
@@ -248,6 +249,8 @@ begin
 end $$;
 
 -- Functional proof that the database, not application code, advances updated_at.
+-- The INSERT and UPDATE intentionally execute inside one DO statement; this catches
+-- the statement_timestamp() bug that S2-B5 Fix 1 replaces with clock_timestamp().
 do $$
 declare
     v_school uuid;
