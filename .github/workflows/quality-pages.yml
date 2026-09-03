@@ -74,6 +74,9 @@ jobs:
       - name: S2-C1 Auth and RLS security foundation
         run: python scripts/check_supabase_s2_c1.py
 
+      - name: S2-C2 domain RLS baseline
+        run: python scripts/check_supabase_s2_c2.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 
