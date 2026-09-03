@@ -1,0 +1,120 @@
+name: Quality & Live Preview
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: TypeScript and Vite build
+        run: npm run check
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install backend and test dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: API tests
+        run: python -m pytest -q
+
+      - name: S0 baseline contract
+        run: python scripts/check_marsad_baseline.py
+
+      - name: S1 Supabase foundation contract
+        run: python scripts/check_supabase_foundation.py
+
+      - name: S2-A PostgreSQL schema design freeze
+        run: python scripts/check_supabase_schema_freeze.py
+
+      - name: S2-B1 core identity and tenancy migration
+        run: python scripts/check_supabase_s2_b1.py
+
+      - name: S2-B2 teachers domain migration
+        run: python scripts/check_supabase_s2_b2.py
+
+      - name: S2-B3 operational domains migration
+        run: python scripts/check_supabase_s2_b3.py
+
+      - name: S2-B4 content and intake domains migration
+        run: python scripts/check_supabase_s2_b4.py
+
+      - name: S2-B5 final schema closure
+        run: python scripts/check_supabase_s2_b5.py
+
+      - name: S2-B5 Fix 1 updated_at clock
+        run: python scripts/check_supabase_s2_b5_fix1.py
+
+      - name: S2-C1 Auth and RLS security foundation
+        run: python scripts/check_supabase_s2_c1.py
+
+      - name: Real HTTP E2E regression
+        run: python scripts/marsad_e2e_regression.py
+
+  build-preview:
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build GitHub Pages preview
+        env:
+          VITE_PREVIEW_MODE: 'true'
+          VITE_BASE_PATH: '/marsad-alinjazat/'
+        run: |
+          npm run build:pages
+          touch dist/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy-preview:
+    needs: build-preview
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
