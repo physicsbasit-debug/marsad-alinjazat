@@ -1,3 +1,7 @@
+## Phase S2-C2 — Domain RLS Baseline
+
+RLS now covers the remaining 21 domain tables with a conservative least-privilege baseline. School-wide operational data is readable to active members, teacher/document private rows use teacher-linked visibility, manager-sensitive token/audit tables are narrower, and direct browser writes remain owner/admin-only and operation-scoped. Five trusted/storage-coupled tables stay browser-write locked. Runtime remains FastAPI/SQLite.
+
 ## Phase S2-C1 — Auth + RLS Security Foundation
 
 The first authorization slice is now defined for the five core identity/tenancy tables. Roles are trusted only from `school_memberships`, RLS helpers live in a non-exposed `private` schema, future Auth users receive a public profile via trigger, and browser membership writes remain forbidden. The other 21 domain tables stay closed until S2-C2. Runtime remains FastAPI/SQLite. See `SUPABASE_SECURITY_FOUNDATION_AR.md`.
@@ -41,8 +45,8 @@ The repository now contains the browser client boundary, local CLI configuration
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة العمل التربوي وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. تجمع أعمال القسم والمعلمين والطلبات والوثائق والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في سجلات مترابطة قابلة للمتابعة بدل توزيعها بين ملفات ومجلدات منفصلة.
 
-> الإصدار الجاري: **v0.21.0 — Phase S2-B4 Events / Documents / Requests / Activities**
-> آخر نقطة استقرار خضراء: **v0.19.0 — Phase S2-B3 Operational Domains + Live Supabase Acceptance**
+> الإصدار الجاري: **v0.23.0 — Phase S2-C2 Domain RLS Baseline**
+> آخر نقطة استقرار خضراء: **v0.22.0 — Phase S2-C1 Auth/RLS Foundation + Live Acceptance**
 > المعاينة الحية: **https://physicsbasit-debug.github.io/marsad-alinjazat/**
 
 ## الفكرة

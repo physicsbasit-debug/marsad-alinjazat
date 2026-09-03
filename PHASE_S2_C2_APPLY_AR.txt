@@ -1,0 +1,10 @@
+Phase S2-C2 — Domain RLS Baseline
+
+1) ارفع changed_files_only فوق main.
+2) انتظر GitHub Actions GREEN.
+3) لا تشغّل أي SQL قبل الأخضر.
+4) بعد الأخضر شغّل فقط migration: 20260903123000_s2_c2_domain_rls_baseline.sql
+5) ثم شغّل: s2_c2_live_acceptance.sql
+6) النتيجة المطلوبة: PASS: S2-C2 domain RLS baseline acceptance
+
+لا تعِد تشغيل migrations السابقة. لا تحذف مستخدم Auth قبل انتهاء قبول S2-C2.

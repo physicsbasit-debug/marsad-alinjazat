@@ -12,6 +12,7 @@
 20260902090000_s2_b5_schema_hardening.sql
 20260903080000_s2_b5_fix1_updated_at_clock.sql
 20260903100000_s2_c1_security_foundation.sql
+20260903123000_s2_c2_domain_rls_baseline.sql
 ```
 
 - S2-B1: `schools`, `profiles`, `school_memberships`, `academic_years`.
@@ -31,3 +32,7 @@
 ### S2-C1 — Security foundation
 
 `20260903100000_s2_c1_security_foundation.sql` starts Auth/RLS on the five core identity/tenancy tables only. It creates the non-exposed `private` policy-helper schema, the Auth->profile trigger, targeted authenticated grants, and 11 RLS policies. The remaining 21 domain tables stay closed until S2-C2.
+
+### S2-C2 — Domain RLS baseline
+
+`20260903123000_s2_c2_domain_rls_baseline.sql` enables RLS on the remaining 21 domain tables, adds 58 least-privilege policies and one private teacher-record visibility helper. Five trusted/storage-coupled tables remain browser-write locked. Runtime stays FastAPI/SQLite.

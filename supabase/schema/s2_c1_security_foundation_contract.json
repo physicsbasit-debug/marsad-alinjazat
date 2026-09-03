@@ -15,7 +15,10 @@
     "private.can_view_profile(uuid)"
   ],
   "auth_profile_trigger": "on_marsad_auth_user_created",
-  "profile_metadata_fields": ["display_name", "name"],
+  "profile_metadata_fields": [
+    "display_name",
+    "name"
+  ],
   "core_policy_tables": [
     "schools",
     "profiles",
@@ -34,14 +37,23 @@
   "direct_membership_writes_from_browser": false,
   "direct_school_create_delete_from_browser": false,
   "direct_profile_create_delete_from_browser": false,
-  "academic_year_manager_roles": ["owner", "admin"],
-  "settings_manager_roles": ["owner", "admin"],
-  "school_update_roles": ["owner"],
+  "academic_year_manager_roles": [
+    "owner",
+    "admin"
+  ],
+  "settings_manager_roles": [
+    "owner",
+    "admin"
+  ],
+  "school_update_roles": [
+    "owner"
+  ],
   "remaining_domain_tables_exposed": false,
   "runtime_switch_allowed": false,
   "sqlite_data_migration_allowed": false,
   "storage_policy_creation_allowed": false,
   "storage_bytes_migration_allowed": false,
   "auth_user_creation_in_migration_allowed": false,
-  "service_secret_in_browser_allowed": false
+  "service_secret_in_browser_allowed": false,
+  "live_acceptance_status": "passed_live_2026-09-03"
 }

@@ -1,0 +1,164 @@
+{
+  "phase": "S2-C2",
+  "project_version": "0.23.0",
+  "base_phase": "S2-C1",
+  "base_version": "0.22.0",
+  "migration": "20260903123000_s2_c2_domain_rls_baseline.sql",
+  "migration_sha256": "85d8325bcbe42ada1446b78c62950448fc33c74229bf71a783fed5f8ad474d32",
+  "tenant_boundary": "school_memberships",
+  "trusted_role_source": "public.school_memberships.role",
+  "user_metadata_authorization_forbidden": true,
+  "domain_table_count": 21,
+  "new_policy_count": 58,
+  "total_policy_count_after_c2": 69,
+  "helper_function": "private.can_access_teacher_record(uuid,bigint)",
+  "schoolwide_select_tables": [
+    "achievement_action_metrics",
+    "achievement_actions",
+    "achievement_assessment_standards",
+    "achievement_assessments",
+    "curriculum_plans",
+    "curriculum_units",
+    "event_media",
+    "event_teacher_links",
+    "events",
+    "meeting_attendees",
+    "meeting_decisions",
+    "meetings",
+    "supervision_actions",
+    "supervision_visits"
+  ],
+  "teacher_private_select_tables": [
+    "documents",
+    "teacher_cv_items",
+    "teacher_profiles",
+    "teacher_years",
+    "teachers"
+  ],
+  "manager_sensitive_select_tables": [
+    "activities",
+    "upload_requests"
+  ],
+  "private_teacher_manager_read_roles": [
+    "owner",
+    "admin",
+    "lead_teacher"
+  ],
+  "private_teacher_self_read_role": "teacher",
+  "domain_write_roles": [
+    "owner",
+    "admin"
+  ],
+  "lead_teacher_browser_writes_enabled": false,
+  "lead_teacher_write_deferral_reason": "department/subject is not a security tenant in schema v1; school-wide lead_teacher writes would over-authorize across departments",
+  "direct_browser_write_locked_tables": [
+    "activities",
+    "documents",
+    "event_media",
+    "teacher_years",
+    "upload_requests"
+  ],
+  "write_operation_matrix": {
+    "achievement_action_metrics": [
+      "delete",
+      "insert",
+      "update"
+    ],
+    "achievement_actions": [
+      "delete",
+      "insert",
+      "update"
+    ],
+    "achievement_assessment_standards": [
+      "insert",
+      "update"
+    ],
+    "achievement_assessments": [
+      "insert",
+      "update"
+    ],
+    "curriculum_plans": [
+      "insert",
+      "update"
+    ],
+    "curriculum_units": [
+      "delete",
+      "insert",
+      "update"
+    ],
+    "event_teacher_links": [
+      "delete",
+      "insert"
+    ],
+    "events": [
+      "insert",
+      "update"
+    ],
+    "meeting_attendees": [
+      "delete",
+      "insert"
+    ],
+    "meeting_decisions": [
+      "delete",
+      "insert",
+      "update"
+    ],
+    "meetings": [
+      "insert",
+      "update"
+    ],
+    "supervision_actions": [
+      "delete",
+      "insert",
+      "update"
+    ],
+    "supervision_visits": [
+      "insert",
+      "update"
+    ],
+    "teacher_cv_items": [
+      "delete",
+      "insert"
+    ],
+    "teacher_profiles": [
+      "insert",
+      "update"
+    ],
+    "teachers": [
+      "insert",
+      "update"
+    ]
+  },
+  "delete_grant_tables": [
+    "achievement_action_metrics",
+    "achievement_actions",
+    "curriculum_units",
+    "event_teacher_links",
+    "meeting_attendees",
+    "meeting_decisions",
+    "supervision_actions",
+    "teacher_cv_items"
+  ],
+  "insert_sequence_grants": [
+    "achievement_actions_id_seq",
+    "achievement_assessments_id_seq",
+    "curriculum_plans_id_seq",
+    "curriculum_units_id_seq",
+    "events_id_seq",
+    "meeting_decisions_id_seq",
+    "meetings_id_seq",
+    "supervision_actions_id_seq",
+    "supervision_visits_id_seq",
+    "teacher_cv_items_id_seq",
+    "teachers_id_seq"
+  ],
+  "public_upload_enabled": false,
+  "storage_policies_enabled": false,
+  "activity_browser_writes_enabled": false,
+  "runtime_switch_allowed": false,
+  "sqlite_data_migration_allowed": false,
+  "storage_bytes_migration_allowed": false,
+  "auth_user_mutation_allowed": false,
+  "service_secret_in_browser_allowed": false,
+  "live_acceptance_status": "pending_after_github_green"
+}

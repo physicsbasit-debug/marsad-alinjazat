@@ -16,3 +16,7 @@
 ### S2-C1 — Auth/RLS foundation
 
 `s2_c1_live_acceptance.sql` requires one temporary Supabase Auth user created from Dashboard after the S2-C1 migration. It never mutates `auth.users` directly, tests real authenticated RLS behavior with that user, and rolls back all public tenant fixtures. Expected result: `PASS: S2-C1 security foundation acceptance`.
+
+### S2-C2 — Domain RLS baseline
+
+`s2_c2_live_acceptance.sql` reuses one real Auth user, tests owner/teacher/viewer/lead_teacher contexts across separate schools, verifies private-record isolation and locked trusted/storage writes, then rolls back all public fixtures. Expected result: `PASS: S2-C2 domain RLS baseline acceptance`.

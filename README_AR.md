@@ -1,3 +1,7 @@
+## Phase S2-C2 — Domain RLS Baseline
+
+اكتملت طبقة RLS الأساسية على الجداول الـ21 المتبقية. القراءة تفرق بين السجلات التشغيلية المدرسية والسجلات الخاصة بالمعلم/الوثائق، والكتابة المباشرة محصورة في `owner/admin` وبالعمليات المثبتة في Legacy. تبقى `teacher_years`, `upload_requests`, `documents`, `event_media`, و`activities` بلا كتابة مباشرة من المتصفح حتى المسارات الموثوقة/Storage اللاحقة. لا يزال Runtime على FastAPI/SQLite. راجع `SUPABASE_DOMAIN_RLS_BASELINE_AR.md`.
+
 ## Phase S2-C1 — Auth + RLS Security Foundation
 
 بدأت طبقة التفويض الفعلية على خمسة جداول نواة فقط: `schools`, `profiles`, `school_memberships`, `academic_years`, و`school_settings`. مصدر الدور الموثوق هو `school_memberships.role` فقط، ودوال RLS المساعدة داخل schema `private` غير المعروضة للـData API. لا توجد كتابة مباشرة للعضويات من المتصفح، وتبقى الجداول الـ21 الأخرى مقفلة حتى S2-C2. التشغيل ما زال FastAPI/SQLite. راجع `SUPABASE_SECURITY_FOUNDATION_AR.md`.
@@ -22,7 +26,7 @@
 
 أضيفت migration ثانية لمجال المعلمين: `teachers`, `teacher_profiles`, `teacher_years`, و`teacher_cv_items`، مع إكمال ربط `school_memberships.teacher_id` بالمعلم داخل المدرسة نفسها. التشغيل ما زال FastAPI/SQLite وRLS مؤجل إلى S2-C.
 
-# مرصد الإنجازات v0.22.0
+# مرصد الإنجازات v0.23.0
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة أعمال المادة وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. الفكرة ليست جمع ملفات في شاشة واحدة، بل ربط الأشخاص والأعمال والقرارات والتخطيط والتحصيل والإشراف والفعاليات والوثائق في سجلات قابلة للمتابعة والتقرير.
 
