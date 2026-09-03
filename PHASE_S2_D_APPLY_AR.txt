@@ -1,0 +1,12 @@
+مرصد الإنجازات — S2-D / v0.24.0
+
+1) ارفع changed_files_only إلى main.
+2) انتظر GitHub Actions GREEN.
+3) لا تشغل أي Migration في Supabase: S2-D لا تحتوي Migration جديدة أصلًا.
+4) أبقِ مستخدم Auth واحدًا موجودًا مع public.profiles.
+5) شغّل فقط supabase/tests/s2_d_live_acceptance.sql في SQL Editor.
+6) النتيجة المطلوبة:
+   PASS: S2-D database acceptance and migration readiness
+7) الاختبار ينتهي بـ ROLLBACK ولا يترك بيانات اختبار.
+
+PASS في S2-D = جاهزية لبدء SQLite data-migration dry run فقط، وليس Runtime cutover.

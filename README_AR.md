@@ -1,3 +1,7 @@
+## Phase S2-D — Database Acceptance & Migration Readiness
+
+أغلقت هذه المرحلة بوابة قبول قاعدة Supabase دون إضافة Migration جديدة: اختبار حي مترابط عبر الجداول الـ26، عزل مدرستين، عامين دراسيين، أدوار Auth/RLS، القيود المرجعية والحسابية، و`updated_at`. كما ثُبت Manifest لنقل جداول SQLite الـ25 إلى الهدف دون إسقاط صامت أو اختلاق بيانات تاريخية. نجاح S2-D يعني الجاهزية لـData Migration Dry Run فقط، وليس قطع FastAPI/SQLite. راجع `SUPABASE_DATABASE_ACCEPTANCE_AR.md`.
+
 ## Phase S2-C2 — Domain RLS Baseline
 
 اكتملت طبقة RLS الأساسية على الجداول الـ21 المتبقية. القراءة تفرق بين السجلات التشغيلية المدرسية والسجلات الخاصة بالمعلم/الوثائق، والكتابة المباشرة محصورة في `owner/admin` وبالعمليات المثبتة في Legacy. تبقى `teacher_years`, `upload_requests`, `documents`, `event_media`, و`activities` بلا كتابة مباشرة من المتصفح حتى المسارات الموثوقة/Storage اللاحقة. لا يزال Runtime على FastAPI/SQLite. راجع `SUPABASE_DOMAIN_RLS_BASELINE_AR.md`.
@@ -26,7 +30,7 @@
 
 أضيفت migration ثانية لمجال المعلمين: `teachers`, `teacher_profiles`, `teacher_years`, و`teacher_cv_items`، مع إكمال ربط `school_memberships.teacher_id` بالمعلم داخل المدرسة نفسها. التشغيل ما زال FastAPI/SQLite وRLS مؤجل إلى S2-C.
 
-# مرصد الإنجازات v0.23.0
+# مرصد الإنجازات v0.24.0
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة أعمال المادة وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. الفكرة ليست جمع ملفات في شاشة واحدة، بل ربط الأشخاص والأعمال والقرارات والتخطيط والتحصيل والإشراف والفعاليات والوثائق في سجلات قابلة للمتابعة والتقرير.
 

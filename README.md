@@ -1,3 +1,7 @@
+## Phase S2-D — Database Acceptance & Migration Readiness
+
+S2-D is an acceptance-only gate: no SQL migration, schema/RLS change, data copy, storage copy, or runtime switch. A rollback-protected live test exercises the complete 26-table target, two-school isolation, academic-year separation, Auth/RLS roles, critical constraints, and updated_at semantics. The data-migration manifest covers all 25 legacy SQLite tables. PASS means ready for a controlled SQLite migration dry run only.
+
 ## Phase S2-C2 — Domain RLS Baseline
 
 RLS now covers the remaining 21 domain tables with a conservative least-privilege baseline. School-wide operational data is readable to active members, teacher/document private rows use teacher-linked visibility, manager-sensitive token/audit tables are narrower, and direct browser writes remain owner/admin-only and operation-scoped. Five trusted/storage-coupled tables stay browser-write locked. Runtime remains FastAPI/SQLite.
@@ -45,8 +49,8 @@ The repository now contains the browser client boundary, local CLI configuration
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة العمل التربوي وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. تجمع أعمال القسم والمعلمين والطلبات والوثائق والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في سجلات مترابطة قابلة للمتابعة بدل توزيعها بين ملفات ومجلدات منفصلة.
 
-> الإصدار الجاري: **v0.23.0 — Phase S2-C2 Domain RLS Baseline**
-> آخر نقطة استقرار خضراء: **v0.22.0 — Phase S2-C1 Auth/RLS Foundation + Live Acceptance**
+> الإصدار الجاري: **v0.24.0 — Phase S2-D Database Acceptance & Migration Readiness**
+> آخر نقطة استقرار خضراء: **v0.23.0 — Phase S2-C2 Domain RLS + Live Acceptance**
 > المعاينة الحية: **https://physicsbasit-debug.github.io/marsad-alinjazat/**
 
 ## الفكرة

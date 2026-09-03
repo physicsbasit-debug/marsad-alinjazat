@@ -20,3 +20,7 @@
 ### S2-C2 — Domain RLS baseline
 
 `s2_c2_live_acceptance.sql` reuses one real Auth user, tests owner/teacher/viewer/lead_teacher contexts across separate schools, verifies private-record isolation and locked trusted/storage writes, then rolls back all public fixtures. Expected result: `PASS: S2-C2 domain RLS baseline acceptance`.
+
+### S2-D — Database acceptance and migration readiness
+
+`s2_d_live_acceptance.sql` is acceptance-only and has no paired migration. It reuses one real Auth user, builds a rollback-protected complete fixture across the 26-table target and two schools, validates year isolation, RLS roles, critical constraints and referential behavior, and returns `PASS: S2-D database acceptance and migration readiness`. PASS authorizes only a controlled SQLite data-migration dry run, not runtime cutover.

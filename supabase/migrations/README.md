@@ -36,3 +36,7 @@
 ### S2-C2 — Domain RLS baseline
 
 `20260903123000_s2_c2_domain_rls_baseline.sql` enables RLS on the remaining 21 domain tables, adds 58 least-privilege policies and one private teacher-record visibility helper. Five trusted/storage-coupled tables remain browser-write locked. Runtime stays FastAPI/SQLite.
+
+## S2-D note
+
+S2-D intentionally adds no migration. It is a database acceptance/data-migration-readiness gate over the S2-C2 live schema.

@@ -160,5 +160,6 @@
   "storage_bytes_migration_allowed": false,
   "auth_user_mutation_allowed": false,
   "service_secret_in_browser_allowed": false,
-  "live_acceptance_status": "pending_after_github_green"
+  "live_acceptance_status": "passed_live_2026-09-03",
+  "live_acceptance_note": "GitHub Quality & Live Preview #50 succeeded and Supabase returned PASS: S2-C2 domain RLS baseline acceptance."
 }

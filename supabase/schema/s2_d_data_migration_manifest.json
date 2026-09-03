@@ -1,0 +1,416 @@
+{
+  "phase": "S2-D",
+  "project_version": "0.24.0",
+  "purpose": "database acceptance and SQLite-to-Supabase data-migration readiness; no data migration is executed in this phase",
+  "source_engine": "SQLite",
+  "target_engine": "PostgreSQL via Supabase",
+  "source_table_count": 25,
+  "source_tables": [
+    "settings",
+    "teachers",
+    "teacher_profiles",
+    "teacher_cv_items",
+    "teacher_record_years",
+    "upload_requests",
+    "request_record_years",
+    "documents",
+    "events",
+    "event_record_years",
+    "event_media",
+    "event_media_meta",
+    "event_teacher_links",
+    "activities",
+    "meetings",
+    "meeting_attendees",
+    "meeting_decisions",
+    "curriculum_plans",
+    "curriculum_units",
+    "supervision_visits",
+    "supervision_actions",
+    "achievement_assessments",
+    "achievement_assessment_standards",
+    "achievement_actions",
+    "achievement_action_metrics"
+  ],
+  "target_table_count": 26,
+  "target_tables": [
+    "schools",
+    "profiles",
+    "school_memberships",
+    "academic_years",
+    "school_settings",
+    "teachers",
+    "teacher_profiles",
+    "teacher_years",
+    "teacher_cv_items",
+    "upload_requests",
+    "documents",
+    "events",
+    "event_media",
+    "event_teacher_links",
+    "activities",
+    "meetings",
+    "meeting_attendees",
+    "meeting_decisions",
+    "curriculum_plans",
+    "curriculum_units",
+    "supervision_visits",
+    "supervision_actions",
+    "achievement_assessments",
+    "achievement_assessment_standards",
+    "achievement_actions",
+    "achievement_action_metrics"
+  ],
+  "target_schema_sha256": "84ba44b8104d09d62095c4af00a40d413ddc78fb1b2b251af1487d439368ecda",
+  "bootstrap_targets": {
+    "schools": "requires an explicit migration input for the real school identity; S2-D must not invent a production school row",
+    "academic_years": "derive the union of explicit legacy year relations and year-scoped record labels using the frozen compatibility rules; do not infer all history from the current date",
+    "profiles": "provision from real Supabase Auth identities, not from SQLite application rows",
+    "school_memberships": "provision through a trusted admin path after Auth identity exists; never infer owner/admin roles from browser metadata"
+  },
+  "legacy_transformations": [
+    {
+      "legacy": "settings",
+      "target": [
+        "school_settings"
+      ],
+      "rule": "migrate only non-secret configuration; OAuth tokens/state are not copied into public schema"
+    },
+    {
+      "legacy": "teachers",
+      "target": [
+        "teachers",
+        "teacher_years"
+      ],
+      "rule": "stable identity to teachers; current-year subject/experience/workload to teacher_years"
+    },
+    {
+      "legacy": "teacher_profiles",
+      "target": [
+        "teacher_profiles",
+        "teacher_years"
+      ],
+      "rule": "employee number/join year/summary stay profile; grades/responsibilities become year-scoped"
+    },
+    {
+      "legacy": "teacher_cv_items",
+      "target": [
+        "teacher_cv_items"
+      ],
+      "rule": "direct"
+    },
+    {
+      "legacy": "teacher_record_years",
+      "target": [
+        "teacher_years"
+      ],
+      "rule": "membership by year; historical annual attributes remain null when source does not prove them"
+    },
+    {
+      "legacy": "upload_requests",
+      "target": [
+        "upload_requests"
+      ],
+      "rule": "direct plus academic_year_id"
+    },
+    {
+      "legacy": "request_record_years",
+      "target": [
+        "upload_requests"
+      ],
+      "rule": "fold academic year relation into upload_requests.academic_year_id"
+    },
+    {
+      "legacy": "documents",
+      "target": [
+        "documents"
+      ],
+      "rule": "provider metadata normalized; file bytes move later in storage phase"
+    },
+    {
+      "legacy": "events",
+      "target": [
+        "events"
+      ],
+      "rule": "direct plus academic_year_id"
+    },
+    {
+      "legacy": "event_record_years",
+      "target": [
+        "events"
+      ],
+      "rule": "fold academic year relation into events.academic_year_id"
+    },
+    {
+      "legacy": "event_media",
+      "target": [
+        "event_media"
+      ],
+      "rule": "direct storage metadata"
+    },
+    {
+      "legacy": "event_media_meta",
+      "target": [
+        "event_media"
+      ],
+      "rule": "merge caption/position/is_cover into event_media"
+    },
+    {
+      "legacy": "event_teacher_links",
+      "target": [
+        "event_teacher_links"
+      ],
+      "rule": "direct plus school_id"
+    },
+    {
+      "legacy": "activities",
+      "target": [
+        "activities"
+      ],
+      "rule": "direct plus school/year/actor context when known"
+    },
+    {
+      "legacy": "meetings",
+      "target": [
+        "meetings"
+      ],
+      "rule": "replace academic_year text with academic_year_id"
+    },
+    {
+      "legacy": "meeting_attendees",
+      "target": [
+        "meeting_attendees"
+      ],
+      "rule": "direct plus school_id"
+    },
+    {
+      "legacy": "meeting_decisions",
+      "target": [
+        "meeting_decisions"
+      ],
+      "rule": "direct plus school_id"
+    },
+    {
+      "legacy": "curriculum_plans",
+      "target": [
+        "curriculum_plans"
+      ],
+      "rule": "replace academic_year text with academic_year_id"
+    },
+    {
+      "legacy": "curriculum_units",
+      "target": [
+        "curriculum_units"
+      ],
+      "rule": "direct plus school_id"
+    },
+    {
+      "legacy": "supervision_visits",
+      "target": [
+        "supervision_visits"
+      ],
+      "rule": "replace academic_year text with academic_year_id"
+    },
+    {
+      "legacy": "supervision_actions",
+      "target": [
+        "supervision_actions"
+      ],
+      "rule": "direct plus school_id"
+    },
+    {
+      "legacy": "achievement_assessments",
+      "target": [
+        "achievement_assessments"
+      ],
+      "rule": "replace academic_year text with academic_year_id; preserve all score/mastery constraints"
+    },
+    {
+      "legacy": "achievement_assessment_standards",
+      "target": [
+        "achievement_assessment_standards"
+      ],
+      "rule": "keep separate one-to-one audit record"
+    },
+    {
+      "legacy": "achievement_actions",
+      "target": [
+        "achievement_actions"
+      ],
+      "rule": "direct plus school_id"
+    },
+    {
+      "legacy": "achievement_action_metrics",
+      "target": [
+        "achievement_action_metrics"
+      ],
+      "rule": "keep one-to-one metric record; preserve direction and baseline/target/outcome semantics"
+    }
+  ],
+  "folded_legacy_tables": [
+    "request_record_years",
+    "event_record_years",
+    "teacher_record_years",
+    "event_media_meta"
+  ],
+  "load_stages": [
+    {
+      "order": 1,
+      "name": "tenant_and_year_context",
+      "sources": [
+        "settings"
+      ],
+      "targets": [
+        "schools",
+        "academic_years",
+        "school_settings"
+      ],
+      "rule": "create explicit tenant/year mapping first; migrate only non-secret settings"
+    },
+    {
+      "order": 2,
+      "name": "teacher_identity_and_history",
+      "sources": [
+        "teachers",
+        "teacher_profiles",
+        "teacher_record_years",
+        "teacher_cv_items"
+      ],
+      "targets": [
+        "teachers",
+        "teacher_profiles",
+        "teacher_years",
+        "teacher_cv_items"
+      ],
+      "rule": "preserve one stable teacher identity; historical annual attributes remain null unless proven"
+    },
+    {
+      "order": 3,
+      "name": "operational_roots",
+      "sources": [
+        "meetings",
+        "curriculum_plans",
+        "supervision_visits",
+        "achievement_assessments"
+      ],
+      "targets": [
+        "meetings",
+        "curriculum_plans",
+        "supervision_visits",
+        "achievement_assessments"
+      ],
+      "rule": "resolve academic_year_id and teacher references before insert"
+    },
+    {
+      "order": 4,
+      "name": "operational_children",
+      "sources": [
+        "meeting_attendees",
+        "meeting_decisions",
+        "curriculum_units",
+        "supervision_actions",
+        "achievement_assessment_standards",
+        "achievement_actions",
+        "achievement_action_metrics"
+      ],
+      "targets": [
+        "meeting_attendees",
+        "meeting_decisions",
+        "curriculum_units",
+        "supervision_actions",
+        "achievement_assessment_standards",
+        "achievement_actions",
+        "achievement_action_metrics"
+      ],
+      "rule": "load only after parent ID maps exist"
+    },
+    {
+      "order": 5,
+      "name": "content_and_year_folds",
+      "sources": [
+        "upload_requests",
+        "request_record_years",
+        "documents",
+        "events",
+        "event_record_years"
+      ],
+      "targets": [
+        "upload_requests",
+        "documents",
+        "events"
+      ],
+      "rule": "fold request/event year relations into academic_year_id; preserve token_hash and metadata"
+    },
+    {
+      "order": 6,
+      "name": "event_children_and_media_fold",
+      "sources": [
+        "event_media",
+        "event_media_meta",
+        "event_teacher_links"
+      ],
+      "targets": [
+        "event_media",
+        "event_teacher_links"
+      ],
+      "rule": "merge media caption/position/is_cover; keep file bytes deferred"
+    },
+    {
+      "order": 7,
+      "name": "audit_activity",
+      "sources": [
+        "activities"
+      ],
+      "targets": [
+        "activities"
+      ],
+      "rule": "preserve activity records; attach school/year/actor only when source proves the relation"
+    }
+  ],
+  "academic_year_rules": {
+    "explicit_year_wins": true,
+    "event_without_explicit_year": "preserve current legacy compatibility: derive YYYY/YYYY from event_date using existing August cutoff and flag as inferred in migration report",
+    "request_without_explicit_year": "preserve current legacy compatibility: derive YYYY/YYYY from created_at using existing August cutoff and flag as inferred in migration report",
+    "document_without_explicit_year": "derive from uploaded_at using the same legacy compatibility rule and flag as inferred in migration report",
+    "no_new_oman_term_boundaries": true
+  },
+  "teacher_year_rule": "union of explicit teacher_record_years and teachers referenced by year-scoped operational records, matching current archive/search linkage; annual attributes remain null unless source proves them",
+  "row_audit_requirements": {
+    "per_source_table": [
+      "source_rows",
+      "accepted_rows",
+      "rejected_rows",
+      "rejection_reason_counts"
+    ],
+    "folded_relation_tables": [
+      "source_links",
+      "matched_links",
+      "unmatched_links"
+    ],
+    "no_silent_drop": true,
+    "no_silent_duplicate_identity": true,
+    "target_count_reconciliation_required": true
+  },
+  "storage_boundary": {
+    "database_phase": "metadata only",
+    "file_bytes_migrated_in_s2_d": false,
+    "storage_provider_values": [
+      "supabase",
+      "google_drive",
+      "legacy_local"
+    ],
+    "storage_bytes_move": "later storage vertical slice"
+  },
+  "security_boundary": {
+    "auth_users_mutated_in_s2_d": false,
+    "rls_changed_in_s2_d": false,
+    "service_role_or_provider_secrets_in_public_schema": false,
+    "authorization_source": "public.school_memberships"
+  },
+  "readiness_gate": {
+    "github_ci_required": true,
+    "live_acceptance_required": true,
+    "live_acceptance_expected_result": "PASS: S2-D database acceptance and migration readiness",
+    "meaning_of_pass": "ready for a controlled SQLite data-migration dry run only; not a production runtime cutover approval"
+  }
+}
