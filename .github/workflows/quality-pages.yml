@@ -71,6 +71,9 @@ jobs:
       - name: S2-B5 Fix 1 updated_at clock
         run: python scripts/check_supabase_s2_b5_fix1.py
 
+      - name: S2-C1 Auth and RLS security foundation
+        run: python scripts/check_supabase_s2_c1.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 
