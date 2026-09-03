@@ -72,16 +72,21 @@ def main() -> None:
             fail(f"required S2-B4 file missing: {path.relative_to(ROOT)}")
 
     package = json.loads(PACKAGE_FILE.read_text(encoding="utf-8"))
-    if package.get("version") != "0.20.0":
-        fail("S2-B4 package version must be 0.20.0")
+    version = package.get("version", "0.0.0")
+    try:
+        version_tuple = tuple(int(part) for part in version.split(".")[:3])
+    except ValueError:
+        fail(f"invalid package version: {version}")
+    if version_tuple < (0, 20, 0):
+        fail("S2-B4 requires package version >= 0.20.0")
 
     if hashlib.sha256(TARGET_CONTRACT.read_bytes()).hexdigest() != EXPECTED_TARGET_SHA256:
         fail("S2-A frozen target schema changed during S2-B4")
 
     migrations = sorted(p.name for p in MIGRATIONS_DIR.glob("*.sql") if p.is_file())
     expected_migrations = [B1, B2, B3, B4]
-    if migrations != expected_migrations:
-        fail(f"unexpected migration history for S2-B4: {migrations}")
+    if len(migrations) < 4 or migrations[:4] != expected_migrations:
+        fail(f"S2-B1..B4 migration history changed unexpectedly: {migrations}")
     for name, expected_hash in EXPECTED_HASHES.items():
         path = MIGRATIONS_DIR / name
         if hashlib.sha256(path.read_bytes()).hexdigest() != expected_hash:

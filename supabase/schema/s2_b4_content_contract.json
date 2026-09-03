@@ -70,11 +70,15 @@
   "live_rls_acceptance": {
     "migration_does_not_enable_rls": true,
     "external_auto_rls_may_be_present": true,
-    "allowed_new_table_rls_counts": [0, 7],
+    "allowed_new_table_rls_counts": [
+      0,
+      7
+    ],
     "policies_before_s2_c": 0,
     "browser_grants_before_s2_c": 0
   },
   "remaining_target_tables_after_s2_b4": [],
   "live_acceptance_file": "supabase/tests/s2_b4_live_acceptance.sql",
-  "live_acceptance_status": "pending_after_github_green"
+  "live_acceptance_status": "passed_live_2026-09-02",
+  "live_acceptance_note": "GitHub Actions green and Supabase live acceptance passed; browser grants/policies remained zero and test data rolled back."
 }

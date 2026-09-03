@@ -1,0 +1,83 @@
+{
+  "contract_version": "1.0.0",
+  "phase": "S2-B5",
+  "project_version": "0.21.0",
+  "purpose": "Final PostgreSQL schema hardening and whole-schema acceptance before S2-C Auth/RLS policies.",
+  "frozen_schema_contract_sha256": "84ba44b8104d09d62095c4af00a40d413ddc78fb1b2b251af1487d439368ecda",
+  "required_prior_migrations": [
+    {
+      "phase": "S2-B1",
+      "project_version": "0.17.0",
+      "filename": "20260901120000_s2_b1_core_identity_tenancy.sql",
+      "sha256": "53a20ade59193cc37ce9aa5935fb6739e76262df6cf9fc2350c6399d6a3a0de2",
+      "live_accepted": true
+    },
+    {
+      "phase": "S2-B2",
+      "project_version": "0.18.0",
+      "filename": "20260901190000_s2_b2_teachers_domain.sql",
+      "sha256": "65030ee568719c5da6a010522c401e52b7b56b362a2547e02ed0f311c4d5e78b",
+      "live_accepted": true
+    },
+    {
+      "phase": "S2-B3",
+      "project_version": "0.19.0",
+      "filename": "20260901210000_s2_b3_operational_domains.sql",
+      "sha256": "b4f444fa180d38688566261f3c124317ed4217b00cc3e760a0d53d5b45c70ae0",
+      "live_accepted": true
+    },
+    {
+      "phase": "S2-B4",
+      "project_version": "0.20.0",
+      "filename": "20260902080000_s2_b4_content_intake_domains.sql",
+      "sha256": "33e094422f5fc78ddd12ab16572b4ac4817372bd745b63c2e67b214f159b6d91",
+      "live_accepted": true
+    }
+  ],
+  "migration": "20260902090000_s2_b5_schema_hardening.sql",
+  "migration_sha256": "1124fb66aba46ca87b79167ad4f93ec3c4d535ae281aaa1a5d36367665f73474",
+  "target_table_count": 26,
+  "new_tables": [],
+  "updated_at_trigger_tables": [
+    "schools",
+    "profiles",
+    "school_memberships",
+    "academic_years",
+    "school_settings",
+    "teachers",
+    "teacher_profiles",
+    "teacher_years",
+    "teacher_cv_items",
+    "upload_requests",
+    "events",
+    "event_media",
+    "meetings",
+    "meeting_decisions",
+    "curriculum_plans",
+    "curriculum_units",
+    "supervision_visits",
+    "supervision_actions",
+    "achievement_assessments",
+    "achievement_assessment_standards",
+    "achievement_actions",
+    "achievement_action_metrics"
+  ],
+  "added_indexes": [
+    "idx_school_memberships_school_status_role",
+    "idx_academic_years_school_start",
+    "idx_teacher_cv_items_teacher_type"
+  ],
+  "runtime_switch_allowed": false,
+  "data_migration_allowed": false,
+  "storage_bytes_migration_allowed": false,
+  "auth_user_creation_allowed": false,
+  "rls_policy_creation_allowed": false,
+  "rls_normalization_phase": "S2-C",
+  "browser_grants_before_s2_c": 0,
+  "policies_before_s2_c": 0,
+  "raw_upload_token_forbidden": true,
+  "secret_material_in_public_schema_forbidden": true,
+  "live_acceptance_file": "supabase/tests/s2_b5_live_acceptance.sql",
+  "live_acceptance_status": "pending_after_github_green",
+  "exit_gate": "S2-B DATABASE SCHEMA COMPLETE"
+}

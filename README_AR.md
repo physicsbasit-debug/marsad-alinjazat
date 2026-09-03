@@ -1,3 +1,7 @@
+## Phase S2-B5 — Final Schema Constraints & Acceptance
+
+أغلقت هذه المرحلة مخطط PostgreSQL المستهدف: 26/26 جدولًا و299 عمودًا مطابقًا لعقد S2-A، مع تدقيق عام لعزل `school_id`، وإضافة 22 trigger موحدًا لـ`updated_at` وثلاثة فهارس نهائية فقط. لا يوجد نقل بيانات أو Auth/RLS Policies بعد. راجع `SUPABASE_SCHEMA_CLOSURE_AR.md`.
+
 ## Phase S2-B4 — Events / Documents / Requests / Activities
 
 أضيفت migration رابعة تكمل الجداول السبعة المتبقية من عقد S2-A: `school_settings`, `upload_requests`, `documents`, `events`, `event_media`, `event_teacher_links`, و`activities`. جداول Legacy الخاصة بربط السنة وmetadata لا يعاد إنشاؤها؛ تُدمج وظيفتها داخل التصميم الجديد. لا يزال التشغيل FastAPI/SQLite ولا يوجد نقل بيانات أو ملفات تخزين في هذه المرحلة. راجع `SUPABASE_CONTENT_INTAKE_MIGRATION_AR.md`.
@@ -10,7 +14,7 @@
 
 أضيفت migration ثانية لمجال المعلمين: `teachers`, `teacher_profiles`, `teacher_years`, و`teacher_cv_items`، مع إكمال ربط `school_memberships.teacher_id` بالمعلم داخل المدرسة نفسها. التشغيل ما زال FastAPI/SQLite وRLS مؤجل إلى S2-C.
 
-# مرصد الإنجازات v0.20.0
+# مرصد الإنجازات v0.21.0
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة أعمال المادة وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. الفكرة ليست جمع ملفات في شاشة واحدة، بل ربط الأشخاص والأعمال والقرارات والتخطيط والتحصيل والإشراف والفعاليات والوثائق في سجلات قابلة للمتابعة والتقرير.
 

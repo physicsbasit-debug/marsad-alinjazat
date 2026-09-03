@@ -1,3 +1,7 @@
+## Phase S2-B5 — Final Schema Closure
+
+The frozen PostgreSQL target is now closed at 26/26 tables and 299 columns. S2-B5 adds database-managed `updated_at` triggers to 22 tables, three final indexes, and whole-schema acceptance guards. Runtime remains FastAPI/SQLite; Auth/RLS policy work begins in S2-C. See `SUPABASE_SCHEMA_CLOSURE_AR.md`.
+
 ## Phase S2-B4 — Events / Documents / Requests / Activities
 
 PostgreSQL now includes the seven remaining frozen target tables: `school_settings`, `upload_requests`, `documents`, `events`, `event_media`, `event_teacher_links`, and `activities`. Legacy year-link/meta tables are folded into the normalized target instead of being recreated. Runtime remains FastAPI/SQLite; no application data or storage bytes move yet.
@@ -29,7 +33,7 @@ The repository now contains the browser client boundary, local CLI configuration
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة العمل التربوي وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. تجمع أعمال القسم والمعلمين والطلبات والوثائق والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في سجلات مترابطة قابلة للمتابعة بدل توزيعها بين ملفات ومجلدات منفصلة.
 
-> الإصدار الجاري: **v0.20.0 — Phase S2-B4 Events / Documents / Requests / Activities**
+> الإصدار الجاري: **v0.21.0 — Phase S2-B4 Events / Documents / Requests / Activities**
 > آخر نقطة استقرار خضراء: **v0.19.0 — Phase S2-B3 Operational Domains + Live Supabase Acceptance**
 > المعاينة الحية: **https://physicsbasit-debug.github.io/marsad-alinjazat/**
 

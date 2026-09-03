@@ -1,0 +1,13 @@
+مرصد الإنجازات — Phase S2-B5 / v0.21.0
+
+1) ارفع محتويات changed_files_only فوق main الحالي بعد S2-B4 LIVE GREEN.
+2) انتظر GitHub Actions حتى تصبح خضراء بالكامل.
+3) لا تشغل أي SQL قبل نجاح GitHub.
+4) بعد الأخضر شغّل يدويًا في Supabase SQL Editor:
+   supabase/migrations/20260902090000_s2_b5_schema_hardening.sql
+5) لا تعِد تشغيل S2-B1..S2-B4.
+6) بعد نجاح migration الخامسة شغّل:
+   supabase/tests/s2_b5_live_acceptance.sql
+7) النتيجة المطلوبة:
+   PASS: S2-B5 final schema acceptance
+8) عند PASS تُغلق S2-B ويبدأ S2-C Auth + RLS.

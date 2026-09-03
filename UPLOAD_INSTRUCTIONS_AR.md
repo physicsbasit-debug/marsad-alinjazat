@@ -1,11 +1,11 @@
-# تعليمات رفع مرصد الإنجازات v0.20.0 — Phase S2-B4
+# تعليمات رفع مرصد الإنجازات v0.21.0 — Phase S2-B5
 
-1. ارفع محتويات `changed_files_only` فوق `main` الحالي بعد S2-B3 LIVE GREEN.
-2. تأكد أن الملفات المخفية وصلت، خصوصًا `.github/workflows/quality-pages.yml` و`.gitignore` و`.env.example`. توجد نسخ مرئية احتياطية كما في المراحل السابقة.
-3. انتظر GitHub Actions وتحقق من نجاح S0 وS1 وS2-A وS2-B1 وS2-B2 وS2-B3 وS2-B4 وpytest وHTTP E2E.
-4. إذا أصبح GitHub أخضر فقط، شغّل `supabase/migrations/20260902080000_s2_b4_content_intake_domains.sql` يدويًا في Supabase SQL Editor.
-5. لا تعِد تشغيل migrations القديمة.
-6. بعد نجاح migration الرابعة شغّل `supabase/tests/s2_b4_live_acceptance.sql`.
-7. النتيجة المطلوبة: `PASS: S2-B4 live acceptance`.
+1. ارفع محتويات `changed_files_only` فوق `main` الحالي بعد **S2-B4 LIVE GREEN**.
+2. تأكد أن `.github/workflows/quality-pages.yml` وصل. توجد نسخة مرئية مطابقة في `GITHUB_WORKFLOW_VISIBLE/quality-pages.yml`.
+3. انتظر GitHub Actions وتحقق من نجاح S0 وS1 وS2-A وS2-B1 وS2-B2 وS2-B3 وS2-B4 وS2-B5 وpytest وHTTP E2E.
+4. إذا أصبح GitHub أخضر فقط، شغّل يدويًا في Supabase SQL Editor: `supabase/migrations/20260902090000_s2_b5_schema_hardening.sql`.
+5. لا تعِد تشغيل migrations القديمة S2-B1..S2-B4.
+6. بعد نجاح migration الخامسة شغّل `supabase/tests/s2_b5_live_acceptance.sql`.
+7. النتيجة المطلوبة: `PASS: S2-B5 final schema acceptance`.
 
-لا تعطل auto-RLS إذا ظهر على الجداول الجديدة. اختبار القبول يتأكد من عدم وجود Policies ومن بقاء browser grants = 0 حتى S2-C.
+S2-B5 لا تنقل بيانات ولا تفعل Auth أو Policies. auto-RLS الموجود من Supabase لا يحتاج تعطيلًا؛ الاختبار يطلب فقط أن تبقى browser grants والسياسات صفرًا قبل S2-C.
