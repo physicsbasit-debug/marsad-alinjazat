@@ -1,0 +1,47 @@
+{
+  "phase": "S2-C1",
+  "project_version": "0.22.0",
+  "base_phase": "S2-B5-Fix1",
+  "base_version": "0.21.1",
+  "migration": "20260903100000_s2_c1_security_foundation.sql",
+  "migration_sha256": "738f22d57a1c087cd60e39702e31c0e0daabbeb4d41e5f31a69a3ce4053dac5f",
+  "tenant_boundary": "school_memberships",
+  "trusted_role_source": "public.school_memberships.role",
+  "user_metadata_authorization_forbidden": true,
+  "helper_schema": "private",
+  "helper_functions": [
+    "private.is_active_school_member(uuid)",
+    "private.has_school_role(uuid,text[])",
+    "private.can_view_profile(uuid)"
+  ],
+  "auth_profile_trigger": "on_marsad_auth_user_created",
+  "profile_metadata_fields": ["display_name", "name"],
+  "core_policy_tables": [
+    "schools",
+    "profiles",
+    "school_memberships",
+    "academic_years",
+    "school_settings"
+  ],
+  "policy_count": 11,
+  "authenticated_select_tables": [
+    "schools",
+    "profiles",
+    "school_memberships",
+    "academic_years",
+    "school_settings"
+  ],
+  "direct_membership_writes_from_browser": false,
+  "direct_school_create_delete_from_browser": false,
+  "direct_profile_create_delete_from_browser": false,
+  "academic_year_manager_roles": ["owner", "admin"],
+  "settings_manager_roles": ["owner", "admin"],
+  "school_update_roles": ["owner"],
+  "remaining_domain_tables_exposed": false,
+  "runtime_switch_allowed": false,
+  "sqlite_data_migration_allowed": false,
+  "storage_policy_creation_allowed": false,
+  "storage_bytes_migration_allowed": false,
+  "auth_user_creation_in_migration_allowed": false,
+  "service_secret_in_browser_allowed": false
+}

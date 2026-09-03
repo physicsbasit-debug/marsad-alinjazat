@@ -1,0 +1,17 @@
+مرصد الإنجازات — Phase S2-C1 / v0.22.0
+
+1) ارفع محتويات changed_files_only إلى GitHub main.
+2) انتظر نجاح GitHub Actions بالكامل.
+3) شغّل فقط migration:
+   supabase/migrations/20260903100000_s2_c1_security_foundation.sql
+   في Supabase SQL Editor.
+4) بعد نجاح migration، افتح Authentication > Users وأنشئ مستخدم اختبار مؤقت واحدًا.
+5) شغّل:
+   supabase/tests/s2_c1_live_acceptance.sql
+6) النتيجة المطلوبة:
+   PASS: S2-C1 security foundation acceptance
+7) بعد PASS يمكن حذف مستخدم الاختبار المؤقت من Authentication > Users.
+
+لا تُعد تشغيل migrations S2-B القديمة.
+لا تنشئ أو تعدّل auth.users مباشرة من SQL.
+لا تغيّر إعدادات RLS يدويًا.

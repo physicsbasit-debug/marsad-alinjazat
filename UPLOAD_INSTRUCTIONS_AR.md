@@ -1,15 +1,27 @@
-# تعليمات رفع مرصد الإنجازات v0.21.0 — Phase S2-B5
+# تعليمات رفع مرصد الإنجازات v0.22.0 — Phase S2-C1
 
-1. ارفع محتويات `changed_files_only` فوق `main` الحالي بعد **S2-B4 LIVE GREEN**.
-2. تأكد أن `.github/workflows/quality-pages.yml` وصل. توجد نسخة مرئية مطابقة في `GITHUB_WORKFLOW_VISIBLE/quality-pages.yml`.
-3. انتظر GitHub Actions وتحقق من نجاح S0 وS1 وS2-A وS2-B1 وS2-B2 وS2-B3 وS2-B4 وS2-B5 وpytest وHTTP E2E.
-4. إذا أصبح GitHub أخضر فقط، شغّل يدويًا في Supabase SQL Editor: `supabase/migrations/20260902090000_s2_b5_schema_hardening.sql`.
-5. لا تعِد تشغيل migrations القديمة S2-B1..S2-B4.
-6. بعد نجاح migration الخامسة شغّل `supabase/tests/s2_b5_live_acceptance.sql`.
-7. النتيجة المطلوبة: `PASS: S2-B5 final schema acceptance`.
+نقطة الأساس: **v0.21.1 / S2-B DATABASE SCHEMA COMPLETE + LIVE GREEN**.
 
-S2-B5 لا تنقل بيانات ولا تفعل Auth أو Policies. auto-RLS الموجود من Supabase لا يحتاج تعطيلًا؛ الاختبار يطلب فقط أن تبقى browser grants والسياسات صفرًا قبل S2-C.
+1. ارفع محتويات `changed_files_only` فوق `main` الحالي.
+2. تأكد من وصول `.github/workflows/quality-pages.yml`. توجد نسخة مرئية مطابقة في `GITHUB_WORKFLOW_VISIBLE/quality-pages.yml` لحماية الرفع من الهاتف.
+3. انتظر GitHub Actions. المطلوب نجاح: pytest، S0، S1، S2-A، S2-B1..B5، S2-B5 Fix 1، S2-C1، وHTTP E2E.
+4. بعد GitHub GREEN فقط شغّل في Supabase SQL Editor:
+   `supabase/migrations/20260903100000_s2_c1_security_foundation.sql`
+5. لا تعِد تشغيل أي migration من S2-B.
+6. بعد نجاح migration افتح **Authentication > Users** وأنشئ مستخدم اختبار مؤقتًا واحدًا. لا تدخل في `auth.users` يدويًا من SQL.
+7. شغّل:
+   `supabase/tests/s2_c1_live_acceptance.sql`
+8. النتيجة المطلوبة:
+   `PASS: S2-C1 security foundation acceptance`
+9. بعد PASS يمكن حذف مستخدم الاختبار المؤقت من شاشة Authentication > Users.
 
+## حدود المرحلة
 
-### S2-B5 Fix 1 — تصحيح updated_at
-كشف اختبار Supabase الحي أن `statement_timestamp()` ثابت طوال SQL statement واحد، لذلك قد لا يتقدم `updated_at` عند تنفيذ أكثر من عملية داخل statement واحد. الإصدار 0.21.1 يضيف Migration تصحيحية جديدة تستبدل الدالة فقط لتستخدم `clock_timestamp()`، مع إبقاء Migration S2-B5 الأصلية والـ22 Trigger دون تعديل.
+- لا تحويل لمسار React إلى Supabase بعد.
+- لا نقل بيانات SQLite.
+- لا Storage policies أو bytes ملفات.
+- لا browser grants للجداول الـ21 غير الأساسية.
+- لا كتابة مباشرة على `school_memberships` حتى للـowner/admin.
+- لا دور أمني مأخوذ من `user_metadata`.
+
+التفاصيل الأمنية: `SUPABASE_SECURITY_FOUNDATION_AR.md`.

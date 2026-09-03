@@ -12,3 +12,7 @@
 ### S2-B5 Fix 1
 
 `s2_b5_live_acceptance.sql` intentionally performs INSERT + sleep + UPDATE inside one DO statement. This proves the trigger uses a wall-clock source (`clock_timestamp()`) rather than statement-scoped time.
+
+### S2-C1 — Auth/RLS foundation
+
+`s2_c1_live_acceptance.sql` requires one temporary Supabase Auth user created from Dashboard after the S2-C1 migration. It never mutates `auth.users` directly, tests real authenticated RLS behavior with that user, and rolls back all public tenant fixtures. Expected result: `PASS: S2-C1 security foundation acceptance`.

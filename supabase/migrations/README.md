@@ -10,6 +10,8 @@
 20260901210000_s2_b3_operational_domains.sql
 20260902080000_s2_b4_content_intake_domains.sql
 20260902090000_s2_b5_schema_hardening.sql
+20260903080000_s2_b5_fix1_updated_at_clock.sql
+20260903100000_s2_c1_security_foundation.sql
 ```
 
 - S2-B1: `schools`, `profiles`, `school_memberships`, `academic_years`.
@@ -25,3 +27,7 @@
 - `20260903080000_s2_b5_fix1_updated_at_clock.sql` replaces only `public.set_row_updated_at()` so it uses `clock_timestamp()` rather than `statement_timestamp()`.
 - The original S2-B5 migration remains unchanged because it has already been applied to the live Supabase project.
 - The 22 existing triggers are reused; no trigger/table/index is recreated.
+
+### S2-C1 — Security foundation
+
+`20260903100000_s2_c1_security_foundation.sql` starts Auth/RLS on the five core identity/tenancy tables only. It creates the non-exposed `private` policy-helper schema, the Auth->profile trigger, targeted authenticated grants, and 11 RLS policies. The remaining 21 domain tables stay closed until S2-C2.

@@ -1,3 +1,11 @@
+## Phase S2-C1 — Auth + RLS Security Foundation
+
+The first authorization slice is now defined for the five core identity/tenancy tables. Roles are trusted only from `school_memberships`, RLS helpers live in a non-exposed `private` schema, future Auth users receive a public profile via trigger, and browser membership writes remain forbidden. The other 21 domain tables stay closed until S2-C2. Runtime remains FastAPI/SQLite. See `SUPABASE_SECURITY_FOUNDATION_AR.md`.
+
+## Phase S2-B5 Fix 1 — updated_at wall clock
+
+The live S2-B5 acceptance exposed statement-scoped timestamp semantics. A follow-up migration replaces only the trigger helper with `clock_timestamp()`; all 22 existing triggers are reused.
+
 ## Phase S2-B5 — Final Schema Closure
 
 The frozen PostgreSQL target is now closed at 26/26 tables and 299 columns. S2-B5 adds database-managed `updated_at` triggers to 22 tables, three final indexes, and whole-schema acceptance guards. Runtime remains FastAPI/SQLite; Auth/RLS policy work begins in S2-C. See `SUPABASE_SCHEMA_CLOSURE_AR.md`.

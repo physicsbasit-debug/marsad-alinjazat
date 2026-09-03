@@ -1,3 +1,11 @@
+## Phase S2-C1 — Auth + RLS Security Foundation
+
+بدأت طبقة التفويض الفعلية على خمسة جداول نواة فقط: `schools`, `profiles`, `school_memberships`, `academic_years`, و`school_settings`. مصدر الدور الموثوق هو `school_memberships.role` فقط، ودوال RLS المساعدة داخل schema `private` غير المعروضة للـData API. لا توجد كتابة مباشرة للعضويات من المتصفح، وتبقى الجداول الـ21 الأخرى مقفلة حتى S2-C2. التشغيل ما زال FastAPI/SQLite. راجع `SUPABASE_SECURITY_FOUNDATION_AR.md`.
+
+## Phase S2-B5 Fix 1 — updated_at clock
+
+أثبت الاختبار الحي أن `statement_timestamp()` ثابت داخل SQL statement واحد، لذلك أضيفت Migration تصحيحية مستقلة تستخدم `clock_timestamp()` مع إعادة استخدام الـ22 Trigger القائمة.
+
 ## Phase S2-B5 — Final Schema Constraints & Acceptance
 
 أغلقت هذه المرحلة مخطط PostgreSQL المستهدف: 26/26 جدولًا و299 عمودًا مطابقًا لعقد S2-A، مع تدقيق عام لعزل `school_id`، وإضافة 22 trigger موحدًا لـ`updated_at` وثلاثة فهارس نهائية فقط. لا يوجد نقل بيانات أو Auth/RLS Policies بعد. راجع `SUPABASE_SCHEMA_CLOSURE_AR.md`.
@@ -14,7 +22,7 @@
 
 أضيفت migration ثانية لمجال المعلمين: `teachers`, `teacher_profiles`, `teacher_years`, و`teacher_cv_items`، مع إكمال ربط `school_memberships.teacher_id` بالمعلم داخل المدرسة نفسها. التشغيل ما زال FastAPI/SQLite وRLS مؤجل إلى S2-C.
 
-# مرصد الإنجازات v0.21.0
+# مرصد الإنجازات v0.22.0
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة أعمال المادة وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. الفكرة ليست جمع ملفات في شاشة واحدة، بل ربط الأشخاص والأعمال والقرارات والتخطيط والتحصيل والإشراف والفعاليات والوثائق في سجلات قابلة للمتابعة والتقرير.
 
