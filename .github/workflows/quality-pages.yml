@@ -92,6 +92,9 @@ jobs:
       - name: S2-E2 production tenant bootstrap contract
         run: python scripts/check_supabase_s2_e2.py
 
+      - name: S3-A Auth and tenant session foundation
+        run: python scripts/check_supabase_s3_a.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 
@@ -114,6 +117,9 @@ jobs:
         env:
           VITE_PREVIEW_MODE: 'true'
           VITE_BASE_PATH: '/marsad-alinjazat/'
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_SESSION_MODE: 'diagnostic'
         run: |
           npm run build:pages
           touch dist/.nojekyll
