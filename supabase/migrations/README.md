@@ -14,6 +14,7 @@
 20260903100000_s2_c1_security_foundation.sql
 20260903123000_s2_c2_domain_rls_baseline.sql
 20260904130000_s3_b2_teacher_write_foundation.sql
+20260904143000_s3_b2_r1_teacher_write_ambiguity_correction.sql
 ```
 
 - S2-B1: `schools`, `profiles`, `school_memberships`, `academic_years`.
@@ -46,3 +47,7 @@ S2-D intentionally adds no migration. It is a database acceptance/data-migration
 ### S3-B2 — Teacher write foundation
 
 `20260904130000_s3_b2_teacher_write_foundation.sql` يفتح INSERT/UPDATE فقط على `teacher_years` لدوري owner/admin عبر RLS، ويضيف دالتي RPC ذريتين `marsad_create_teacher_v1` و`marsad_update_teacher_v1` بصلاحية `SECURITY INVOKER`. لا يضيف حذفًا للمعلمين، ولا يمنح `lead_teacher` كتابة، ولا يحول واجهة المعلمين التشغيلية إلى Supabase.
+
+### S3-B2R1 — Teacher write ambiguity correction
+
+`20260904143000_s3_b2_r1_teacher_write_ambiguity_correction.sql` لا يغير الجداول أو RLS. يعيد تعريف `marsad_create_teacher_v1` فقط لاستخدام `ON CONFLICT ON CONSTRAINT teacher_years_pkey` بعد ظهور خطأ 42702 في القبول الحي بسبب تعارض اسم خرج PL/pgSQL `teacher_id` مع عمود `teacher_years.teacher_id`.

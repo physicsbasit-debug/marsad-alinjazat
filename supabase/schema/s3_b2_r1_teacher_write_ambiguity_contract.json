@@ -1,0 +1,30 @@
+{
+  "phase": "S3-B2R1",
+  "project_version": "0.29.1",
+  "title": "Teacher Write RPC Ambiguity Correction",
+  "depends_on": "S3-B2 v0.29.0 migration already applied",
+  "historical_migration_immutable": "20260904130000_s3_b2_teacher_write_foundation.sql",
+  "correction_migration": "20260904143000_s3_b2_r1_teacher_write_ambiguity_correction.sql",
+  "correction_migration_sha256": "417fb30a563a6cd92f7371a1c25ae07574258c8729e8f3cb44b0de785d3d9f3e",
+  "root_cause": "PL/pgSQL RETURNS TABLE output column teacher_id became an implicit variable and conflicted with the unqualified ON CONFLICT column target teacher_id.",
+  "correction": "Use ON CONFLICT ON CONSTRAINT teacher_years_pkey DO NOTHING inside marsad_create_teacher_v1.",
+  "function_signature_unchanged": true,
+  "function_return_contract_unchanged": true,
+  "rls_changes_allowed": false,
+  "grant_changes_allowed": false,
+  "table_or_column_schema_changes_allowed": false,
+  "operational_ui_cutover": false,
+  "teacher_delete_enabled": false,
+  "lead_teacher_write_enabled": false,
+  "storage_changes_allowed": false,
+  "live_acceptance": {
+    "file": "supabase/tests/s3_b2_r1_live_acceptance.sql",
+    "expected_text": "PASS: S3-B2R1 teacher write ambiguity correction",
+    "replays_s3_b2_owner_create_update": true,
+    "tests_cross_tenant_block": true,
+    "tests_lead_teacher_block": true,
+    "tests_delete_stays_blocked": true,
+    "verifies_constraint_conflict_target": true,
+    "rollback_required": true
+  }
+}

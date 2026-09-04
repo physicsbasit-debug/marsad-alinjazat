@@ -373,3 +373,11 @@ STORAGE_MODE
 ## S3-B1 — Teachers Read Repository
 
 الإصدار v0.28.0 يضيف قراءة مجال المعلمين من Supabase عبر RLS كبوابة تشخيص فقط. صفحة المعلمين التشغيلية و`api.ts` يبقيان على FastAPI/SQLite حتى اعتماد Parity/Cutover مستقل. راجع `SUPABASE_TEACHERS_READ_PARITY_AR.md`.
+
+## S3-B2 — Teachers Write Repository & RLS Acceptance
+
+الإصدار **v0.29.0** يضيف طبقة كتابة مرحلية لمجال المعلمين عبر Supabase RPC دون تحويل واجهة المعلمين التشغيلية. تفتح Migration محدودة `INSERT/UPDATE` على `teacher_years` لدوري `owner/admin` فقط، وتضيف `marsad_create_teacher_v1` و`marsad_update_teacher_v1` بصلاحية `SECURITY INVOKER` حتى تبقى RLS هي المرجع. لا حذف معلمين، لا كتابة لـ`lead_teacher`، ولا Storage أو Cutover في هذه المرحلة. راجع `SUPABASE_TEACHERS_WRITE_AR.md`.
+
+
+## S3-B2R1 v0.29.1
+أضيف تصحيح additive مستقل لغموض `teacher_id` داخل `marsad_create_teacher_v1`; لا Cutover ولا تغيير RLS/Schema. راجع `SUPABASE_TEACHER_WRITE_AMBIGUITY_CORRECTION_AR.md`.

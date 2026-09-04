@@ -29,3 +29,20 @@
 - افتح `?teachers-check=1` على GitHub Pages.
 - المطلوب `PASS: S3-B1 Teachers Read Repository`.
 - `NOT ESTABLISHED` في Parity Gate لا يعد فشلًا في S3-B1؛ معناه أن Cutover ما زال محظورًا.
+
+## S3-B2 v0.29.0
+- ارفع Changed Files Only فوق `main`.
+- انتظر GitHub Actions GREEN ونجاح خطوة `S3-B2 teachers write repository and RLS acceptance`.
+- شغّل Migration `supabase/migrations/20260904130000_s3_b2_teacher_write_foundation.sql` كاملة في Supabase SQL Editor.
+- بعد نجاحها شغّل `supabase/tests/s3_b2_live_acceptance.sql`.
+- المطلوب: `PASS: S3-B2 teacher write RLS acceptance`.
+- اختبار القبول ينتهي بـ`ROLLBACK;` ولا يترك مدارس أو معلمين تجريبيين.
+- لا Cutover لواجهة المعلمين في S3-B2؛ `Teachers.tsx` و`api.ts` يظلان على Legacy حتى بوابة مستقلة لاحقة.
+
+
+## S3-B2R1 v0.29.1
+1. ارفع حزمة Changed Files Only فوق `main`.
+2. انتظر GitHub Actions GREEN وفيها `S3-B2R1 teacher write ambiguity correction`.
+3. شغّل Migration التصحيحية `20260904143000_s3_b2_r1_teacher_write_ambiguity_correction.sql` في Supabase.
+4. شغّل `supabase/tests/s3_b2_r1_live_acceptance.sql`.
+5. المطلوب: `PASS: S3-B2R1 teacher write ambiguity correction`.

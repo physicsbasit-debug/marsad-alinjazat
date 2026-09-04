@@ -1,0 +1,16 @@
+مرصد الإنجازات — S3-B2R1 v0.29.1
+
+السبب:
+ظهر في القبول الحي خطأ PostgreSQL 42702 لأن teacher_id اسم حقل إرجاع ضمني في PL/pgSQL وظهر أيضًا غير مؤهل داخل ON CONFLICT.
+
+التصحيح:
+- لا نعدل Migration S3-B2 القديمة لأنها طُبقت بالفعل.
+- نضيف Migration تصحيحية واحدة تعيد تعريف marsad_create_teacher_v1 فقط.
+- تستخدم ON CONFLICT ON CONSTRAINT teacher_years_pkey DO NOTHING.
+- لا تغيير في الجداول أو RLS أو Grants أو واجهة المعلمين.
+
+التطبيق:
+1) ارفع Changed Files Only وانتظر GitHub GREEN.
+2) شغّل 20260904143000_s3_b2_r1_teacher_write_ambiguity_correction.sql في Supabase SQL Editor.
+3) شغّل s3_b2_r1_live_acceptance.sql.
+4) المطلوب: PASS: S3-B2R1 teacher write ambiguity correction
