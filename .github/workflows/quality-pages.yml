@@ -104,6 +104,9 @@ jobs:
       - name: S3-B2R1 teacher write ambiguity correction
         run: python scripts/check_supabase_s3_b2_r1.py
 
+      - name: S3-B3 teachers UI cutover
+        run: python scripts/check_supabase_s3_b3.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 
@@ -129,6 +132,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_SUPABASE_SESSION_MODE: 'diagnostic'
+          VITE_TEACHERS_DATA_MODE: 'supabase'
         run: |
           npm run build:pages
           touch dist/.nojekyll
