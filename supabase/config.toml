@@ -5,3 +5,6 @@ project_id = "marsad-alinjazat"
 enabled = true
 site_url = "http://localhost:5173"
 additional_redirect_urls = ["http://localhost:5173/**"]
+
+[functions.marsad-public-upload]
+verify_jwt = false

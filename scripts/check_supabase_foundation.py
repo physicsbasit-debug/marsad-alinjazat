@@ -121,6 +121,11 @@ def main() -> None:
             "src/pages/DocumentsWorkspace.tsx",
             "src/pages/RequestsDocumentsCountProbe.tsx",
         })
+    if version_tuple >= (0, 34, 0):
+        approved_supabase_consumers.update({
+            "src/lib/supabasePublicUpload.ts",
+            "src/pages/PublicUpload.tsx",
+        })
     import_hits: list[str] = []
     for path in SRC_DIR.rglob("*.ts*"):
         if path == CLIENT_FILE:

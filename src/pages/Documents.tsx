@@ -12,6 +12,7 @@ export function Documents({
   onRefresh,
   canUpload = true,
   sourceNotice,
+  onOpenDocument,
 }: {
   documents: DocumentRecord[];
   teachers: Teacher[];
@@ -19,11 +20,12 @@ export function Documents({
   onRefresh: () => Promise<void>;
   canUpload?: boolean;
   sourceNotice?: string;
+  onOpenDocument?: (document: DocumentRecord) => Promise<void>;
 }) {
   const [adding, setAdding] = useState(false);
   return <div className="page"><PageHeader eyebrow="المكتبة المؤسسية" title="الوثائق والمراجع" description="الملف في Drive، أما هنا فالمعنى: نوعه، مادته، صفه، صاحبه، سنته وحالته." action={canUpload?'إضافة وثيقة':undefined} onAction={canUpload?()=>setAdding(true):undefined} />{sourceNotice&&<div className="quiet-note">{sourceNotice}</div>}
     {documents.length===0?<div className="library-empty"><div className="empty-illustration"><Icon name="document" size={36}/></div><h2>لا توجد وثائق لهذا العام</h2><p>يمكن رفع وثيقة مباشرة لهذا العام، أو ستظهر الملفات المستلمة عبر طلبات الملفات تلقائيًا.</p></div>:
-    <div className="document-grid">{documents.map(doc=><article className="document-card" key={doc.id}><span className="doc-icon"><Icon name="document"/></span><div><strong>{doc.title}</strong><p>{doc.originalName}</p><small>{[doc.subject,doc.grade,doc.academicYear].filter(Boolean).join(' • ')}</small></div>{doc.webViewLink?<a href={doc.webViewLink} target="_blank" rel="noreferrer" className="icon-button"><Icon name="external"/></a>:<span className="local-badge">محلي</span>}</article>)}</div>}
+    <div className="document-grid">{documents.map(doc=><article className="document-card" key={doc.id}><span className="doc-icon"><Icon name="document"/></span><div><strong>{doc.title}</strong><p>{doc.originalName}</p><small>{[doc.subject,doc.grade,doc.academicYear].filter(Boolean).join(' • ')}</small></div>{doc.webViewLink?<a href={doc.webViewLink} target="_blank" rel="noreferrer" className="icon-button"><Icon name="external"/></a>:onOpenDocument&&doc.storageProvider==='supabase'&&doc.storagePath?<button type="button" className="icon-button" onClick={()=>void onOpenDocument(doc)} aria-label="فتح الوثيقة"><Icon name="external"/></button>:<span className="local-badge">محلي</span>}</article>)}</div>}
     {canUpload&&<DirectDocumentModal open={adding} teachers={teachers} academicYear={academicYear} onClose={()=>setAdding(false)} onCreated={async()=>{setAdding(false);await onRefresh();}}/>}
   </div>;
 }

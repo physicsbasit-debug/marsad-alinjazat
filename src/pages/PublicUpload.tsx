@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Icon } from '../components/Icon';
 import { getPublicUploadInfo, uploadPublicFile } from '../lib/api';
+import { getSupabasePublicUploadInfo, uploadSupabasePublicFile } from '../lib/supabasePublicUpload';
 import type { PublicUploadInfo } from '../types';
+
+const PUBLIC_UPLOAD_SUPABASE = (import.meta.env.VITE_REQUESTS_DOCUMENTS_DATA_MODE || 'legacy').trim().toLowerCase() === 'supabase';
 
 export function PublicUpload({ token }: { token: string }) {
   const [info, setInfo] = useState<PublicUploadInfo | null>(null);
@@ -10,8 +13,8 @@ export function PublicUpload({ token }: { token: string }) {
   const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
-  useEffect(()=>{getPublicUploadInfo(token).then(setInfo).catch((e:Error)=>setError(e.message)).finally(()=>setLoading(false));},[token]);
-  async function submit(){ if(!file) return; setUploading(true); setError(''); try{await uploadPublicFile(token,file); setDone(true);}catch(e){setError(e instanceof Error?e.message:'تعذر رفع الملف.');}finally{setUploading(false);} }
+  useEffect(()=>{const loadInfo=PUBLIC_UPLOAD_SUPABASE?getSupabasePublicUploadInfo:getPublicUploadInfo;loadInfo(token).then(setInfo).catch((e:Error)=>setError(e.message)).finally(()=>setLoading(false));},[token]);
+  async function submit(){ if(!file) return; setUploading(true); setError(''); try{const upload=PUBLIC_UPLOAD_SUPABASE?uploadSupabasePublicFile:uploadPublicFile;await upload(token,file); setDone(true);}catch(e){setError(e instanceof Error?e.message:'تعذر رفع الملف.');}finally{setUploading(false);} }
   if(loading) return <PublicShell><div className="public-state"><div className="spinner"></div><p>جاري التحقق من رابط الطلب...</p></div></PublicShell>;
   if(error&&!info) return <PublicShell><div className="public-state error-state"><Icon name="alert" size={36}/><h2>تعذر فتح الطلب</h2><p>{error}</p></div></PublicShell>;
   if(done) return <PublicShell><div className="public-state success-state"><span className="success-orb"><Icon name="check" size={28}/></span><h2>تم استلام الملف بنجاح</h2><p>وصل الملف إلى صندوق مراجعة المعلم الأول. لا يلزمك أي إجراء آخر.</p></div></PublicShell>;

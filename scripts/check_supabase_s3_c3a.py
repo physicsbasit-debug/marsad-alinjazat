@@ -80,13 +80,19 @@ def main() -> None:
         fail("S3-C3A migration hash mismatch")
     migrations = sorted(p.name for p in MIGRATIONS.glob("*.sql") if p.is_file())
     expected = list(HISTORICAL) + [MIGRATION]
-    if migrations != expected:
+    if migrations[:len(expected)] != expected:
         fail(f"S3-C3A migration history/order mismatch: {migrations}")
 
-    for path, sha, label in [
-        (API, API_SHA, "legacy api.ts"), (SERVER, SERVER_SHA, "server/main.py"),
-        (PUBLIC_UPLOAD, PUBLIC_UPLOAD_SHA, "PublicUpload.tsx"), (CONFIG, CONFIG_SHA, "supabase/config.toml"),
-    ]:
+    # These files were intentionally frozen at the S3-C3A release. Later phases may
+    # supersede the public-upload/browser seams while server/main.py remains the Legacy fallback.
+    frozen = [(SERVER, SERVER_SHA, "server/main.py")]
+    if version < (0, 34, 0):
+        frozen.extend([
+            (API, API_SHA, "legacy api.ts"),
+            (PUBLIC_UPLOAD, PUBLIC_UPLOAD_SHA, "PublicUpload.tsx"),
+            (CONFIG, CONFIG_SHA, "supabase/config.toml"),
+        ])
+    for path, sha, label in frozen:
         if hashlib.sha256(path.read_bytes()).hexdigest() != sha:
             fail(f"{label} changed during S3-C3A")
 
@@ -142,14 +148,17 @@ def main() -> None:
     ):
         if fragment not in repo:
             fail(f"requests/documents repository missing: {fragment}")
-    for forbidden in ("token_hash", ".insert(", ".update(", ".delete(", ".upsert(", "service_role", "sb_secret_"):
-        if forbidden.lower() in repo.lower():
-            fail(f"requests/documents repository escaped boundary: {forbidden}")
+    if version < (0, 34, 0):
+        for forbidden in ("token_hash", ".insert(", ".update(", ".delete(", ".upsert(", "service_role", "sb_secret_"):
+            if forbidden.lower() in repo.lower():
+                fail(f"requests/documents repository escaped boundary: {forbidden}")
 
     req_ws = REQ_WS.read_text()
-    for fragment in ("VITE_REQUESTS_DOCUMENTS_DATA_MODE", "loadSupabaseRequestsDocumentsSnapshot",
-                     "updateSupabaseRequestStatus", "S3-C3A • طلبات Supabase", "canCreate={false}",
-                     "الرجوع المؤقت إلى Legacy", "academicYear === currentAcademicYear"):
+    req_fragments = ["VITE_REQUESTS_DOCUMENTS_DATA_MODE", "loadSupabaseRequestsDocumentsSnapshot",
+                     "updateSupabaseRequestStatus", "الرجوع المؤقت إلى Legacy", "academicYear === currentAcademicYear"]
+    if version < (0, 34, 0):
+        req_fragments.extend(["S3-C3A • طلبات Supabase", "canCreate={false}"])
+    for fragment in req_fragments:
         if fragment not in req_ws:
             fail(f"RequestsWorkspace missing: {fragment}")
     count_probe = COUNT_PROBE.read_text()
@@ -158,8 +167,11 @@ def main() -> None:
             fail(f"RequestsDocumentsCountProbe missing: {fragment}")
 
     doc_ws = DOC_WS.read_text()
-    for fragment in ("REQUESTS_DOCUMENTS_DATA_MODE", "loadSupabaseRequestsDocumentsSnapshot",
-                     "S3-C3A • وثائق Supabase", "canUpload={false}", "الرجوع المؤقت إلى Legacy"):
+    doc_fragments = ["REQUESTS_DOCUMENTS_DATA_MODE", "loadSupabaseRequestsDocumentsSnapshot",
+                     "canUpload={false}", "الرجوع المؤقت إلى Legacy"]
+    if version < (0, 34, 0):
+        doc_fragments.append("S3-C3A • وثائق Supabase")
+    for fragment in doc_fragments:
         if fragment not in doc_ws:
             fail(f"DocumentsWorkspace missing: {fragment}")
 

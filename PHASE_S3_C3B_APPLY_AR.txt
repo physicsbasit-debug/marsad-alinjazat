@@ -1,0 +1,22 @@
+مرصد الإنجازات — S3-C3B Public Intake & Supabase Storage — v0.34.0
+
+النطاق:
+- إنشاء طلبات الرفع للعام الحالي عبر Supabase.
+- رمز تسليم عشوائي؛ لا يُحفظ إلا SHA-256 داخل upload_requests.
+- Edge Function عامة تتحقق من الرمز وترفع إلى Bucket خاصة marsad-documents.
+- حد الملف 25MB وأنواع تعليمية محددة.
+- تسجيل الوثيقة وتحديث الطلب إلى review ذريًا عبر RPC.
+- إذا فشل تسجيل metadata بعد رفع Storage، تحذف Edge Function الملف اليتيم.
+- فتح ملفات Supabase للإدارة عبر Signed URL لمدة 300 ثانية.
+- الأعوام التاريخية وLegacy fallback لم تتغير.
+- الرفع المباشر من صفحة الوثائق مؤجل.
+
+قبل الدمج:
+1) ارفع changed-files-only إلى فرع مراجعة.
+2) انتظر GitHub Actions: npm check + pytest + S0→S3-C3B + HTTP E2E.
+3) نفّذ migration مرة واحدة فقط بعد نجاح CI والمراجعة.
+4) انشر Edge Function marsad-public-upload.
+5) نفّذ ملف Live Acceptance داخل SQL Editor؛ يجب أن ينتهي بـ PASS ثم ROLLBACK.
+6) اختبار حي: إنشاء طلب، فتح الرابط دون تسجيل دخول، رفع ملف، ظهور الطلب review، فتح الوثيقة من الإدارة.
+
+لا حاجة إلى Secret يدوي جديد: بيئة Edge Functions توفر مفاتيح الخادم. لا تضع أي مفتاح Secret/Service Role داخل VITE_* أو src/.

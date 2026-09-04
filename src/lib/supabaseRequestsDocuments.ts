@@ -2,7 +2,7 @@ import { getSupabaseClient } from './supabase';
 import { loadSupabaseTeachersReadSnapshot } from './supabaseTeachers';
 import type { SupabaseTeacherReadRecord } from './supabaseTeachers';
 import type { TenantSessionContext } from './supabaseSession';
-import type { DocumentRecord, RequestStatus, Teacher, UploadRequest } from '../types';
+import type { CreateRequestInput, DocumentRecord, RequestStatus, Teacher, UploadRequest } from '../types';
 
 export type SupabaseRequestsDocumentsSnapshot = {
   schoolId: string;
@@ -208,3 +208,72 @@ export async function loadSupabaseOpenRequestCount(context: TenantSessionContext
   if (error) throw new Error('تعذر قراءة عداد طلبات الملفات عبر RLS.');
   return (data || []).length;
 }
+
+function randomUploadToken(byteLength = 32): string {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+function resolvePublicUploadUrl(token: string): string {
+  const base = new URL(import.meta.env.BASE_URL || '/', window.location.origin);
+  return new URL(`upload/${encodeURIComponent(token)}`, base).toString();
+}
+
+export async function createSupabaseUploadRequest(
+  context: TenantSessionContext,
+  input: CreateRequestInput,
+): Promise<{ id: number; uploadUrl: string; expiresAt: string }> {
+  if (context.role !== 'owner' && context.role !== 'admin') {
+    throw new Error('إنشاء طلب ملف متاح لمالك النظام أو الإدارة فقط.');
+  }
+  if (!Number.isSafeInteger(input.teacherId) || input.teacherId <= 0) throw new Error('المعلم المحدد غير صالح.');
+  const token = randomUploadToken();
+  const tokenHash = await sha256Hex(token);
+  const { data, error } = await getSupabaseClient().rpc('marsad_create_upload_request_v1', {
+    p_school_id: context.schoolId,
+    p_academic_year_id: context.academicYearId,
+    p_teacher_id: input.teacherId,
+    p_request_type: input.requestType,
+    p_subject: input.subject,
+    p_grade: input.grade,
+    p_title: input.title,
+    p_deadline: input.deadline || null,
+    p_notes: input.notes || null,
+    p_allowed_files: input.allowedFiles,
+    p_token_hash: tokenHash,
+  });
+  if (error) throw new Error('تعذر إنشاء طلب الرفع في Supabase.');
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== 'object') throw new Error('لم تُرجع خدمة إنشاء الطلب بيانات صالحة.');
+  const id = safeId((row as { id?: unknown }).id, 'معرف الطلب الجديد');
+  const expiresAt = clean(String((row as { expires_at?: unknown }).expires_at || ''));
+  if (!expiresAt) throw new Error('لم تُرجع خدمة إنشاء الطلب تاريخ انتهاء صالحًا.');
+  return { id, uploadUrl: resolvePublicUploadUrl(token), expiresAt };
+}
+
+export async function createSupabaseDocumentSignedUrl(
+  context: TenantSessionContext,
+  document: Pick<DocumentRecord, 'storageProvider' | 'storagePath'>,
+): Promise<string> {
+  if (context.role !== 'owner' && context.role !== 'admin') {
+    throw new Error('فتح وثائق التخزين متاح لمالك النظام أو الإدارة فقط.');
+  }
+  if (document.storageProvider !== 'supabase' || !document.storagePath) {
+    throw new Error('هذه الوثيقة لا تحتوي مسار Supabase Storage صالحًا.');
+  }
+  const { data, error } = await getSupabaseClient()
+    .storage
+    .from('marsad-documents')
+    .createSignedUrl(document.storagePath, 300);
+  if (error || !data?.signedUrl) throw new Error('تعذر إنشاء رابط فتح مؤقت للوثيقة.');
+  return data.signedUrl;
+}
+
