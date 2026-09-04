@@ -9,6 +9,8 @@ import { getSupabaseClient } from './supabase';
 import type { TenantSessionContext } from './supabaseSession';
 import { loadSupabaseTeachersReadSnapshot } from './supabaseTeachers';
 import { updateSupabaseTeacher } from './supabaseTeachersWrite';
+import type { SupabaseTeacherRelatedSnapshot } from './supabaseTeacherRelated';
+import { teacherRelatedStats } from './supabaseTeacherRelated';
 
 function ensureManager(context: TenantSessionContext): void {
   if (context.role !== 'owner' && context.role !== 'admin') {
@@ -64,6 +66,7 @@ type CvRow = {
 export async function getSupabaseTeacherProfile(
   context: TenantSessionContext,
   teacherId: number,
+  relatedSnapshot?: SupabaseTeacherRelatedSnapshot,
 ): Promise<TeacherProfileDetails> {
   const safeTeacherId = ensureSafeNumericId(teacherId, 'معرف المعلم');
   const snapshot = await loadSupabaseTeachersReadSnapshot(context);
@@ -103,13 +106,15 @@ export async function getSupabaseTeacherProfile(
       professionalSummary: record.professionalSummary,
     },
     cvItems,
-    stats: {
-      requestCount: 0,
-      documentCount: 0,
-      approvedDocumentCount: 0,
-      visitCount: 0,
-      openFollowupCount: 0,
-    },
+    stats: relatedSnapshot
+      ? teacherRelatedStats(relatedSnapshot, safeTeacherId)
+      : {
+          requestCount: 0,
+          documentCount: 0,
+          approvedDocumentCount: 0,
+          visitCount: 0,
+          openFollowupCount: 0,
+        },
   };
 }
 

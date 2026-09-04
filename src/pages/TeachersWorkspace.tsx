@@ -6,6 +6,8 @@ import type { TenantSessionContext } from '../lib/supabaseSession';
 import { loadSupabaseTeachersReadSnapshot } from '../lib/supabaseTeachers';
 import type { SupabaseTeachersReadSnapshot } from '../lib/supabaseTeachers';
 import { createSupabaseTeacher } from '../lib/supabaseTeachersWrite';
+import { loadSupabaseTeacherRelatedSnapshot } from '../lib/supabaseTeacherRelated';
+import type { SupabaseTeacherRelatedSnapshot } from '../lib/supabaseTeacherRelated';
 import {
   createSupabaseTeacherCvItem,
   deleteSupabaseTeacherCvItem,
@@ -25,8 +27,6 @@ import type {
 export type TeachersDataMode = 'legacy' | 'supabase';
 const rawMode = (import.meta.env.VITE_TEACHERS_DATA_MODE || 'legacy').trim().toLowerCase();
 export const TEACHERS_DATA_MODE: TeachersDataMode = rawMode === 'supabase' ? 'supabase' : 'legacy';
-
-const RELATED_DATA_NOTICE = 'طلبات الملفات والوثائق والزيارات ما زالت على مصدر Legacy، لذلك لا تُخلط معرفاتها مع معلمي Supabase في هذه المرحلة.';
 
 function toTeacher(record: SupabaseTeachersReadSnapshot['teachers'][number]): Teacher {
   return {
@@ -72,6 +72,7 @@ export function TeachersWorkspace({
   const [forceLegacy, setForceLegacy] = useState(false);
   const [context, setContext] = useState<TenantSessionContext | null>(null);
   const [snapshot, setSnapshot] = useState<SupabaseTeachersReadSnapshot | null>(null);
+  const [relatedSnapshot, setRelatedSnapshot] = useState<SupabaseTeacherRelatedSnapshot | null>(null);
   const [loading, setLoading] = useState(eligibleForSupabase);
   const [error, setError] = useState('');
   const [addOpen, setAddOpen] = useState(false);
@@ -85,6 +86,7 @@ export function TeachersWorkspace({
       if (!nextContext) {
         setContext(null);
         setSnapshot(null);
+        setRelatedSnapshot(null);
         onSupabaseTeacherCount?.(null);
         return;
       }
@@ -92,11 +94,14 @@ export function TeachersWorkspace({
         throw new Error('جلسة Supabase لا تطابق عام العمل الحالي.');
       }
       const nextSnapshot = await loadSupabaseTeachersReadSnapshot(nextContext);
+      const nextRelatedSnapshot = await loadSupabaseTeacherRelatedSnapshot(nextContext, nextSnapshot);
       setContext(nextContext);
       setSnapshot(nextSnapshot);
+      setRelatedSnapshot(nextRelatedSnapshot);
       onSupabaseTeacherCount?.(nextSnapshot.teachers.length);
     } catch (caught) {
       setSnapshot(null);
+      setRelatedSnapshot(null);
       onSupabaseTeacherCount?.(null);
       setError(caught instanceof Error ? caught.message : 'تعذر تحميل معلمي Supabase.');
     } finally {
@@ -107,6 +112,7 @@ export function TeachersWorkspace({
   useEffect(() => {
     setForceLegacy(false);
     setSnapshot(null);
+    setRelatedSnapshot(null);
     setContext(null);
     if (!eligibleForSupabase) {
       onSupabaseTeacherCount?.(null);
@@ -119,16 +125,16 @@ export function TeachersWorkspace({
   const supabaseTeachers = useMemo(() => snapshot?.teachers.map(toTeacher) || [], [snapshot]);
 
   const profileActions = useMemo<TeacherProfileActions | undefined>(() => {
-    if (!context) return undefined;
+    if (!context || !relatedSnapshot) return undefined;
     return {
-      loadProfile: (teacherId) => getSupabaseTeacherProfile(context, teacherId),
+      loadProfile: (teacherId) => getSupabaseTeacherProfile(context, teacherId, relatedSnapshot),
       updateProfile: async (teacherId, input) => {
         await updateSupabaseTeacherProfile(context, teacherId, input);
       },
       createCvItem: (teacherId, input) => createSupabaseTeacherCvItem(context, teacherId, input),
       deleteCvItem: (teacherId, itemId) => deleteSupabaseTeacherCvItem(context, teacherId, itemId),
     };
-  }, [context]);
+  }, [context, relatedSnapshot]);
 
   function activateLegacy(): void {
     setForceLegacy(true);
@@ -176,7 +182,7 @@ export function TeachersWorkspace({
     return <TeacherLoginGate error={error} onSignedIn={loadSupabase} onLegacy={activateLegacy} />;
   }
 
-  if (error || !snapshot || !profileActions) {
+  if (error || !snapshot || !relatedSnapshot || !profileActions) {
     return (
       <TeacherCutoverState
         title="تعذر تشغيل مصدر Supabase للمعلمين"
@@ -191,15 +197,15 @@ export function TeachersWorkspace({
     <>
       <TeacherSourceBanner
         source="supabase"
-        detail={`مصدر المعلمين: Supabase / RLS • ${snapshot.schoolName} • ${snapshot.academicYear}`}
+        detail={`المعلمون والعلاقات: Supabase / RLS • ${snapshot.schoolName} • ${snapshot.academicYear} • الطلبات ${relatedSnapshot.requestRowsInScope} • الملفات ${relatedSnapshot.documentRowsInScope} • الزيارات ${relatedSnapshot.visitRowsInScope}`}
         onLegacy={activateLegacy}
         onRefresh={() => void loadSupabase()}
       />
       <Teachers
         teachers={supabaseTeachers}
-        requests={[]}
-        documents={[]}
-        visits={[]}
+        requests={relatedSnapshot.requests}
+        documents={relatedSnapshot.documents}
+        visits={relatedSnapshot.visits}
         academicYear={academicYear}
         currentAcademicYear={currentAcademicYear}
         onAddTeacher={() => setAddOpen(true)}
@@ -207,7 +213,6 @@ export function TeachersWorkspace({
         initialOpenId={null}
         onInitialOpened={onInitialOpened}
         profileActions={profileActions}
-        relatedDataNotice={RELATED_DATA_NOTICE}
       />
       <SupabaseTeacherModal
         open={addOpen}
@@ -239,7 +244,7 @@ function TeacherSourceBanner({
     <div className={`teacher-source-banner ${source}`}>
       <div>
         <span className="teacher-source-dot" />
-        <div><strong>{source === 'supabase' ? 'S3-B3 • تشغيل Supabase' : 'مصدر Legacy مؤقت'}</strong><span>{detail}</span></div>
+        <div><strong>{source === 'supabase' ? 'S3-C1 • علاقات Supabase' : 'مصدر Legacy مؤقت'}</strong><span>{detail}</span></div>
       </div>
       <div className="teacher-source-actions">
         {onRefresh && <button type="button" onClick={onRefresh}><Icon name="arrow" size={15} /> تحديث</button>}
@@ -270,7 +275,7 @@ function TeacherLoginGate({ error, onSignedIn, onLegacy }: { error: string; onSi
   return (
     <div className="teacher-cutover-state">
       <div className="teacher-cutover-card">
-        <span className="eyebrow">S3-B3 • Supabase</span>
+        <span className="eyebrow">S3-C1 • Supabase</span>
         <h2>تسجيل الدخول لتشغيل صفحة المعلمين</h2>
         <p>هذه الصفحة انتقلت إلى Supabase للعام الجاري. بقية وحدات المرصد ما زالت تعمل بمصدرها السابق.</p>
         <form onSubmit={submit} className="teacher-login-form">

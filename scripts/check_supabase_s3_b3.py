@@ -62,7 +62,8 @@ def main() -> None:
             fail(f"missing S3-B3 artifact: {path.relative_to(ROOT)}")
 
     package = json.loads(PACKAGE.read_text(encoding="utf-8"))
-    if version_tuple(package.get("version", "0.0.0")) < (0, 30, 0):
+    current_version = version_tuple(package.get("version", "0.0.0"))
+    if current_version < (0, 30, 0):
         fail("S3-B3 requires package version >= 0.30.0")
 
     migrations = sorted(path.name for path in MIGRATIONS.glob("*.sql") if path.is_file())
@@ -115,16 +116,29 @@ def main() -> None:
         fail("Legacy TeacherModal rollback path was removed")
 
     workspace = WORKSPACE.read_text(encoding="utf-8")
-    for fragment in (
+    common_workspace_fragments = (
         "VITE_TEACHERS_DATA_MODE", "academicYear === currentAcademicYear", "loadTenantSessionContext",
         "loadSupabaseTeachersReadSnapshot", "createSupabaseTeacher", "getSupabaseTeacherProfile",
         "updateSupabaseTeacherProfile", "createSupabaseTeacherCvItem", "deleteSupabaseTeacherCvItem",
-        "الرجوع المؤقت إلى Legacy", "طلبات الملفات والوثائق والزيارات ما زالت على مصدر Legacy",
-        "requests={[]}", "documents={[]}", "visits={[]}", "relatedDataNotice={RELATED_DATA_NOTICE}",
-        "if (eligibleForSupabase && initialOpenId)", "setForceLegacy(true)",
-    ):
+        "الرجوع المؤقت إلى Legacy", "if (eligibleForSupabase && initialOpenId)", "setForceLegacy(true)",
+    )
+    for fragment in common_workspace_fragments:
         if fragment not in workspace:
             fail(f"TeachersWorkspace missing: {fragment}")
+    if current_version < (0, 31, 0):
+        for fragment in (
+            "طلبات الملفات والوثائق والزيارات ما زالت على مصدر Legacy",
+            "requests={[]}", "documents={[]}", "visits={[]}", "relatedDataNotice={RELATED_DATA_NOTICE}",
+        ):
+            if fragment not in workspace:
+                fail(f"S3-B3 related-domain isolation missing: {fragment}")
+    else:
+        for fragment in (
+            "loadSupabaseTeacherRelatedSnapshot", "requests={relatedSnapshot.requests}",
+            "documents={relatedSnapshot.documents}", "visits={relatedSnapshot.visits}",
+        ):
+            if fragment not in workspace:
+                fail(f"post-S3-B3 staged related-domain seam missing: {fragment}")
     for forbidden in ("service_role", "service-role", "sb_secret_", "raw_user_meta_data", "user_metadata.role", "app_metadata.role"):
         if forbidden.lower() in workspace.lower():
             fail(f"TeachersWorkspace contains forbidden auth/secret behavior: {forbidden}")

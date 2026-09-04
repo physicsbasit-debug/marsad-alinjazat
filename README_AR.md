@@ -386,3 +386,7 @@ STORAGE_MODE
 ## S3-B3 — Teachers UI Cutover
 
 تم تحويل صفحة المعلمين للعام الجاري إلى Supabase مع رجوع يدوي إلى Legacy، دون قطع بقية المجالات أو إضافة Migration جديدة.
+
+## S3-C1 — Teacher Related Domains Read Boundary
+
+الإصدار **v0.31.0** يربط بطاقة وملف المعلم بقراءات Supabase المباشرة لطلبات الملفات والوثائق والزيارات وإجراءات المتابعة عبر `teacher_id` السحابي نفسه. لا توجد مطابقة مع Legacy ولا Migration جديدة ولا كتابة لهذه المجالات. تبقى السجلات القديمة منفصلة حتى مراحل نقلها الخاصة. راجع `SUPABASE_TEACHER_RELATED_READ_AR.md`.

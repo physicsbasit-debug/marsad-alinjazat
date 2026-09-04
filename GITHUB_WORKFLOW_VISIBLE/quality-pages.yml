@@ -107,6 +107,9 @@ jobs:
       - name: S3-B3 teachers UI cutover
         run: python scripts/check_supabase_s3_b3.py
 
+      - name: S3-C1 teacher-related Supabase read boundary
+        run: python scripts/check_supabase_s3_c1.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 

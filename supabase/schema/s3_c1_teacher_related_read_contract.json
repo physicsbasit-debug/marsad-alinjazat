@@ -1,0 +1,30 @@
+{
+  "phase": "S3-C1",
+  "project_version": "0.31.0",
+  "title": "Teachers Related Domains Read Boundary",
+  "schema_changes_allowed": false,
+  "rls_changes_allowed": false,
+  "sql_schema_migration_added": false,
+  "related_domain_writes_enabled": false,
+  "teacher_delete_enabled": false,
+  "current_academic_year_only": true,
+  "historical_years_use_legacy": true,
+  "legacy_related_rows_never_joined_to_supabase_teacher_ids": true,
+  "supabase_teacher_identity_is_authoritative": true,
+  "related_read_tables": [
+    "upload_requests",
+    "documents",
+    "supervision_visits",
+    "supervision_actions"
+  ],
+  "forbidden_selected_columns": [
+    "token_hash"
+  ],
+  "legacy_related_write_flows_unchanged": [
+    "upload_requests",
+    "documents",
+    "supervision_visits"
+  ],
+  "manual_legacy_rollback_preserved": true,
+  "other_domain_runtime_switch_allowed": false
+}

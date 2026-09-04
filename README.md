@@ -414,3 +414,7 @@ Version **v0.29.0** adds a staged Supabase write repository for teacher create/u
 ## S3-B3 — Teachers UI Cutover
 
 تم تحويل صفحة المعلمين للعام الجاري إلى Supabase مع رجوع يدوي إلى Legacy، دون قطع بقية المجالات أو إضافة Migration جديدة.
+
+## S3-C1 — Teacher Related Domains Read Boundary
+
+Version **v0.31.0** expands the current-year Teachers workspace with direct Supabase/RLS reads for upload requests, documents, supervision visits, and supervision actions using the authoritative Supabase `teacher_id`. No Legacy ID matching, schema migration, or related-domain write cutover is introduced.
