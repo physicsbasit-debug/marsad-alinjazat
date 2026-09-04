@@ -387,3 +387,7 @@ Live Supabase acceptance exposed that `statement_timestamp()` remains constant f
 ### S2-E1B — self-contained representative legacy dry run
 
 Version **v0.25.1** makes the S2-E1 gate self-contained for the GitHub + Supabase Dashboard workflow. CI builds a deterministic 25-table legacy fixture, runs it through the migration compiler, validates semantic reconciliation, and keeps a reviewable rollback-only Supabase SQL pack. No schema/RLS/runtime/storage cutover occurs in this phase.
+
+### S2-E2 — production tenant bootstrap
+
+Version **v0.26.0** adds the one-time production tenant bootstrap contract without changing PostgreSQL schema, RLS, runtime, or storage. The committed SQL remains privacy-safe and contains placeholders only. The live personalized bootstrap is delivered outside the public repository. It creates only the real school, the owner membership projection, and academic year `2026/2027`; domain demo data and school settings are intentionally not seeded. A separate rollback-only RLS acceptance verifies owner access and non-member tenant isolation.

@@ -1,17 +1,17 @@
-# تعليمات رفع مرصد الإنجازات v0.25.1 — S2-E1B
+# تعليمات رفع مرصد الإنجازات v0.26.0 — S2-E2
 
-نقطة الأساس: **v0.25.0 / S2-E1 GitHub GREEN**، وS2-D LIVE GREEN.
+1. ارفع محتويات حزمة **Changed Files Only** إلى جذر مستودع GitHub.
+2. تأكد أن الملفين التاليين رُفعا معًا وبنفس المحتوى:
+   - `.github/workflows/quality-pages.yml`
+   - `GITHUB_WORKFLOW_VISIBLE/quality-pages.yml`
+3. انتظر نجاح `Quality & Live Preview` وظهور خطوة:
+   `S2-E2 production tenant bootstrap contract`.
+4. لا تشغّل أي Migration جديدة؛ S2-E2 لا تضيف Migration.
+5. بعد GitHub GREEN شغّل ملف **Live Bootstrap** المخصص الذي يُسلّم خارج المستودع في Supabase SQL Editor.
+6. النتيجة المطلوبة أولًا:
+   `PASS: S2-E2 production tenant bootstrap`
+7. بعدها شغّل ملف **Live RLS Acceptance** المخصص.
+8. النتيجة المطلوبة:
+   `PASS: S2-E2 tenant RLS acceptance`
 
-1. ارفع محتويات `changed_files_only` فوق `main`.
-2. تأكد من وصول `.github/workflows/quality-pages.yml` والنسخة المرئية المطابقة.
-3. انتظر GitHub Actions GREEN، بما في ذلك:
-   `S2-E1B representative legacy dry-run pack`.
-4. **لا تشغّل أي Migration في Supabase**؛ S2-E1B لا تضيف Migration.
-5. لا تحتاج Terminal ولا ملف SQLite خارجي.
-6. بعد GREEN افتح Supabase > SQL Editor > New query وشغّل كامل الملف:
-   `supabase/tests/s2_e1b_representative_dry_run.sql`.
-7. النتيجة المطلوبة:
-   `PASS: S2-E1 SQLite migration dry run`.
-8. الملف ينتهي بـ`ROLLBACK;`، لذلك لا تبقى بيانات Fixture.
-
-نجاح S2-E1B يثبت أن خريطة Legacy الممثلة متوافقة مع قاعدة Supabase الحالية. لا يوجد Runtime cutover ولا نقل Storage bytes في هذه المرحلة.
+لا تُرفع ملفات Live الشخصية إلى GitHub لأنها تحتوي معرف المدرسة/بريد المالك التشغيلي.

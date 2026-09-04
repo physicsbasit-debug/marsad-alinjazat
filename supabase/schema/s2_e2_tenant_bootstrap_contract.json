@@ -1,0 +1,46 @@
+{
+  "phase": "S2-E2",
+  "project_version": "0.26.0",
+  "title": "Production Tenant Bootstrap",
+  "schema_changes_allowed": false,
+  "rls_changes_allowed": false,
+  "runtime_switch_allowed": false,
+  "auth_user_mutation_allowed": false,
+  "domain_seed_data_allowed": false,
+  "tenant_bootstrap_commit_allowed": true,
+  "school_settings_seed_allowed": false,
+  "sql_schema_migration_added": false,
+  "bootstrap_scope": [
+    "schools",
+    "profiles",
+    "school_memberships",
+    "academic_years"
+  ],
+  "owner_role": "owner",
+  "owner_status": "active",
+  "current_academic_year": {
+    "label": "2026/2027",
+    "start_year": 2026,
+    "end_year": 2027,
+    "is_current": true
+  },
+  "privacy": {
+    "owner_email_in_repository": false,
+    "school_name_in_repository_template": false,
+    "live_personalized_sql_committed": false
+  },
+  "safety": {
+    "bootstrap_is_idempotent_for_same_owner_school_year": true,
+    "duplicate_school_name_is_error": true,
+    "conflicting_owner_membership_is_error": true,
+    "conflicting_current_academic_year_is_error": true,
+    "inactive_existing_school_is_error": true,
+    "acceptance_sql_must_rollback": true
+  },
+  "acceptance": {
+    "github_ci_required": true,
+    "bootstrap_expected_result": "PASS: S2-E2 production tenant bootstrap",
+    "rls_expected_result": "PASS: S2-E2 tenant RLS acceptance",
+    "meaning": "the real school tenant and owner boundary exist in Supabase; React runtime is still not cut over"
+  }
+}
