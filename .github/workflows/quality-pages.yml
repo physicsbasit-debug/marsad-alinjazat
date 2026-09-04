@@ -89,6 +89,9 @@ jobs:
       - name: S2-E1B representative legacy dry-run pack
         run: python scripts/check_supabase_s2_e1b.py
 
+      - name: S2-E2 production tenant bootstrap contract
+        run: python scripts/check_supabase_s2_e2.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 
