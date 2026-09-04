@@ -1,4 +1,5 @@
 import { getSupabaseClient } from './supabase';
+import { buildPublicUploadUrl } from './publicUploadRoute';
 import { loadSupabaseTeachersReadSnapshot } from './supabaseTeachers';
 import type { SupabaseTeacherReadRecord } from './supabaseTeachers';
 import type { TenantSessionContext } from './supabaseSession';
@@ -223,8 +224,7 @@ async function sha256Hex(value: string): Promise<string> {
 }
 
 function resolvePublicUploadUrl(token: string): string {
-  const base = new URL(import.meta.env.BASE_URL || '/', window.location.origin);
-  return new URL(`upload/${encodeURIComponent(token)}`, base).toString();
+  return buildPublicUploadUrl(token, window.location.origin, import.meta.env.BASE_URL || '/');
 }
 
 export async function createSupabaseUploadRequest(

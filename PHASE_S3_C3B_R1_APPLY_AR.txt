@@ -1,0 +1,32 @@
+مرصد الإنجازات — S3-C3B R1 — v0.34.1
+تصحيح توجيه رابط الرفع العام على GitHub Pages
+
+الهدف
+- منع ظهور 404 عند فتح رابط الرفع العام مباشرة من GitHub Pages.
+- جعل الروابط الجديدة تستخدم المسار الجذري مع ?upload=TOKEN.
+- إبقاء التوافق مع الروابط القديمة /upload/TOKEN عبر نسخة SPA fallback في 404.html.
+
+ما يتغير
+1) src/lib/publicUploadRoute.ts
+   - بناء رابط الرفع الجديد بصيغة query parameter.
+   - قراءة token من ?upload= أولًا، ثم دعم /upload/TOKEN للتوافق الخلفي.
+2) src/App.tsx
+   - استخدام محلل المسار الموحد.
+3) src/lib/supabaseRequestsDocuments.ts
+   - إنشاء روابط الرفع الجديدة عبر helper الموحد.
+4) GitHub Pages workflow
+   - نسخ dist/index.html إلى dist/404.html بعد البناء.
+5) إضافة guard مستقل S3-C3B R1.
+
+لا يحتاج هذا الإصدار إلى:
+- SQL جديد.
+- إعادة تشغيل Migration.
+- تعديل قاعدة البيانات.
+- إعادة نشر Edge Function.
+- سر جديد.
+
+بوابة القبول
+- GitHub Actions أخضر.
+- رابط جديد يظهر بصيغة /marsad-alinjazat/?upload=TOKEN ولا يعطي 404.
+- رابط قديم /marsad-alinjazat/upload/TOKEN يفتح واجهة الرفع بدل صفحة GitHub 404 الخام.
+- رفع ملف تجريبي ينقل الطلب إلى review وتظهر الوثيقة للإدارة.

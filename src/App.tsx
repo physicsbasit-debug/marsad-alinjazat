@@ -18,6 +18,7 @@ import { REQUESTS_DOCUMENTS_DATA_MODE, RequestsWorkspace } from './pages/Request
 import { RequestsDocumentsCountProbe } from './pages/RequestsDocumentsCountProbe';
 import { TeachersWorkspace } from './pages/TeachersWorkspace';
 import { AuthDiagnostic } from './pages/AuthDiagnostic';
+import { resolvePublicUploadToken } from './lib/publicUploadRoute';
 import { TeachersReadDiagnostic } from './pages/TeachersReadDiagnostic';
 import type { BootstrapData, CreateEventInput, CreateRequestInput, CreateTeacherInput, RequestStatus, SearchResult } from './types';
 
@@ -44,14 +45,11 @@ export default function App() {
       : pathname;
     return /^\/?auth-check\/?$/.test(relativePath) || new URLSearchParams(window.location.search).get('auth-check') === '1';
   }, []);
-  const publicToken = useMemo(() => {
-    const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
-    const pathname = window.location.pathname;
-    const relativePath = basePath && basePath !== '/' && pathname.startsWith(basePath)
-      ? pathname.slice(basePath.length)
-      : pathname;
-    return relativePath.match(/^\/?upload\/([^/]+)$/)?.[1] || null;
-  }, []);
+  const publicToken = useMemo(() => resolvePublicUploadToken(
+    window.location.pathname,
+    window.location.search,
+    import.meta.env.BASE_URL || '/',
+  ), []);
   if(isAuthDiagnostic) return <AuthDiagnostic/>;
   if(isTeachersReadDiagnostic) return <TeachersReadDiagnostic/>;
   if(publicToken) return <PublicUpload token={publicToken}/>;
