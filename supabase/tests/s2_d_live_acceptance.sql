@@ -357,6 +357,12 @@ begin
     select count(*) into v_count from public.documents where id=v_doc and request_id is null;
     if v_count <> 1 then raise exception 'S2-D acceptance failed: document.request_id did not SET NULL'; end if;
 
+    -- Remove the temporary referential-behavior fixture before role visibility counts.
+    -- Otherwise teacher/lead_teacher legitimately see a third self-linked document.
+    delete from public.documents where id=v_doc;
+    select count(*) into v_count from public.documents where id=v_doc;
+    if v_count <> 0 then raise exception 'S2-D acceptance failed: temporary SET NULL document cleanup failed'; end if;
+
     -- Event delete must cascade to media and teacher links.
     insert into public.events(school_id,academic_year_id,title,event_type,event_date)
     values(s_a,y_a_cur,'Cascade event','x',date '2090-09-06') returning id into v_event;

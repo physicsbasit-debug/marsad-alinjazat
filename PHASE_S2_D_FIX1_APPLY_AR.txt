@@ -1,0 +1,13 @@
+مرصد الإنجازات — S2-D Fix 1 v0.24.1
+
+السبب: اختبار SET NULL كان يترك مستندًا مؤقتًا ثالثًا قبل اختبارات صلاحيات teacher/lead_teacher.
+التصحيح: حذف المستند المؤقت بعد إثبات SET NULL وقبل اختبارات الأدوار.
+لا توجد Migration أو تغييرات Schema/RLS/Runtime.
+
+الترتيب:
+1) ارفع changed_files_only إلى GitHub.
+2) انتظر GitHub Actions GREEN.
+3) لا تشغّل Migration.
+4) أبقِ مستخدم Auth واحدًا.
+5) شغّل supabase/tests/s2_d_live_acceptance.sql.
+6) المطلوب PASS: S2-D database acceptance and migration readiness.

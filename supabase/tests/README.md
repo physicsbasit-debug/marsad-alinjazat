@@ -24,3 +24,5 @@
 ### S2-D — Database acceptance and migration readiness
 
 `s2_d_live_acceptance.sql` is acceptance-only and has no paired migration. It reuses one real Auth user, builds a rollback-protected complete fixture across the 26-table target and two schools, validates year isolation, RLS roles, critical constraints and referential behavior, and returns `PASS: S2-D database acceptance and migration readiness`. PASS authorizes only a controlled SQLite data-migration dry run, not runtime cutover.
+
+- S2-D Fix 1 v0.24.1: corrected the SET NULL temporary-document fixture cleanup before role visibility assertions.

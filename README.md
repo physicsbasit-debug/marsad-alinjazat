@@ -1,3 +1,7 @@
+## Phase S2-D Fix 1 — acceptance fixture cleanup
+
+This patch corrects the S2-D live acceptance fixture only. The SET NULL referential test left a third teacher-linked document in the transaction before role visibility counts. The temporary document is now deleted after SET NULL is proven. No migration, schema, RLS, runtime, or data-migration change is introduced.
+
 ## Phase S2-D — Database Acceptance & Migration Readiness
 
 S2-D is an acceptance-only gate: no SQL migration, schema/RLS change, data copy, storage copy, or runtime switch. A rollback-protected live test exercises the complete 26-table target, two-school isolation, academic-year separation, Auth/RLS roles, critical constraints, and updated_at semantics. The data-migration manifest covers all 25 legacy SQLite tables. PASS means ready for a controlled SQLite migration dry run only.
@@ -49,7 +53,7 @@ The repository now contains the browser client boundary, local CLI configuration
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة العمل التربوي وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. تجمع أعمال القسم والمعلمين والطلبات والوثائق والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في سجلات مترابطة قابلة للمتابعة بدل توزيعها بين ملفات ومجلدات منفصلة.
 
-> الإصدار الجاري: **v0.24.0 — Phase S2-D Database Acceptance & Migration Readiness**
+> الإصدار الجاري: **v0.24.1 — Phase S2-D Database Acceptance & Migration Readiness**
 > آخر نقطة استقرار خضراء: **v0.23.0 — Phase S2-C2 Domain RLS + Live Acceptance**
 > المعاينة الحية: **https://physicsbasit-debug.github.io/marsad-alinjazat/**
 

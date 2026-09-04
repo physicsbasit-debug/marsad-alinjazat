@@ -1,0 +1,23 @@
+{
+  "phase": "S2-D Fix 1",
+  "project_version": "0.24.1",
+  "base_phase": "S2-D",
+  "base_version": "0.24.0",
+  "change_type": "acceptance_fixture_correction_only",
+  "root_cause": "the SET NULL referential-behavior test created a third teacher-linked document and left it in the transaction before role visibility assertions",
+  "correction": "delete the temporary SET NULL document after proving request_id becomes NULL, before role visibility tests",
+  "schema_changes_allowed": false,
+  "rls_changes_allowed": false,
+  "sql_migration_added": false,
+  "runtime_switch_allowed": false,
+  "sqlite_data_migration_executed": false,
+  "storage_bytes_migration_executed": false,
+  "auth_user_mutation_allowed": false,
+  "live_acceptance": "supabase/tests/s2_d_live_acceptance.sql",
+  "live_acceptance_sha256": "9e3ff1d9b811acfd9f6c93ecaefe21264f706a24cb69c709d5bcc04d01e8f24e",
+  "live_acceptance_status": "pending_after_github_green",
+  "expected_teacher_document_count": 2,
+  "expected_lead_teacher_document_count": 2,
+  "temporary_fixture_cleanup_required": true,
+  "pass_meaning": "database is ready for a controlled SQLite data-migration dry run; application runtime cutover remains forbidden"
+}

@@ -1,3 +1,7 @@
+## Phase S2-D Fix 1 — Acceptance Fixture Cleanup
+
+صحح هذا الإصدار اختبار S2-D فقط. اختبار `ON DELETE SET NULL` كان ينشئ مستندًا مؤقتًا ثالثًا مرتبطًا بالمعلم ثم يتركه داخل نفس Transaction، بينما اختبارات دور `teacher` و`lead_teacher` كانت تقيس المستندين الأساسيين فقط. بعد إثبات أن `documents.request_id` أصبح `NULL` يُحذف المستند المؤقت قبل اختبارات الأدوار. لا توجد Migration أو تغييرات Schema/RLS/Runtime.
+
 ## Phase S2-D — Database Acceptance & Migration Readiness
 
 أغلقت هذه المرحلة بوابة قبول قاعدة Supabase دون إضافة Migration جديدة: اختبار حي مترابط عبر الجداول الـ26، عزل مدرستين، عامين دراسيين، أدوار Auth/RLS، القيود المرجعية والحسابية، و`updated_at`. كما ثُبت Manifest لنقل جداول SQLite الـ25 إلى الهدف دون إسقاط صامت أو اختلاق بيانات تاريخية. نجاح S2-D يعني الجاهزية لـData Migration Dry Run فقط، وليس قطع FastAPI/SQLite. راجع `SUPABASE_DATABASE_ACCEPTANCE_AR.md`.
@@ -30,7 +34,7 @@
 
 أضيفت migration ثانية لمجال المعلمين: `teachers`, `teacher_profiles`, `teacher_years`, و`teacher_cv_items`، مع إكمال ربط `school_memberships.teacher_id` بالمعلم داخل المدرسة نفسها. التشغيل ما زال FastAPI/SQLite وRLS مؤجل إلى S2-C.
 
-# مرصد الإنجازات v0.24.0
+# مرصد الإنجازات v0.24.1
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة أعمال المادة وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. الفكرة ليست جمع ملفات في شاشة واحدة، بل ربط الأشخاص والأعمال والقرارات والتخطيط والتحصيل والإشراف والفعاليات والوثائق في سجلات قابلة للمتابعة والتقرير.
 
