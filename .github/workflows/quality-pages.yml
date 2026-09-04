@@ -113,6 +113,9 @@ jobs:
       - name: S3-C2 supervision read/write cutover
         run: python scripts/check_supabase_s3_c2.py
 
+      - name: S3-C3A requests/documents review cutover
+        run: python scripts/check_supabase_s3_c3a.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 
@@ -140,6 +143,7 @@ jobs:
           VITE_SUPABASE_SESSION_MODE: 'diagnostic'
           VITE_TEACHERS_DATA_MODE: 'supabase'
           VITE_SUPERVISION_DATA_MODE: 'supabase'
+          VITE_REQUESTS_DOCUMENTS_DATA_MODE: 'supabase'
         run: |
           npm run build:pages
           touch dist/.nojekyll
