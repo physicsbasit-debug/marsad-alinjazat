@@ -1,0 +1,88 @@
+{
+  "phase": "S3-B2",
+  "project_version": "0.29.0",
+  "title": "Teachers Write Repository and RLS Acceptance",
+  "migration": "20260904130000_s3_b2_teacher_write_foundation.sql",
+  "migration_sha256": "6cfce0ab365018feb8a3a3c5b9205120485cbaf5f21e6cb6de71f8119902e1f0",
+  "table_or_column_schema_changes_allowed": false,
+  "rls_changes_allowed": true,
+  "database_function_changes_allowed": true,
+  "sql_schema_migration_added": true,
+  "domain_runtime_switch_allowed": false,
+  "legacy_fastapi_teachers_remain_operational_source": true,
+  "storage_changes_allowed": false,
+  "teacher_delete_enabled": false,
+  "lead_teacher_write_enabled": false,
+  "write_roles": [
+    "owner",
+    "admin"
+  ],
+  "teacher_years_write_unlock": {
+    "insert": true,
+    "update": true,
+    "delete": false,
+    "tenant_scope": "school_id via RLS",
+    "academic_year_scope": "S3-A TenantSessionContext.academicYearId",
+    "insert_columns": [
+      "school_id",
+      "academic_year_id",
+      "teacher_id",
+      "subject",
+      "experience_years",
+      "workload",
+      "grades",
+      "responsibilities"
+    ],
+    "update_columns": [
+      "subject",
+      "experience_years",
+      "workload",
+      "grades",
+      "responsibilities"
+    ]
+  },
+  "atomic_write_strategy": {
+    "transport": "Supabase RPC",
+    "security_mode": "SECURITY INVOKER",
+    "functions": [
+      "marsad_create_teacher_v1",
+      "marsad_update_teacher_v1"
+    ],
+    "caller_rls_remains_authoritative": true,
+    "service_role_required": false
+  },
+  "create_behavior": {
+    "identity_table": "teachers",
+    "annual_table": "teacher_years",
+    "link_existing_by_email_first": true,
+    "fallback_identity_match": "name + subject from existing teacher_years",
+    "existing_annual_row_is_not_overwritten": true
+  },
+  "update_behavior": {
+    "identity_table": "teachers",
+    "annual_table": "teacher_years",
+    "profile_table": "teacher_profiles",
+    "annual_row_upserted": true,
+    "profile_row_upserted": true,
+    "preserves_teacher_is_active": true,
+    "preserves_existing_teacher_year_is_active": true
+  },
+  "repository_file": "src/lib/supabaseTeachersWrite.ts",
+  "operational_ui_cutover": false,
+  "live_acceptance": {
+    "file": "supabase/tests/s3_b2_live_acceptance.sql",
+    "expected_text": "PASS: S3-B2 teacher write RLS acceptance",
+    "uses_authenticated_role": true,
+    "tests_owner_create_update": true,
+    "tests_cross_tenant_block": true,
+    "tests_lead_teacher_block": true,
+    "tests_delete_stays_blocked": true,
+    "rollback_required": true
+  },
+  "privacy": {
+    "service_role_key_allowed_in_browser": false,
+    "raw_provider_errors_shown_to_user": false,
+    "real_owner_email_committed": false
+  },
+  "meaning": "Owner/admin teacher create and profile update can now be executed atomically through SECURITY INVOKER RPCs while RLS remains authoritative. The operational Teachers UI still stays on Legacy until the next cutover gate."
+}

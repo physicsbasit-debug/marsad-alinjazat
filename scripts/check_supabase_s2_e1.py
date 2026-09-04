@@ -159,7 +159,7 @@ def main() -> None:
         fail("S2-E1 requires package version >= 0.25.0")
 
     migrations = sorted(p.name for p in MIGRATIONS.glob("*.sql") if p.is_file())
-    if migrations != EXPECTED_MIGRATIONS:
+    if migrations[:len(EXPECTED_MIGRATIONS)] != EXPECTED_MIGRATIONS:
         fail("S2-E1 is compiler/dry-run tooling only and must not add a schema migration")
 
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))

@@ -42,7 +42,7 @@ def main() -> None:
         fail("S2-D Fix 1 requires package version >= 0.24.1")
 
     migrations = sorted(p.name for p in MIGRATIONS.glob("*.sql") if p.is_file())
-    if migrations != EXPECTED_MIGRATIONS:
+    if migrations[:len(EXPECTED_MIGRATIONS)] != EXPECTED_MIGRATIONS:
         fail("S2-D Fix 1 is acceptance-only and must not add/change migration filenames")
 
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))

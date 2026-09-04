@@ -46,7 +46,7 @@ def main() -> None:
         fail("S2-E1B requires package version 0.25.1 or newer")
 
     migrations = sorted(p.name for p in MIGRATIONS.glob("*.sql") if p.is_file())
-    if migrations != EXPECTED_MIGRATIONS:
+    if migrations[:len(EXPECTED_MIGRATIONS)] != EXPECTED_MIGRATIONS:
         fail("S2-E1B must not add or alter schema migration history")
 
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))

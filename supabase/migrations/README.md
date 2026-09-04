@@ -13,6 +13,7 @@
 20260903080000_s2_b5_fix1_updated_at_clock.sql
 20260903100000_s2_c1_security_foundation.sql
 20260903123000_s2_c2_domain_rls_baseline.sql
+20260904130000_s3_b2_teacher_write_foundation.sql
 ```
 
 - S2-B1: `schools`, `profiles`, `school_memberships`, `academic_years`.
@@ -40,3 +41,8 @@
 ## S2-D note
 
 S2-D intentionally adds no migration. It is a database acceptance/data-migration-readiness gate over the S2-C2 live schema.
+
+
+### S3-B2 — Teacher write foundation
+
+`20260904130000_s3_b2_teacher_write_foundation.sql` يفتح INSERT/UPDATE فقط على `teacher_years` لدوري owner/admin عبر RLS، ويضيف دالتي RPC ذريتين `marsad_create_teacher_v1` و`marsad_update_teacher_v1` بصلاحية `SECURITY INVOKER`. لا يضيف حذفًا للمعلمين، ولا يمنح `lead_teacher` كتابة، ولا يحول واجهة المعلمين التشغيلية إلى Supabase.

@@ -53,7 +53,7 @@ def main() -> None:
         fail("S3-B1 requires package version >= 0.28.0")
 
     migrations = sorted(p.name for p in MIGRATIONS.glob("*.sql") if p.is_file())
-    if migrations != EXPECTED_MIGRATIONS:
+    if migrations[:len(EXPECTED_MIGRATIONS)] != EXPECTED_MIGRATIONS:
         fail("S3-B1 must not alter PostgreSQL migration history")
 
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))

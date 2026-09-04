@@ -42,7 +42,7 @@ def main() -> None:
         fail("S2-E2 requires package version >= 0.26.0")
 
     migrations = sorted(p.name for p in MIGRATIONS.glob("*.sql") if p.is_file())
-    if migrations != EXPECTED_MIGRATIONS:
+    if migrations[:len(EXPECTED_MIGRATIONS)] != EXPECTED_MIGRATIONS:
         fail("S2-E2 is tenant bootstrap data only and must not alter migration history")
 
     contract = json.loads(CONTRACT.read_text(encoding="utf-8"))

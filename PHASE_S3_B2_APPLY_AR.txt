@@ -1,0 +1,13 @@
+مرصد الإنجازات — S3-B2 / v0.29.0
+Teachers Write Repository & RLS Acceptance
+
+1) ارفع Changed Files Only فوق main.
+2) انتظر GitHub Actions GREEN.
+3) في Supabase SQL Editor شغّل Migration التالية كاملة:
+   supabase/migrations/20260904130000_s3_b2_teacher_write_foundation.sql
+4) بعد نجاحها شغّل:
+   supabase/tests/s3_b2_live_acceptance.sql
+5) النتيجة المطلوبة:
+   PASS: S3-B2 teacher write RLS acceptance
+6) اختبار القبول ينتهي بـ ROLLBACK ولا يترك بيانات اختبار.
+7) لا Cutover لواجهة المعلمين في هذه المرحلة.
