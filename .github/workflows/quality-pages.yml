@@ -95,6 +95,9 @@ jobs:
       - name: S3-A Auth and tenant session foundation
         run: python scripts/check_supabase_s3_a.py
 
+      - name: S3-B1 teachers read repository and parity gate
+        run: python scripts/check_supabase_s3_b1.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 
