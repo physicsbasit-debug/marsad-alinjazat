@@ -1,0 +1,51 @@
+{
+  "phase": "S2-E1",
+  "project_version": "0.25.0",
+  "title": "SQLite Migration Compiler and Controlled Dry Run",
+  "source_table_count": 25,
+  "target_table_count": 26,
+  "schema_changes_allowed": false,
+  "rls_changes_allowed": false,
+  "runtime_switch_allowed": false,
+  "live_data_commit_allowed": false,
+  "storage_bytes_migration_allowed": false,
+  "auth_user_mutation_allowed": false,
+  "sql_schema_migration_added": false,
+  "dry_run_sql_must_rollback": true,
+  "current_academic_year_must_be_explicit": true,
+  "school_identity_for_dry_run": "synthetic deterministic tenant scoped only to rollback transaction",
+  "real_source_requirement": "verified consistent marsad_alinjazat.sqlite3 backup; repository runtime data is intentionally gitignored",
+  "compiler_outputs": [
+    "marsad_s2_e1_dry_run.sql",
+    "marsad_s2_e1_reconciliation.json",
+    "marsad_s2_e1_report.md"
+  ],
+  "security_rules": {
+    "legacy_secret_settings": "excluded with explicit audit reason and values never emitted to SQL",
+    "auth_profiles": "not migrated from SQLite",
+    "school_memberships": "not migrated from SQLite",
+    "browser_or_service_role_secrets": "never emitted"
+  },
+  "identity_strategy": {
+    "dry_run_domain_ids": "remap to high bigint range to avoid collision with existing target rows",
+    "production_identity_strategy": "deferred until dry run reconciliation passes"
+  },
+  "academic_year_strategy": {
+    "current_year": "explicit input required",
+    "legacy_cutoff": "August, matching server.search.academic_year_from_date",
+    "explicit_relation_wins": true,
+    "inferred_rows_must_be_counted": true
+  },
+  "storage_strategy": {
+    "local_to": "legacy_local",
+    "google_drive_to": "google_drive",
+    "legacy_storage_file_id": "fold to storage_path only when storage_path is absent",
+    "file_bytes": "deferred"
+  },
+  "acceptance": {
+    "github_ci_required": true,
+    "real_sqlite_snapshot_required_for_real_dry_run": true,
+    "supabase_expected_result": "PASS: S2-E1 SQLite migration dry run",
+    "meaning": "data mapping is ready for a production migration plan only; still no runtime cutover"
+  }
+}

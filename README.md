@@ -1,3 +1,7 @@
+## Phase S2-E1 — SQLite Migration Compiler & Controlled Dry Run
+
+S2-E1 adds a rollback-only compiler that validates a consistent legacy SQLite snapshot, maps all 25 source tables into the 26-table Supabase target, emits reconciliation artifacts, excludes legacy secret settings, preserves the frozen academic-year rules, and generates a Supabase SQL dry run ending in `ROLLBACK;`. No schema/RLS/runtime/storage-byte change is introduced.
+
 ## Phase S2-D Fix 1 — acceptance fixture cleanup
 
 This patch corrects the S2-D live acceptance fixture only. The SET NULL referential test left a third teacher-linked document in the transaction before role visibility counts. The temporary document is now deleted after SET NULL is proven. No migration, schema, RLS, runtime, or data-migration change is introduced.
@@ -53,7 +57,7 @@ The repository now contains the browser client boundary, local CLI configuration
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة العمل التربوي وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. تجمع أعمال القسم والمعلمين والطلبات والوثائق والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في سجلات مترابطة قابلة للمتابعة بدل توزيعها بين ملفات ومجلدات منفصلة.
 
-> الإصدار الجاري: **v0.24.1 — Phase S2-D Database Acceptance & Migration Readiness**
+> الإصدار الجاري: **v0.25.0 — Phase S2-E1 SQLite Migration Dry Run**
 > آخر نقطة استقرار خضراء: **v0.23.0 — Phase S2-C2 Domain RLS + Live Acceptance**
 > المعاينة الحية: **https://physicsbasit-debug.github.io/marsad-alinjazat/**
 

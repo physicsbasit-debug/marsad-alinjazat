@@ -1,3 +1,7 @@
+## Phase S2-E1 — SQLite Migration Compiler & Controlled Dry Run
+
+تضيف S2-E1 Compiler مضبوطًا لنسخة SQLite الحقيقية: يتحقق من سلامة القاعدة والعلاقات، يغطي جداول المصدر الـ25 والهدف الـ26، يطبق تحويلات السنوات و`teacher_years` ودمج علاقات Legacy، يستبعد الأسرار بتدقيق صريح، ويولد SQL تجريبيًا ينتهي إلزاميًا بـ`ROLLBACK;`. لا توجد Migration جديدة ولا تغيير Schema/RLS/Runtime أو نقل ملفات فعلية. راجع `SUPABASE_SQLITE_MIGRATION_DRY_RUN_AR.md`.
+
 ## Phase S2-D Fix 1 — Acceptance Fixture Cleanup
 
 صحح هذا الإصدار اختبار S2-D فقط. اختبار `ON DELETE SET NULL` كان ينشئ مستندًا مؤقتًا ثالثًا مرتبطًا بالمعلم ثم يتركه داخل نفس Transaction، بينما اختبارات دور `teacher` و`lead_teacher` كانت تقيس المستندين الأساسيين فقط. بعد إثبات أن `documents.request_id` أصبح `NULL` يُحذف المستند المؤقت قبل اختبارات الأدوار. لا توجد Migration أو تغييرات Schema/RLS/Runtime.
@@ -34,7 +38,7 @@
 
 أضيفت migration ثانية لمجال المعلمين: `teachers`, `teacher_profiles`, `teacher_years`, و`teacher_cv_items`، مع إكمال ربط `school_memberships.teacher_id` بالمعلم داخل المدرسة نفسها. التشغيل ما زال FastAPI/SQLite وRLS مؤجل إلى S2-C.
 
-# مرصد الإنجازات v0.24.1
+# مرصد الإنجازات v0.25.0
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة أعمال المادة وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. الفكرة ليست جمع ملفات في شاشة واحدة، بل ربط الأشخاص والأعمال والقرارات والتخطيط والتحصيل والإشراف والفعاليات والوثائق في سجلات قابلة للمتابعة والتقرير.
 

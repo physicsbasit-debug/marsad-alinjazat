@@ -33,8 +33,13 @@ def main() -> None:
             fail(f"missing S2-D Fix 1 file: {path.relative_to(ROOT)}")
 
     package = json.loads(PACKAGE.read_text(encoding="utf-8"))
-    if package.get("version") != "0.24.1":
-        fail("S2-D Fix 1 requires package version 0.24.1")
+    raw_version = package.get("version", "0.0.0")
+    try:
+        version = tuple(int(part) for part in raw_version.split("."))
+    except ValueError:
+        fail(f"invalid package version: {raw_version}")
+    if version < (0, 24, 1):
+        fail("S2-D Fix 1 requires package version >= 0.24.1")
 
     migrations = sorted(p.name for p in MIGRATIONS.glob("*.sql") if p.is_file())
     if migrations != EXPECTED_MIGRATIONS:

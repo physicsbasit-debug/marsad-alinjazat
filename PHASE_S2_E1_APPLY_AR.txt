@@ -1,0 +1,11 @@
+S2-E1 v0.25.0 — SQLite Migration Compiler & Controlled Dry Run
+
+1) ارفع changed_files_only إلى GitHub.
+2) انتظر Quality & Live Preview = GREEN.
+3) لا تشغّل أي Migration في Supabase، فلا توجد Migration جديدة في S2-E1.
+4) جهز نسخة SQLite متسقة من marsad_alinjazat.sqlite3. لا تنسخ ملفًا مفتوحًا عشوائيًا إذا كان WAL نشطًا؛ استخدم backup المدمج إن أمكن.
+5) مرر النسخة إلى compiler مع اسم مدرسة Dry Run والسنة الحالية الصريحة.
+6) راجع reconciliation.json. أي status غير READY يمنع تشغيل SQL.
+7) شغّل marsad_s2_e1_dry_run.sql في Supabase SQL Editor.
+8) النتيجة المطلوبة: PASS: S2-E1 SQLite migration dry run.
+9) SQL ينتهي بـROLLBACK؛ لا تستبدله بـCOMMIT.

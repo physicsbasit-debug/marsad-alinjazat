@@ -83,6 +83,9 @@ jobs:
       - name: S2-D Fix 1 acceptance fixture cleanup
         run: python scripts/check_supabase_s2_d_fix1.py
 
+      - name: S2-E1 SQLite migration compiler dry-run tooling
+        run: python scripts/check_supabase_s2_e1.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 
