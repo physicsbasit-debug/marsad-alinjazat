@@ -109,6 +109,11 @@ def main() -> None:
         approved_supabase_consumers.update({
             "src/lib/supabaseTeacherRelated.ts",
         })
+    if version_tuple >= (0, 32, 0):
+        approved_supabase_consumers.update({
+            "src/lib/supabaseSupervision.ts",
+            "src/pages/SupervisionWorkspace.tsx",
+        })
     import_hits: list[str] = []
     for path in SRC_DIR.rglob("*.ts*"):
         if path == CLIENT_FILE:

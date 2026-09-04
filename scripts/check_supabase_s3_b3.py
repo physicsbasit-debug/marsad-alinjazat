@@ -67,7 +67,9 @@ def main() -> None:
         fail("S3-B3 requires package version >= 0.30.0")
 
     migrations = sorted(path.name for path in MIGRATIONS.glob("*.sql") if path.is_file())
-    if migrations != EXPECTED_MIGRATIONS:
+    if current_version < (0, 32, 0) and migrations != EXPECTED_MIGRATIONS:
+        fail(f"S3-B3 must preserve its original migration history: {migrations}")
+    if current_version >= (0, 32, 0) and migrations[:len(EXPECTED_MIGRATIONS)] != EXPECTED_MIGRATIONS:
         fail(f"S3-B3 must add no migration and preserve migration history: {migrations}")
 
     if hashlib.sha256(API.read_bytes()).hexdigest() != API_SHA:

@@ -20,6 +20,22 @@ import type {
   Teacher,
 } from '../types';
 
+export type SupervisionDataActions = {
+  getVisit: (id: number) => Promise<SupervisionVisitDetails>;
+  updateVisit: (id: number, input: SupervisionVisitInput) => Promise<void | SupervisionVisitDetails>;
+  createAction: (visitId: number, input: SupervisionActionInput) => Promise<SupervisionAction>;
+  updateAction: (visitId: number, actionId: number, input: SupervisionActionInput) => Promise<SupervisionAction>;
+  deleteAction: (visitId: number, actionId: number) => Promise<void>;
+};
+
+const legacySupervisionDataActions: SupervisionDataActions = {
+  getVisit: getSupervisionVisit,
+  updateVisit: updateSupervisionVisit,
+  createAction: createSupervisionAction,
+  updateAction: updateSupervisionAction,
+  deleteAction: deleteSupervisionAction,
+};
+
 export function Supervision({
   visits,
   supervisionAttention,
@@ -28,6 +44,9 @@ export function Supervision({
   onRefresh,
   initialOpenId = null,
   onInitialOpened,
+  dataActions = legacySupervisionDataActions,
+  canManage = true,
+  sourceNotice,
 }: {
   visits: SupervisionVisitRecord[];
   supervisionAttention: SupervisionVisitRecord[];
@@ -36,6 +55,9 @@ export function Supervision({
   onRefresh: () => Promise<void>;
   initialOpenId?: number | null;
   onInitialOpened?: () => void;
+  dataActions?: SupervisionDataActions;
+  canManage?: boolean;
+  sourceNotice?: string;
 }) {
   const [subject, setSubject] = useState('الكل');
   const [status, setStatus] = useState('الكل');
@@ -52,7 +74,7 @@ export function Supervision({
   async function openVisit(id: number) {
     setMessage('');
     try {
-      setSelected(await getSupervisionVisit(id));
+      setSelected(await dataActions.getVisit(id));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'تعذر فتح الزيارة.');
     }
@@ -77,7 +99,7 @@ export function Supervision({
           <h1>الزيارات والمتابعة المهنية</h1>
           <p>زيارة صفية واضحة، توصية قابلة للمتابعة، وأثر محفوظ في ملف المعلم بدل ملاحظات تتبخر بعد نهاية الحصة.</p>
         </div>
-        <button className="primary-button" onClick={onAddVisit}><Icon name="plus" /> تسجيل زيارة</button>
+        {canManage ? <button className="primary-button" onClick={onAddVisit}><Icon name="plus" /> تسجيل زيارة</button> : <span className="quiet-note">عرض فقط حسب صلاحية الحساب</span>}
       </header>
 
       <section className="supervision-metrics">
@@ -86,6 +108,8 @@ export function Supervision({
         <SupervisionMetric label="متأخرة" value={overdue} detail="زيارة أو متابعة فات موعدها" danger={overdue > 0} />
         <SupervisionMetric label="إغلاق المتابعات" value={`${closureRate}%`} detail="من الزيارات التي احتاجت متابعة" />
       </section>
+
+      {sourceNotice && <div className="quiet-note supervision-source-note">{sourceNotice}</div>}
 
       {supervisionAttention.length > 0 && (
         <section className="panel supervision-attention-panel">
@@ -125,7 +149,7 @@ export function Supervision({
       </section>
 
       <Modal open={!!selected} onClose={() => setSelected(null)}>
-        {selected && <VisitDetails visit={selected} teachers={teachers} onReload={async () => { const next = await getSupervisionVisit(selected.id); setSelected(next); await onRefresh(); }} />}
+        {selected && <VisitDetails visit={selected} teachers={teachers} canManage={canManage} dataActions={dataActions} onReload={async () => { const next = await dataActions.getVisit(selected.id); setSelected(next); await onRefresh(); }} />}
       </Modal>
     </div>
   );
@@ -155,7 +179,7 @@ function VisitCard({ visit, onOpen }: { visit: SupervisionVisitRecord; onOpen: (
   );
 }
 
-function VisitDetails({ visit, teachers, onReload }: { visit: SupervisionVisitDetails; teachers: Teacher[]; onReload: () => Promise<void> }) {
+function VisitDetails({ visit, teachers, onReload, dataActions, canManage }: { visit: SupervisionVisitDetails; teachers: Teacher[]; onReload: () => Promise<void>; dataActions: SupervisionDataActions; canManage: boolean }) {
   const [editing, setEditing] = useState(false);
   const [actionEditing, setActionEditing] = useState<SupervisionAction | 'new' | null>(null);
   const [busy, setBusy] = useState(false);
@@ -166,7 +190,7 @@ function VisitDetails({ visit, teachers, onReload }: { visit: SupervisionVisitDe
     const form = new FormData(event.currentTarget);
     const payload = visitPayloadFromForm(form);
     setBusy(true); setMessage('');
-    try { await updateSupervisionVisit(visit.id, payload); setEditing(false); await onReload(); setMessage('تم تحديث الزيارة.'); }
+    try { await dataActions.updateVisit(visit.id, payload); setEditing(false); await onReload(); setMessage('تم تحديث الزيارة.'); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'تعذر تحديث الزيارة.'); }
     finally { setBusy(false); }
   }
@@ -185,8 +209,8 @@ function VisitDetails({ visit, teachers, onReload }: { visit: SupervisionVisitDe
     };
     setBusy(true); setMessage('');
     try {
-      if (actionEditing === 'new') await createSupervisionAction(visit.id, payload);
-      else if (actionEditing) await updateSupervisionAction(visit.id, actionEditing.id, payload);
+      if (actionEditing === 'new') await dataActions.createAction(visit.id, payload);
+      else if (actionEditing) await dataActions.updateAction(visit.id, actionEditing.id, payload);
       setActionEditing(null); await onReload(); setMessage('تم حفظ إجراء المتابعة.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'تعذر حفظ الإجراء.'); }
     finally { setBusy(false); }
@@ -195,7 +219,7 @@ function VisitDetails({ visit, teachers, onReload }: { visit: SupervisionVisitDe
   async function removeAction(action: SupervisionAction) {
     if (!window.confirm(`حذف إجراء «${action.title}»؟`)) return;
     setBusy(true); setMessage('');
-    try { await deleteSupervisionAction(visit.id, action.id); await onReload(); setMessage('تم حذف إجراء المتابعة.'); }
+    try { await dataActions.deleteAction(visit.id, action.id); await onReload(); setMessage('تم حذف إجراء المتابعة.'); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'تعذر حذف الإجراء.'); }
     finally { setBusy(false); }
   }
@@ -208,7 +232,7 @@ function VisitDetails({ visit, teachers, onReload }: { visit: SupervisionVisitDe
         <div className="supervision-detail-side"><VisitStatus visit={visit}/><span className={`report-readiness ${visit.reportReady ? 'ready' : ''}`}><Icon name={visit.reportReady ? 'check' : 'clock'} size={14}/>{visit.reportReady ? 'جاهزة للتقرير' : 'التوثيق غير مكتمل'}</span></div>
       </div>
 
-      <div className="supervision-detail-actions"><button className="soft-button" onClick={() => setEditing(!editing)}><Icon name="edit" size={16}/>{editing ? 'إغلاق التعديل' : 'تحديث الزيارة'}</button><button className="primary-button" onClick={() => setActionEditing('new')}><Icon name="plus" size={16}/> إجراء متابعة</button></div>
+      {canManage && <div className="supervision-detail-actions"><button className="soft-button" onClick={() => setEditing(!editing)}><Icon name="edit" size={16}/>{editing ? 'إغلاق التعديل' : 'تحديث الزيارة'}</button><button className="primary-button" onClick={() => setActionEditing('new')}><Icon name="plus" size={16}/> إجراء متابعة</button></div>}
       {message && <div className={`profile-message ${message.includes('تعذر') || message.includes('معاينة') ? 'warning' : ''}`}>{message}</div>}
 
       {editing ? <VisitForm teachers={teachers} visit={visit} busy={busy} onSubmit={saveVisit} submitLabel="حفظ تحديث الزيارة" /> : (
@@ -229,7 +253,7 @@ function VisitDetails({ visit, teachers, onReload }: { visit: SupervisionVisitDe
         </>
       )}
 
-      {actionEditing && <ActionForm key={actionEditing === 'new' ? 'new' : actionEditing.id} action={actionEditing === 'new' ? null : actionEditing} teachers={teachers} busy={busy} onSubmit={saveAction} onCancel={() => setActionEditing(null)} />}
+      {canManage && actionEditing && <ActionForm key={actionEditing === 'new' ? 'new' : actionEditing.id} action={actionEditing === 'new' ? null : actionEditing} teachers={teachers} busy={busy} onSubmit={saveAction} onCancel={() => setActionEditing(null)} />}
 
       <section className="supervision-actions-section">
         <div className="panel-heading"><div><span className="eyebrow">متابعة التوصيات</span><h3>إجراءات قابلة للإغلاق</h3></div><span className="counter">{visit.actions.length}</span></div>
@@ -239,7 +263,7 @@ function VisitDetails({ visit, teachers, onReload }: { visit: SupervisionVisitDe
               <span className={`action-state-dot ${action.status}`}></span>
               <div><strong>{action.title}</strong><small>{action.responsibleName || 'دون مسؤول'}{action.dueDate ? ` • حتى ${formatDate(action.dueDate)}` : ''}</small>{action.notes && <p>{action.notes}</p>}</div>
               <ActionStatus action={action}/>
-              <div className="row-actions"><button className="icon-button" onClick={() => setActionEditing(action)} title="تعديل"><Icon name="edit" size={16}/></button><button className="icon-button danger" onClick={() => void removeAction(action)} title="حذف"><Icon name="trash" size={16}/></button></div>
+              {canManage && <div className="row-actions"><button className="icon-button" onClick={() => setActionEditing(action)} title="تعديل"><Icon name="edit" size={16}/></button><button className="icon-button danger" onClick={() => void removeAction(action)} title="حذف"><Icon name="trash" size={16}/></button></div>}
             </article>
           ))}
           {!visit.actions.length && <div className="empty-state-compact">لا توجد إجراءات متابعة مسجلة لهذه الزيارة.</div>}
@@ -254,14 +278,14 @@ function VisitDetails({ visit, teachers, onReload }: { visit: SupervisionVisitDe
   );
 }
 
-export function SupervisionVisitModal({ open, teachers, academicYear, onClose, onCreated }: { open: boolean; teachers: Teacher[]; academicYear: string; onClose: () => void; onCreated: () => Promise<void> }) {
+export function SupervisionVisitModal({ open, teachers, academicYear, onClose, onCreated, createVisit = createSupervisionVisit }: { open: boolean; teachers: Teacher[]; academicYear: string; onClose: () => void; onCreated: () => Promise<void>; createVisit?: (input: SupervisionVisitInput) => Promise<unknown> }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formElement = event.currentTarget;
     setBusy(true); setMessage('');
-    try { await createSupervisionVisit(visitPayloadFromForm(new FormData(formElement))); formElement.reset(); await onCreated(); }
+    try { await createVisit(visitPayloadFromForm(new FormData(formElement))); formElement.reset(); await onCreated(); }
     catch (error) { setMessage(error instanceof Error ? error.message : 'تعذر إنشاء الزيارة.'); }
     finally { setBusy(false); }
   }

@@ -1,0 +1,20 @@
+مرصد الإنجازات — S3-C2 / v0.32.0
+
+1) ارفع changed_files_only فوق main.
+2) انتظر Quality & Live Preview = GREEN.
+3) شغّل Migration التالية مرة واحدة في Supabase SQL Editor:
+   supabase/migrations/20260904194500_s3_c2_supervision_write_cutover.sql
+4) افتح Query جديدة وشغّل:
+   supabase/tests/s3_c2_live_acceptance.sql
+5) النتيجة المطلوبة:
+   PASS: S3-C2 supervision write RLS acceptance
+6) بعد PASS افتح GitHub Pages > الإشراف والمتابعة.
+7) تحقق من ظهور:
+   S3-C2 • تشغيل الإشراف عبر Supabase
+8) اختبر زيارة حقيقية: إنشاء > تعديل > إجراء متابعة > تحديث الإجراء > F5.
+
+مهم:
+- Migration تحفظ فعليًا.
+- Live Acceptance ينتهي بـ ROLLBACK ولا يترك Fixtures.
+- لا تعِد تشغيل migrations التاريخية.
+- لا SQL آخر مطلوب في S3-C2.

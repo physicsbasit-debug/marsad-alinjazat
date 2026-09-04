@@ -16,3 +16,5 @@ VITE_SUPABASE_SESSION_MODE=off
 
 # S3-B3 teachers operational source: legacy | supabase
 VITE_TEACHERS_DATA_MODE=legacy
+# S3-C2 supervision operational source: legacy | supabase
+VITE_SUPERVISION_DATA_MODE=legacy

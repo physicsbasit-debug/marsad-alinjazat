@@ -58,11 +58,14 @@ def main() -> None:
             fail(f"missing S3-C1 artifact: {path.relative_to(ROOT)}")
 
     package = json.loads(PACKAGE.read_text(encoding="utf-8"))
-    if version_tuple(package.get("version", "0.0.0")) < (0, 31, 0):
+    current_version = version_tuple(package.get("version", "0.0.0"))
+    if current_version < (0, 31, 0):
         fail("S3-C1 requires package version >= 0.31.0")
 
     migrations = sorted(path.name for path in MIGRATIONS.glob("*.sql") if path.is_file())
-    if migrations != EXPECTED_MIGRATIONS:
+    if current_version < (0, 32, 0) and migrations != EXPECTED_MIGRATIONS:
+        fail(f"S3-C1 must preserve its original migration history: {migrations}")
+    if current_version >= (0, 32, 0) and migrations[:len(EXPECTED_MIGRATIONS)] != EXPECTED_MIGRATIONS:
         fail(f"S3-C1 must add no migration and preserve migration history: {migrations}")
 
     if hashlib.sha256(API.read_bytes()).hexdigest() != API_SHA:

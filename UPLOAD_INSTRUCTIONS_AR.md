@@ -1,8 +1,8 @@
-# تعليمات رفع S3-C1 — v0.31.0
+# تعليمات رفع S3-C2 — v0.32.0
 
 1. ارفع محتويات حزمة `changed_files_only` فوق الفرع `main`.
-2. انتبه للملفات المخفية عند الرفع من المتصفح، وخصوصًا `.github/workflows/quality-pages.yml`. توجد نسخة مرئية مطابقة في `GITHUB_WORKFLOW_VISIBLE/quality-pages.yml`.
-3. انتظر `Quality & Live Preview` حتى تصبح جميع الوظائف خضراء.
-4. لا يوجد SQL أو Migration لهذه المرحلة.
-5. افتح GitHub Pages ثم «المعلمون» وتحقق من ظهور `S3-C1 • علاقات Supabase`.
-6. اختبر فتح ملف المعلم والتأكد أن عدادات الطلبات والملفات والزيارات تعرض بيانات Supabase فقط.
+2. تأكد من رفع `.env.example` و`.github/workflows/quality-pages.yml`. النسختان المرئيتان موجودتان في `ENV_EXAMPLE_VISIBLE.txt` و`GITHUB_WORKFLOW_VISIBLE/quality-pages.yml` للحماية من تجاهل الملفات المخفية.
+3. انتظر `Quality & Live Preview` حتى تصبح `quality` و`build-preview` و`deploy-preview` خضراء.
+4. بعد GitHub GREEN فقط، شغّل Migration S3-C2 مرة واحدة في Supabase SQL Editor.
+5. شغّل بعدها `supabase/tests/s3_c2_live_acceptance.sql` وتأكد من ظهور `PASS: S3-C2 supervision write RLS acceptance`.
+6. افتح GitHub Pages ثم «الإشراف والمتابعة» واختبر إنشاء وتعديل زيارة وإجراء متابعة، ثم أعد تحميل الصفحة.

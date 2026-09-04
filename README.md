@@ -418,3 +418,7 @@ Version **v0.29.0** adds a staged Supabase write repository for teacher create/u
 ## S3-C1 — Teacher Related Domains Read Boundary
 
 Version **v0.31.0** expands the current-year Teachers workspace with direct Supabase/RLS reads for upload requests, documents, supervision visits, and supervision actions using the authoritative Supabase `teacher_id`. No Legacy ID matching, schema migration, or related-domain write cutover is introduced.
+
+## S3-C2 — Supervision Visits Read/Write Cutover
+
+Version **v0.32.0** cuts the current-year supervision workspace over to Supabase. Visits and follow-up actions use RLS-backed `SECURITY INVOKER` RPCs, while supervision timeline entries are appended to `activities` atomically. Writes remain owner/admin only, lead teachers are read-only, visit deletion stays disabled, and historical years/manual rollback remain on Legacy. See `SUPABASE_SUPERVISION_CUTOVER_AR.md`.
