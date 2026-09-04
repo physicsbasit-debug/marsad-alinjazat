@@ -101,6 +101,9 @@ jobs:
       - name: S3-B2 teachers write repository and RLS acceptance
         run: python scripts/check_supabase_s3_b2.py
 
+      - name: S3-B2R1 teacher write ambiguity correction
+        run: python scripts/check_supabase_s3_b2_r1.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 
