@@ -409,3 +409,8 @@ Version **v0.29.0** adds a staged Supabase write repository for teacher create/u
 
 ## S3-B2R1 v0.29.1
 أضيف تصحيح additive مستقل لغموض `teacher_id` داخل `marsad_create_teacher_v1`; لا Cutover ولا تغيير RLS/Schema. راجع `SUPABASE_TEACHER_WRITE_AMBIGUITY_CORRECTION_AR.md`.
+
+
+## S3-B3 — Teachers UI Cutover
+
+تم تحويل صفحة المعلمين للعام الجاري إلى Supabase مع رجوع يدوي إلى Legacy، دون قطع بقية المجالات أو إضافة Migration جديدة.

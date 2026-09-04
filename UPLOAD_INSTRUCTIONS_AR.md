@@ -46,3 +46,7 @@
 3. شغّل Migration التصحيحية `20260904143000_s3_b2_r1_teacher_write_ambiguity_correction.sql` في Supabase.
 4. شغّل `supabase/tests/s3_b2_r1_live_acceptance.sql`.
 5. المطلوب: `PASS: S3-B2R1 teacher write ambiguity correction`.
+
+
+## S3-B3 v0.30.0
+ارفع Changed Files Only فوق main وانتظر Quality & Live Preview GREEN. لا يوجد SQL أو Migration. بعد النشر افتح صفحة المعلمين وتحقق من ظهور «S3-B3 • تشغيل Supabase».

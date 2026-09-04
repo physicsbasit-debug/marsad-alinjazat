@@ -1,0 +1,47 @@
+{
+  "phase": "S3-B3",
+  "project_version": "0.30.0",
+  "title": "Teachers UI Cutover",
+  "schema_changes_allowed": false,
+  "rls_changes_allowed": false,
+  "sql_schema_migration_added": false,
+  "storage_changes_allowed": false,
+  "teacher_delete_enabled": false,
+  "other_domain_runtime_switch_allowed": false,
+  "teachers_operational_ui_cutover": true,
+  "current_academic_year_only": true,
+  "historical_years_use_legacy": true,
+  "default_env_mode": "legacy",
+  "github_pages_mode": "supabase",
+  "rollback_switch": {
+    "implemented": true,
+    "scope": "teachers page session only",
+    "label": "الرجوع المؤقت إلى Legacy"
+  },
+  "supabase_teacher_scope": [
+    "teachers",
+    "teacher_years",
+    "teacher_profiles",
+    "teacher_cv_items"
+  ],
+  "write_paths": {
+    "create_teacher": "marsad_create_teacher_v1",
+    "update_teacher": "marsad_update_teacher_v1",
+    "create_cv_item": "teacher_cv_items RLS insert",
+    "delete_cv_item": "teacher_cv_items RLS delete"
+  },
+  "related_domains_not_joined_by_teacher_id": [
+    "upload_requests",
+    "documents",
+    "supervision_visits"
+  ],
+  "legacy_api_unchanged": true,
+  "server_unchanged": true,
+  "live_acceptance": {
+    "method": "operational GitHub Pages teachers page",
+    "expected_source_label": "S3-B3 • تشغيل Supabase",
+    "sql_required": false,
+    "migration_required": false
+  },
+  "legacy_teacher_search_deep_links_trigger_legacy_fallback": true
+}

@@ -19,6 +19,21 @@ import type {
   SupervisionVisitRecord,
 } from '../types';
 
+
+export type TeacherProfileActions = {
+  loadProfile: (teacherId: number) => Promise<TeacherProfileDetails>;
+  updateProfile: (teacherId: number, input: UpdateTeacherProfileInput) => Promise<void>;
+  createCvItem: (teacherId: number, input: CreateTeacherCvItemInput) => Promise<{ id: number }>;
+  deleteCvItem: (teacherId: number, itemId: number) => Promise<void>;
+};
+
+const legacyTeacherProfileActions: TeacherProfileActions = {
+  loadProfile: getTeacherProfile,
+  updateProfile: updateTeacherProfile,
+  createCvItem: createTeacherCvItem,
+  deleteCvItem: deleteTeacherCvItem,
+};
+
 export function Teachers({
   teachers,
   requests,
@@ -30,6 +45,8 @@ export function Teachers({
   onChanged,
   initialOpenId = null,
   onInitialOpened,
+  profileActions = legacyTeacherProfileActions,
+  relatedDataNotice,
 }: {
   teachers: Teacher[];
   requests: UploadRequest[];
@@ -41,6 +58,8 @@ export function Teachers({
   onChanged: () => Promise<void>;
   initialOpenId?: number | null;
   onInitialOpened?: () => void;
+  profileActions?: TeacherProfileActions;
+  relatedDataNotice?: string;
 }) {
   const [query, setQuery] = useState('');
   const [subject, setSubject] = useState('الكل');
@@ -87,6 +106,7 @@ export function Teachers({
         </label>
       </div>
       <div className="teacher-grid">
+        {visible.length === 0 && <div className="teacher-empty-state"><Icon name="teachers" size={28} /><strong>لا يوجد معلمون مطابقون</strong><span>{teachers.length ? 'غيّر البحث أو مرشح المادة.' : 'أضف أول معلم إلى عام العمل الحالي.'}</span></div>}
         {visible.map((teacher) => {
           const requestCount = requests.filter((item) => item.teacherId === teacher.id).length;
           const documentCount = documents.filter((item) => item.teacherId === teacher.id).length;
@@ -102,8 +122,8 @@ export function Teachers({
               </div>
               <div className="teacher-facts">
                 <div><strong>{teacher.workload}</strong><span>النصاب</span></div>
-                <div><strong>{requestCount}</strong><span>الطلبات</span></div>
-                <div><strong>{documentCount}</strong><span>الملفات</span></div>
+                <div><strong>{relatedDataNotice ? '—' : requestCount}</strong><span>الطلبات</span></div>
+                <div><strong>{relatedDataNotice ? '—' : documentCount}</strong><span>الملفات</span></div>
               </div>
               <div className="completion-head"><span>اكتمال السيرة المهنية</span><strong>{teacher.cvCompletion}%</strong></div>
               <div className="mini-progress"><span style={{ width: `${teacher.cvCompletion}%` }} /></div>
@@ -125,6 +145,8 @@ export function Teachers({
             onChanged={onChanged}
             historicalContext={academicYear !== currentAcademicYear}
             academicYear={academicYear}
+            profileActions={profileActions}
+            relatedDataNotice={relatedDataNotice}
           />
         )}
       </Modal>
@@ -142,6 +164,8 @@ function TeacherProfile({
   onChanged,
   historicalContext,
   academicYear,
+  profileActions,
+  relatedDataNotice,
 }: {
   teacher: Teacher;
   requests: UploadRequest[];
@@ -150,6 +174,8 @@ function TeacherProfile({
   onChanged: () => Promise<void>;
   historicalContext: boolean;
   academicYear: string;
+  profileActions: TeacherProfileActions;
+  relatedDataNotice?: string;
 }) {
   const [details, setDetails] = useState<TeacherProfileDetails | null>(null);
   const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
@@ -161,7 +187,7 @@ function TeacherProfile({
   async function load() {
     setMessage('');
     try {
-      setDetails(await getTeacherProfile(teacher.id));
+      setDetails(await profileActions.loadProfile(teacher.id));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'تعذر تحميل الملف المهني.');
     }
@@ -172,7 +198,7 @@ function TeacherProfile({
     setEditing(false);
     setAddingItem(false);
     void load();
-  }, [teacher.id]);
+  }, [teacher.id, profileActions]);
 
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -197,7 +223,7 @@ function TeacherProfile({
     setBusy(true);
     setMessage('');
     try {
-      await updateTeacherProfile(teacher.id, payload);
+      await profileActions.updateProfile(teacher.id, payload);
       await load();
       await onChanged();
       setEditing(false);
@@ -226,7 +252,7 @@ function TeacherProfile({
     setBusy(true);
     setMessage('');
     try {
-      await createTeacherCvItem(teacher.id, payload);
+      await profileActions.createCvItem(teacher.id, payload);
       formElement.reset();
       await load();
       await onChanged();
@@ -244,7 +270,7 @@ function TeacherProfile({
     setBusy(true);
     setMessage('');
     try {
-      await deleteTeacherCvItem(teacher.id, item.id);
+      await profileActions.deleteCvItem(teacher.id, item.id);
       await load();
       await onChanged();
       setMessage('تم حذف البند.');
@@ -292,13 +318,13 @@ function TeacherProfile({
       {editing ? (
         <ProfileEditForm details={details} busy={busy} onSubmit={saveProfile} />
       ) : activeTab === 'overview' ? (
-        <Overview details={details} />
+        <Overview details={details} relatedDataNotice={relatedDataNotice} />
       ) : activeTab === 'cv' ? (
         <CvSection details={details} busy={busy} addingItem={addingItem} setAddingItem={setAddingItem} onAdd={addCvItem} onDelete={removeCvItem} />
       ) : activeTab === 'works' ? (
-        <WorksSection requests={requests} documents={documents} stats={details.stats} />
+        <WorksSection requests={requests} documents={documents} stats={details.stats} relatedDataNotice={relatedDataNotice} />
       ) : activeTab === 'visits' ? (
-        <VisitsSection visits={visits} stats={details.stats} />
+        <VisitsSection visits={visits} stats={details.stats} relatedDataNotice={relatedDataNotice} />
       ) : (
         <AchievementsSection items={achievementItems} onAdd={() => { setActiveTab('cv'); setAddingItem(true); }} />
       )}
@@ -310,15 +336,16 @@ function Tab({ id, current, onSelect, children }: { id: ProfileTab; current: Pro
   return <button className={current === id ? 'active' : ''} onClick={() => onSelect(id)}>{children}</button>;
 }
 
-function Overview({ details }: { details: TeacherProfileDetails }) {
+function Overview({ details, relatedDataNotice }: { details: TeacherProfileDetails; relatedDataNotice?: string }) {
   const { teacher, profile, stats } = details;
   return (
     <div className="profile-panel">
+      {relatedDataNotice && <div className="teacher-source-notice">{relatedDataNotice}</div>}
       <div className="profile-stats">
-        <div><strong>{stats.requestCount}</strong><span>طلبات ملفات</span></div>
-        <div><strong>{stats.documentCount}</strong><span>ملفات مرتبطة</span></div>
-        <div><strong>{stats.approvedDocumentCount}</strong><span>ملفات معتمدة</span></div>
-        <div><strong>{stats.visitCount}</strong><span>زيارات إشرافية</span></div>
+        <div><strong>{relatedDataNotice ? '—' : stats.requestCount}</strong><span>طلبات ملفات</span></div>
+        <div><strong>{relatedDataNotice ? '—' : stats.documentCount}</strong><span>ملفات مرتبطة</span></div>
+        <div><strong>{relatedDataNotice ? '—' : stats.approvedDocumentCount}</strong><span>ملفات معتمدة</span></div>
+        <div><strong>{relatedDataNotice ? '—' : stats.visitCount}</strong><span>زيارات إشرافية</span></div>
       </div>
       <div className="profile-summary-card">
         <span className="eyebrow">نبذة مهنية</span>
@@ -438,13 +465,14 @@ function CvItem({ item, onDelete }: { item: TeacherCvItem; onDelete: (item: Teac
   );
 }
 
-function WorksSection({ requests, documents, stats }: { requests: UploadRequest[]; documents: DocumentRecord[]; stats: TeacherProfileDetails['stats'] }) {
+function WorksSection({ requests, documents, stats, relatedDataNotice }: { requests: UploadRequest[]; documents: DocumentRecord[]; stats: TeacherProfileDetails['stats']; relatedDataNotice?: string }) {
   return (
     <div className="profile-panel">
+      {relatedDataNotice && <div className="teacher-source-notice">{relatedDataNotice}</div>}
       <div className="profile-stats">
-        <div><strong>{stats.requestCount}</strong><span>طلبات مرتبطة</span></div>
-        <div><strong>{stats.documentCount}</strong><span>ملفات مستلمة</span></div>
-        <div><strong>{stats.approvedDocumentCount}</strong><span>ملفات معتمدة</span></div>
+        <div><strong>{relatedDataNotice ? '—' : stats.requestCount}</strong><span>طلبات مرتبطة</span></div>
+        <div><strong>{relatedDataNotice ? '—' : stats.documentCount}</strong><span>ملفات مستلمة</span></div>
+        <div><strong>{relatedDataNotice ? '—' : stats.approvedDocumentCount}</strong><span>ملفات معتمدة</span></div>
       </div>
       <div className="profile-section-head compact"><div><span className="eyebrow">الأعمال</span><h3>آخر الطلبات والملفات المرتبطة بالمعلم</h3></div></div>
       <div className="teacher-work-list">
@@ -456,14 +484,15 @@ function WorksSection({ requests, documents, stats }: { requests: UploadRequest[
   );
 }
 
-function VisitsSection({ visits, stats }: { visits: SupervisionVisitRecord[]; stats: TeacherProfileDetails['stats'] }) {
+function VisitsSection({ visits, stats, relatedDataNotice }: { visits: SupervisionVisitRecord[]; stats: TeacherProfileDetails['stats']; relatedDataNotice?: string }) {
   const labels: Record<string, string> = { planned: 'مخططة', completed: 'منفذة', needs_followup: 'تحتاج متابعة', closed: 'مغلقة', overdue: 'متأخرة' };
   return (
     <div className="profile-panel">
+      {relatedDataNotice && <div className="teacher-source-notice">{relatedDataNotice}</div>}
       <div className="profile-stats">
-        <div><strong>{stats.visitCount}</strong><span>إجمالي الزيارات</span></div>
-        <div><strong>{visits.filter((item) => item.status !== 'planned').length}</strong><span>زيارات منفذة</span></div>
-        <div><strong>{stats.openFollowupCount}</strong><span>متابعات مفتوحة</span></div>
+        <div><strong>{relatedDataNotice ? '—' : stats.visitCount}</strong><span>إجمالي الزيارات</span></div>
+        <div><strong>{relatedDataNotice ? '—' : visits.filter((item) => item.status !== 'planned').length}</strong><span>زيارات منفذة</span></div>
+        <div><strong>{relatedDataNotice ? '—' : stats.openFollowupCount}</strong><span>متابعات مفتوحة</span></div>
       </div>
       <div className="profile-section-head compact"><div><span className="eyebrow">الإشراف الفني</span><h3>سجل الزيارات المرتبط بالمعلم</h3></div></div>
       <div className="teacher-visit-list">
