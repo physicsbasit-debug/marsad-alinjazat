@@ -1,0 +1,10 @@
+مرصد الإنجازات — S3-B1 v0.28.0
+
+1) ارفع Changed Files Only فوق main.
+2) انتظر Quality & Live Preview حتى يصبح أخضر.
+3) لا تشغّل SQL. لا توجد Migration في هذه المرحلة.
+4) افتح GitHub Pages مع ?teachers-check=1.
+5) سجّل الدخول بحساب Supabase الحقيقي.
+6) المطلوب: PASS: S3-B1 Teachers Read Repository.
+7) ظهور 0 معلمين مقبول لمسار القراءة، لكنه لا يسمح بتحويل الصفحة التشغيلية إلى Supabase.
+8) Parity Gate تبقى NOT ESTABLISHED ما لم يوجد مصدر Legacy حقيقي للمقارنة.

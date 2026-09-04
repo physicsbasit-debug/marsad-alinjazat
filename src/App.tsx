@@ -16,6 +16,7 @@ import { PublicUpload } from './pages/PublicUpload';
 import { Requests } from './pages/Requests';
 import { Teachers } from './pages/Teachers';
 import { AuthDiagnostic } from './pages/AuthDiagnostic';
+import { TeachersReadDiagnostic } from './pages/TeachersReadDiagnostic';
 import type { BootstrapData, CreateEventInput, CreateRequestInput, CreateTeacherInput, RequestStatus, SearchResult } from './types';
 
 const nav = [
@@ -25,6 +26,14 @@ const nav = [
 type View = typeof nav[number][0];
 
 export default function App() {
+  const isTeachersReadDiagnostic = useMemo(() => {
+    const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+    const pathname = window.location.pathname;
+    const relativePath = basePath && basePath !== '/' && pathname.startsWith(basePath)
+      ? pathname.slice(basePath.length)
+      : pathname;
+    return /^\/?teachers-check\/?$/.test(relativePath) || new URLSearchParams(window.location.search).get('teachers-check') === '1';
+  }, []);
   const isAuthDiagnostic = useMemo(() => {
     const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
     const pathname = window.location.pathname;
@@ -42,6 +51,7 @@ export default function App() {
     return relativePath.match(/^\/?upload\/([^/]+)$/)?.[1] || null;
   }, []);
   if(isAuthDiagnostic) return <AuthDiagnostic/>;
+  if(isTeachersReadDiagnostic) return <TeachersReadDiagnostic/>;
   if(publicToken) return <PublicUpload token={publicToken}/>;
   return <AdminApp/>;
 }

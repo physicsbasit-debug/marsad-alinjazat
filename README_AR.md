@@ -368,3 +368,8 @@ STORAGE_MODE
 ## S3-A — Auth & Tenant Session Foundation
 
 الإصدار `v0.27.0` يضيف صفحة تشخيص حيّة لـSupabase Auth والجلسة المدرسية عبر `?auth-check=1`. تقرأ الصفحة `profiles` و`school_memberships` و`schools` و`academic_years` عبر RLS فقط. لا يوجد تحويل لأي مجال تشغيلي إلى Supabase بعد، ويظل `/api/bootstrap` على FastAPI/SQLite. راجع `SUPABASE_AUTH_SESSION_AR.md`.
+
+
+## S3-B1 — Teachers Read Repository
+
+الإصدار v0.28.0 يضيف قراءة مجال المعلمين من Supabase عبر RLS كبوابة تشخيص فقط. صفحة المعلمين التشغيلية و`api.ts` يبقيان على FastAPI/SQLite حتى اعتماد Parity/Cutover مستقل. راجع `SUPABASE_TEACHERS_READ_PARITY_AR.md`.

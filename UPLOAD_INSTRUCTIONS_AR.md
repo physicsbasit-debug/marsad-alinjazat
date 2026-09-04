@@ -20,3 +20,12 @@
 ## S3-A / v0.27.0
 
 ارفع Changed Files Only فوق `main` وانتظر GitHub Actions GREEN. بعد ذلك أضف Repository Variables: `VITE_SUPABASE_URL` و`VITE_SUPABASE_PUBLISHABLE_KEY`، ثم أعد تشغيل Workflow وافتح GitHub Pages مع `?auth-check=1`. لا توجد Migration أو SQL مطلوبان في هذه المرحلة.
+
+
+## S3-B1 v0.28.0
+- ارفع Changed Files Only فوق main.
+- انتظر GitHub Actions GREEN.
+- لا SQL ولا Migration.
+- افتح `?teachers-check=1` على GitHub Pages.
+- المطلوب `PASS: S3-B1 Teachers Read Repository`.
+- `NOT ESTABLISHED` في Parity Gate لا يعد فشلًا في S3-B1؛ معناه أن Cutover ما زال محظورًا.
