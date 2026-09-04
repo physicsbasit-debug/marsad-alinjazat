@@ -1,0 +1,21 @@
+مرصد الإنجازات — S3-C3A / v0.33.0
+طلبات الملفات + فهرس الوثائق على Supabase
+
+1) ارفع changed_files_only فوق main.
+2) انتظر Quality & Live Preview = GREEN.
+3) شغّل migration:
+   20260904212000_s3_c3a_requests_documents_review_cutover.sql
+4) شغّل:
+   supabase/tests/s3_c3a_live_acceptance.sql
+5) النتيجة المطلوبة:
+   PASS: S3-C3A requests/documents review RLS acceptance
+6) افتح GitHub Pages واختبر طلبات الملفات والوثائق.
+
+حدود المرحلة:
+- قراءة الطلبات والوثائق من Supabase للعام الجاري.
+- اعتماد الطلب من Supabase، واعتماد metadata الوثيقة المرتبطة معه.
+- لا إنشاء رابط رفع جديد في Supabase بعد.
+- لا رفع مباشر لوثيقة في Supabase بعد.
+- لا Storage ولا Public Upload في هذه المرحلة.
+
+ملاحظة: لا تعديل على .env.example في S3-C3A؛ GitHub Pages يفعّل الوضع من workflow فقط.

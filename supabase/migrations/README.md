@@ -16,6 +16,7 @@
 20260904130000_s3_b2_teacher_write_foundation.sql
 20260904143000_s3_b2_r1_teacher_write_ambiguity_correction.sql
 20260904194500_s3_c2_supervision_write_cutover.sql
+20260904212000_s3_c3a_requests_documents_review_cutover.sql
 ```
 
 - S2-B1: `schools`, `profiles`, `school_memberships`, `academic_years`.
@@ -56,3 +57,8 @@ S2-D intentionally adds no migration. It is a database acceptance/data-migration
 ### S3-C2 — Supervision write cutover
 
 `20260904194500_s3_c2_supervision_write_cutover.sql` لا يضيف جدولًا أو عمودًا. يفتح INSERT محدودًا على `activities` للإدارة ويضيف خمس RPCs ذرية بصلاحية `SECURITY INVOKER` لدورة الزيارة وإجراءات المتابعة، مع إبقاء حذف الزيارة غير متاح.
+
+
+### S3-C3A — Requests/documents review cutover
+
+`20260904212000_s3_c3a_requests_documents_review_cutover.sql` لا يضيف جدولًا أو عمودًا. يفتح UPDATE محدودًا لحالة `upload_requests` وmetadata اعتماد `documents` لدوري owner/admin، ويضيف RPC واحدة `SECURITY INVOKER` للمراجعة الذرية مع سجل `activities`. لا يفتح INSERT للطلبات أو الوثائق، ولا Storage أو Public Upload.

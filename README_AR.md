@@ -394,3 +394,8 @@ STORAGE_MODE
 ## S3-C2 — Supervision Visits Read/Write Cutover
 
 الإصدار **v0.32.0** يحول مسار الإشراف والمتابعة للعام الجاري إلى Supabase. الزيارات وإجراءات المتابعة تُقرأ وتُكتب عبر RLS وRPCs ذرية بصلاحية `SECURITY INVOKER`، مع سجل زمني في `activities`. الكتابة محصورة بـ`owner/admin`، و`lead_teacher` للقراءة فقط. لا حذف للزيارة ولا Storage ولا تحويل لبقية المجالات. الأعوام التاريخية والرجوع اليدوي يبقيان على Legacy. راجع `SUPABASE_SUPERVISION_CUTOVER_AR.md`.
+
+
+## S3-C3A — Requests & Documents Review Cutover
+
+الإصدار **v0.33.0** ينقل قائمة طلبات الملفات وفهرس الوثائق للعام الجاري إلى Supabase، مع تحديث حالة الطلب واعتماد metadata الوثائق المرتبطة عبر RLS وRPC ذرية. إنشاء رابط رفع جديد ورفع الملفات وSupabase Storage تبقى مؤجلة صراحة إلى S3-C3B. الرجوع اليدوي وLegacy للأعوام التاريخية يبقيان متاحين. راجع `SUPABASE_REQUESTS_DOCUMENTS_REVIEW_AR.md`.

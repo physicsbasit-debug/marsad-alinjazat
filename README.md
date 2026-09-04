@@ -422,3 +422,8 @@ Version **v0.31.0** expands the current-year Teachers workspace with direct Supa
 ## S3-C2 — Supervision Visits Read/Write Cutover
 
 Version **v0.32.0** cuts the current-year supervision workspace over to Supabase. Visits and follow-up actions use RLS-backed `SECURITY INVOKER` RPCs, while supervision timeline entries are appended to `activities` atomically. Writes remain owner/admin only, lead teachers are read-only, visit deletion stays disabled, and historical years/manual rollback remain on Legacy. See `SUPABASE_SUPERVISION_CUTOVER_AR.md`.
+
+
+## S3-C3A — Requests & Documents Review Cutover
+
+الإصدار **v0.33.0** ينقل قائمة طلبات الملفات وفهرس الوثائق للعام الجاري إلى Supabase، مع تحديث حالة الطلب واعتماد metadata الوثائق المرتبطة عبر RLS وRPC ذرية. إنشاء رابط رفع جديد ورفع الملفات وSupabase Storage تبقى مؤجلة صراحة إلى S3-C3B. الرجوع اليدوي وLegacy للأعوام التاريخية يبقيان متاحين. راجع `SUPABASE_REQUESTS_DOCUMENTS_REVIEW_AR.md`.

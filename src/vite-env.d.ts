@@ -9,6 +9,7 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_SESSION_MODE?: string;
   readonly VITE_TEACHERS_DATA_MODE?: string;
   readonly VITE_SUPERVISION_DATA_MODE?: string;
+  readonly VITE_REQUESTS_DOCUMENTS_DATA_MODE?: string;
 }
 
 interface ImportMeta {

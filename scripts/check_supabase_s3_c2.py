@@ -84,7 +84,7 @@ def main() -> None:
         fail("S3-C2 migration hash mismatch")
     migrations = sorted(path.name for path in MIGRATIONS.glob("*.sql") if path.is_file())
     expected = list(HISTORICAL_MIGRATIONS) + [MIGRATION]
-    if migrations != expected:
+    if migrations[:len(expected)] != expected:
         fail(f"S3-C2 migration history/order mismatch: {migrations}")
 
     if hashlib.sha256(API.read_bytes()).hexdigest() != API_SHA:
