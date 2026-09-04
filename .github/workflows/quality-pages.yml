@@ -110,6 +110,9 @@ jobs:
       - name: S3-C1 teacher-related Supabase read boundary
         run: python scripts/check_supabase_s3_c1.py
 
+      - name: S3-C2 supervision read/write cutover
+        run: python scripts/check_supabase_s3_c2.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 
@@ -136,6 +139,7 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_SUPABASE_SESSION_MODE: 'diagnostic'
           VITE_TEACHERS_DATA_MODE: 'supabase'
+          VITE_SUPERVISION_DATA_MODE: 'supabase'
         run: |
           npm run build:pages
           touch dist/.nojekyll
