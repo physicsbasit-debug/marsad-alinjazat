@@ -34,8 +34,12 @@ def main() -> None:
             fail(f"missing S2-E2 artifact: {path.relative_to(ROOT)}")
 
     package = json.loads(PACKAGE.read_text(encoding="utf-8"))
-    if package.get("version") != "0.26.0":
-        fail("S2-E2 requires package version 0.26.0")
+    try:
+        version_tuple = tuple(int(part) for part in package.get("version", "0.0.0").split("."))
+    except ValueError:
+        fail("invalid package version")
+    if version_tuple < (0, 26, 0):
+        fail("S2-E2 requires package version >= 0.26.0")
 
     migrations = sorted(p.name for p in MIGRATIONS.glob("*.sql") if p.is_file())
     if migrations != EXPECTED_MIGRATIONS:

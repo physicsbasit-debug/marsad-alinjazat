@@ -1,0 +1,13 @@
+مرصد الإنجازات — S3-A / v0.27.0
+
+1) ارفع Changed Files Only فوق main.
+2) انتظر Quality & Live Preview = GREEN.
+3) في GitHub: Settings → Secrets and variables → Actions → Variables.
+4) أضف VITE_SUPABASE_URL بقيمة Project URL من Supabase.
+5) أضف VITE_SUPABASE_PUBLISHABLE_KEY بقيمة Publishable key فقط.
+6) أعد تشغيل Workflow أو اعمل commit بسيط ليعاد بناء Pages.
+7) افتح GitHub Pages وأضف ?auth-check=1 للرابط.
+8) سجّل الدخول بحساب Auth الحقيقي.
+9) القبول: PASS: S3-A Auth & Tenant Session + المدرسة + الدور + العام الحالي.
+
+لا SQL جديد ولا Migration في هذه المرحلة.

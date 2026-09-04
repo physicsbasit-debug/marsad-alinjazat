@@ -363,3 +363,8 @@ STORAGE_MODE
 ### S2-E2 — تهيئة المستأجر الإنتاجي
 
 الإصدار **v0.26.0** يضيف عقد التهيئة الحية الأولى للمدرسة دون تعديل Schema أو RLS أو Runtime أو Storage. ملف GitHub يحتوي placeholders فقط حفاظًا على الخصوصية، بينما تُسلَّم نسخة Live المخصصة خارج المستودع العام. تنشئ التهيئة فقط المدرسة الحقيقية، إسقاط حساب Auth إلى `profiles` عند الحاجة، عضوية `owner/active`، والعام الدراسي `2026/2027`. لا تُزرع بيانات تجريبية ولا `school_settings` غير معتمدة. بعد ذلك يُشغّل اختبار RLS منفصل ينتهي بـ`ROLLBACK` ليثبت وصول المالك وعزل غير الأعضاء.
+
+
+## S3-A — Auth & Tenant Session Foundation
+
+الإصدار `v0.27.0` يضيف صفحة تشخيص حيّة لـSupabase Auth والجلسة المدرسية عبر `?auth-check=1`. تقرأ الصفحة `profiles` و`school_memberships` و`schools` و`academic_years` عبر RLS فقط. لا يوجد تحويل لأي مجال تشغيلي إلى Supabase بعد، ويظل `/api/bootstrap` على FastAPI/SQLite. راجع `SUPABASE_AUTH_SESSION_AR.md`.

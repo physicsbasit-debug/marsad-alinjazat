@@ -1239,3 +1239,13 @@ a { color: inherit; text-decoration: none; }
   .historical-context-banner { margin:10px 10px -4px; align-items:flex-start; flex-wrap:wrap; padding:10px 12px; }
   .historical-context-banner .ghost-button { width:100%; }
 }
+
+/* S3-A: Supabase Auth / tenant-session diagnostic */
+.auth-diagnostic-shell{min-height:100vh;display:grid;place-items:center;padding:32px 18px;background:linear-gradient(145deg,#f5f7fb,#eef2f7)}
+.auth-diagnostic-card{width:min(680px,100%);background:#fff;border:1px solid #e4e8ef;border-radius:24px;padding:30px;box-shadow:0 24px 70px rgba(15,23,42,.08)}
+.auth-diagnostic-brand{display:flex;align-items:center;gap:12px;padding-bottom:20px;border-bottom:1px solid #edf0f4}.auth-diagnostic-brand>div{display:flex;flex-direction:column;gap:2px}.auth-diagnostic-brand small{color:#7a8494}
+.auth-diagnostic-heading{padding:24px 0 18px}.auth-diagnostic-heading h1{margin:7px 0 10px;font-size:clamp(24px,4vw,34px)}.auth-diagnostic-heading p{margin:0;color:#667085;line-height:1.9}
+.auth-status{display:flex;gap:12px;align-items:flex-start;border:1px solid #e6eaf0;background:#f8fafc;border-radius:16px;padding:15px 16px;margin:12px 0}.auth-status>div{display:flex;flex-direction:column;gap:5px}.auth-status span{color:#667085;line-height:1.6}.auth-status-success{background:#f0fdf4;border-color:#bbf7d0}.auth-status-warning{background:#fffbeb;border-color:#fde68a}.auth-status-error{background:#fef2f2;border-color:#fecaca}
+.auth-login-form{display:grid;gap:15px;margin-top:8px}.auth-login-form label{display:grid;gap:7px;font-weight:700;color:#344054}.auth-login-form input{width:100%;box-sizing:border-box;border:1px solid #d5dae2;border-radius:12px;padding:12px 14px;font:inherit;background:#fff;outline:none}.auth-login-form input:focus{border-color:#4758c7;box-shadow:0 0 0 3px rgba(71,88,199,.1)}
+.auth-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0}.auth-facts>div{border:1px solid #e8ebf0;border-radius:14px;padding:13px 14px;background:#fbfcfe}.auth-facts dt{font-size:12px;color:#7a8494;margin-bottom:5px}.auth-facts dd{margin:0;font-weight:800;color:#1f2937}.auth-diagnostic-note{margin:18px 0 0;color:#8a94a3;font-size:13px;text-align:center}.spinner{width:20px;height:20px;border:3px solid #dce2ea;border-top-color:#4758c7;border-radius:50%;animation:authspin .8s linear infinite}@keyframes authspin{to{transform:rotate(360deg)}}
+@media(max-width:560px){.auth-diagnostic-card{padding:22px 18px;border-radius:18px}.auth-facts{grid-template-columns:1fr}}

@@ -15,3 +15,8 @@
    `PASS: S2-E2 tenant RLS acceptance`
 
 لا تُرفع ملفات Live الشخصية إلى GitHub لأنها تحتوي معرف المدرسة/بريد المالك التشغيلي.
+
+
+## S3-A / v0.27.0
+
+ارفع Changed Files Only فوق `main` وانتظر GitHub Actions GREEN. بعد ذلك أضف Repository Variables: `VITE_SUPABASE_URL` و`VITE_SUPABASE_PUBLISHABLE_KEY`، ثم أعد تشغيل Workflow وافتح GitHub Pages مع `?auth-check=1`. لا توجد Migration أو SQL مطلوبان في هذه المرحلة.

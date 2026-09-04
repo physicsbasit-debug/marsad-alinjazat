@@ -10,3 +10,6 @@ VITE_API_BASE_URL=
 VITE_SUPABASE_URL=
 # Use the current publishable key (sb_publishable_...). Never put a secret/service-role key here.
 VITE_SUPABASE_PUBLISHABLE_KEY=
+
+# S3-A session mode: off | diagnostic | required
+VITE_SUPABASE_SESSION_MODE=off

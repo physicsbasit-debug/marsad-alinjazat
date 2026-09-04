@@ -391,3 +391,8 @@ Version **v0.25.1** makes the S2-E1 gate self-contained for the GitHub + Supabas
 ### S2-E2 — production tenant bootstrap
 
 Version **v0.26.0** adds the one-time production tenant bootstrap contract without changing PostgreSQL schema, RLS, runtime, or storage. The committed SQL remains privacy-safe and contains placeholders only. The live personalized bootstrap is delivered outside the public repository. It creates only the real school, the owner membership projection, and academic year `2026/2027`; domain demo data and school settings are intentionally not seeded. A separate rollback-only RLS acceptance verifies owner access and non-member tenant isolation.
+
+
+## S3-A — Auth & Tenant Session Foundation
+
+الإصدار `v0.27.0` يضيف صفحة تشخيص حيّة لـSupabase Auth والجلسة المدرسية عبر `?auth-check=1`. تقرأ الصفحة `profiles` و`school_memberships` و`schools` و`academic_years` عبر RLS فقط. لا يوجد تحويل لأي مجال تشغيلي إلى Supabase بعد، ويظل `/api/bootstrap` على FastAPI/SQLite. راجع `SUPABASE_AUTH_SESSION_AR.md`.

@@ -83,16 +83,23 @@ def main() -> None:
     if secret_hits:
         fail(f"frontend contains forbidden Supabase secret/service-role material: {secret_hits}")
 
-    # S1 is foundation-only. No production page or legacy API path may consume Supabase yet.
+    # S1 originally allowed no Supabase consumers. From S3-A onward, two isolated
+    # diagnostic/session files are allowed while the operational API boundary stays legacy.
+    allowed_s3a_consumers = {
+        "src/lib/supabaseSession.ts",
+        "src/pages/AuthDiagnostic.tsx",
+    } if version_tuple >= (0, 27, 0) else set()
     import_hits: list[str] = []
     for path in SRC_DIR.rglob("*.ts*"):
         if path == CLIENT_FILE:
             continue
         text = path.read_text(encoding="utf-8")
-        if re.search(r"from\s+['\"][^'\"]*supabase['\"]", text):
-            import_hits.append(str(path.relative_to(ROOT)))
+        if re.search(r'from\s+[\'\"][^\'\"]*supabase[\'\"]', text):
+            relative = str(path.relative_to(ROOT))
+            if relative not in allowed_s3a_consumers:
+                import_hits.append(relative)
     if import_hits:
-        fail(f"S1 must not switch runtime data paths to Supabase yet: {import_hits}")
+        fail(f"Supabase escaped the approved S3-A diagnostic boundary: {import_hits}")
 
     if not LEGACY_API_FILE.exists() or "VITE_PREVIEW_MODE" not in LEGACY_API_FILE.read_text(encoding="utf-8"):
         fail("legacy runtime boundary changed unexpectedly during S1")
@@ -109,7 +116,7 @@ def main() -> None:
         fail(f"pre-S2-B projects must not contain application migrations yet: {migration_files}")
 
     print("PASS: Marsad Phase S1 Supabase foundation contract")
-    print(f"INFO: runtime_source=FastAPI/SQLite supabase_runtime_consumers=0 migrations={len(migration_files)}")
+    print(f"INFO: runtime_source=FastAPI/SQLite approved_supabase_diagnostic_consumers={len(allowed_s3a_consumers)} migrations={len(migration_files)}")
     print("INFO: browser_key=VITE_SUPABASE_PUBLISHABLE_KEY forbidden_frontend_secrets=0")
     print(f"INFO: env_template_source={env_contract_file.name}")
 

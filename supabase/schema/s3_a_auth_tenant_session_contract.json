@@ -1,0 +1,46 @@
+{
+  "phase": "S3-A",
+  "project_version": "0.27.0",
+  "title": "Supabase Auth and Tenant Session Foundation",
+  "schema_changes_allowed": false,
+  "rls_changes_allowed": false,
+  "sql_schema_migration_added": false,
+  "domain_runtime_switch_allowed": false,
+  "legacy_fastapi_bootstrap_remains_source": true,
+  "storage_changes_allowed": false,
+  "auth_user_creation_allowed": false,
+  "membership_mutation_allowed": false,
+  "diagnostic_read_tables": [
+    "profiles",
+    "school_memberships",
+    "schools",
+    "academic_years"
+  ],
+  "auth_method": "supabase.auth.signInWithPassword",
+  "authorization_source": "public.school_memberships only; never Auth user_metadata/app_metadata",
+  "supported_active_memberships": 1,
+  "multiple_membership_behavior": "fail closed until an explicit school selector phase",
+  "diagnostic_entry": "?auth-check=1",
+  "github_pages": {
+    "preview_mode_remains_true": true,
+    "repository_variables": [
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_PUBLISHABLE_KEY"
+    ],
+    "session_mode": "diagnostic"
+  },
+  "privacy": {
+    "owner_email_committed": false,
+    "password_committed": false,
+    "service_role_key_allowed_in_browser": false,
+    "raw_provider_errors_shown_to_user": false
+  },
+  "live_acceptance": {
+    "expected_text": "PASS: S3-A Auth & Tenant Session",
+    "must_show_school": true,
+    "must_show_role": true,
+    "must_show_current_academic_year": true,
+    "writes_domain_data": false
+  },
+  "meaning": "The browser can authenticate and resolve one active tenant context through existing RLS. No operational domain has switched away from FastAPI/SQLite yet."
+}

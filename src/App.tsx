@@ -15,6 +15,7 @@ import { Supervision, SupervisionVisitModal } from './pages/Supervision';
 import { PublicUpload } from './pages/PublicUpload';
 import { Requests } from './pages/Requests';
 import { Teachers } from './pages/Teachers';
+import { AuthDiagnostic } from './pages/AuthDiagnostic';
 import type { BootstrapData, CreateEventInput, CreateRequestInput, CreateTeacherInput, RequestStatus, SearchResult } from './types';
 
 const nav = [
@@ -24,6 +25,14 @@ const nav = [
 type View = typeof nav[number][0];
 
 export default function App() {
+  const isAuthDiagnostic = useMemo(() => {
+    const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
+    const pathname = window.location.pathname;
+    const relativePath = basePath && basePath !== '/' && pathname.startsWith(basePath)
+      ? pathname.slice(basePath.length)
+      : pathname;
+    return /^\/?auth-check\/?$/.test(relativePath) || new URLSearchParams(window.location.search).get('auth-check') === '1';
+  }, []);
   const publicToken = useMemo(() => {
     const basePath = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '');
     const pathname = window.location.pathname;
@@ -32,6 +41,7 @@ export default function App() {
       : pathname;
     return relativePath.match(/^\/?upload\/([^/]+)$/)?.[1] || null;
   }, []);
+  if(isAuthDiagnostic) return <AuthDiagnostic/>;
   if(publicToken) return <PublicUpload token={publicToken}/>;
   return <AdminApp/>;
 }
