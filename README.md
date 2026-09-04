@@ -383,3 +383,7 @@ STORAGE_MODE
 
 ### S2-B5 Fix 1 — updated_at clock semantics
 Live Supabase acceptance exposed that `statement_timestamp()` remains constant for an entire SQL statement. Version 0.21.1 adds a corrective migration that replaces only `public.set_row_updated_at()` with `clock_timestamp()` while preserving the already-applied S2-B5 migration and all 22 triggers.
+
+### S2-E1B — self-contained representative legacy dry run
+
+Version **v0.25.1** makes the S2-E1 gate self-contained for the GitHub + Supabase Dashboard workflow. CI builds a deterministic 25-table legacy fixture, runs it through the migration compiler, validates semantic reconciliation, and keeps a reviewable rollback-only Supabase SQL pack. No schema/RLS/runtime/storage cutover occurs in this phase.

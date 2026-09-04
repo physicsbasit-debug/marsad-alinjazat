@@ -1,0 +1,297 @@
+{
+  "phase": "S2-E1",
+  "compiler_version": "1.0.0",
+  "status": "READY_FOR_SUPABASE_DRY_RUN",
+  "source": {
+    "filename": "marsad_alinjazat.sqlite3",
+    "sha256": "f856c70a821403b2cfdf8cb142825b8a57ca318be5666281a5087634eb77377c",
+    "size_bytes": 266240,
+    "integrity_check": "ok",
+    "foreign_key_violations": 0,
+    "source_table_count": 25
+  },
+  "dry_run": {
+    "school_id": "897b2a8a-4f44-5ce1-b870-cc5bc74f2a7f",
+    "school_name": "مدرسة مرصد الاختبار التمثيلي",
+    "current_academic_year": "2026/2027",
+    "id_base": 7000000000000000000,
+    "sql_ends_with_rollback": true,
+    "production_commit_allowed": false
+  },
+  "source_audit": {
+    "settings": {
+      "source_rows": 2,
+      "accepted_rows": 1,
+      "excluded_rows": 1,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {
+        "security_boundary_secret_setting": 1
+      },
+      "rejection_reason_counts": {}
+    },
+    "teachers": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "teacher_profiles": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "teacher_cv_items": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "teacher_record_years": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "upload_requests": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "request_record_years": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "documents": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "events": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "event_record_years": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "event_media": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "event_media_meta": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "event_teacher_links": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "activities": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "meetings": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "meeting_attendees": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "meeting_decisions": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "curriculum_plans": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "curriculum_units": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "supervision_visits": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "supervision_actions": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "achievement_assessments": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "achievement_assessment_standards": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "achievement_actions": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    },
+    "achievement_action_metrics": {
+      "source_rows": 1,
+      "accepted_rows": 1,
+      "excluded_rows": 0,
+      "rejected_rows": 0,
+      "exclusion_reason_counts": {},
+      "rejection_reason_counts": {}
+    }
+  },
+  "folded_relations": {
+    "request_record_years": {
+      "source_links": 1,
+      "matched_links": 1,
+      "unmatched_links": 0
+    },
+    "event_record_years": {
+      "source_links": 1,
+      "matched_links": 1,
+      "unmatched_links": 0
+    },
+    "teacher_record_years": {
+      "source_links": 1,
+      "matched_links": 1,
+      "unmatched_links": 0
+    },
+    "event_media_meta": {
+      "source_links": 1,
+      "matched_links": 1,
+      "unmatched_links": 0
+    }
+  },
+  "academic_years": {
+    "labels": [
+      "2025/2026",
+      "2026/2027"
+    ],
+    "inferred_counts": {
+      "documents": 1
+    }
+  },
+  "transform_metrics": {
+    "teacher_year_rows": 2,
+    "storage_file_id_folded_to_storage_path": 1,
+    "secret_settings_excluded": 1
+  },
+  "target_expected_counts": {
+    "schools": 1,
+    "profiles": 0,
+    "school_memberships": 0,
+    "academic_years": 2,
+    "school_settings": 1,
+    "teachers": 1,
+    "teacher_profiles": 1,
+    "teacher_years": 2,
+    "teacher_cv_items": 1,
+    "upload_requests": 1,
+    "documents": 1,
+    "events": 1,
+    "event_media": 1,
+    "event_teacher_links": 1,
+    "activities": 1,
+    "meetings": 1,
+    "meeting_attendees": 1,
+    "meeting_decisions": 1,
+    "curriculum_plans": 1,
+    "curriculum_units": 1,
+    "supervision_visits": 1,
+    "supervision_actions": 1,
+    "achievement_assessments": 1,
+    "achievement_assessment_standards": 1,
+    "achievement_actions": 1,
+    "achievement_action_metrics": 1
+  },
+  "boundaries": {
+    "auth_users_migrated": false,
+    "school_memberships_migrated": false,
+    "storage_bytes_migrated": false,
+    "runtime_cutover": false,
+    "live_data_commit": false
+  },
+  "next_gate": "run marsad_s2_e1_dry_run.sql in Supabase SQL Editor and require PASS; the script rolls back"
+}

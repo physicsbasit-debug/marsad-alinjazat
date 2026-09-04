@@ -151,8 +151,12 @@ def main() -> None:
             fail(f"missing S2-E1 file: {path.relative_to(ROOT)}")
 
     package = json.loads(PACKAGE.read_text(encoding="utf-8"))
-    if package.get("version") != "0.25.0":
-        fail("S2-E1 requires package version 0.25.0")
+    try:
+        version_tuple = tuple(int(part) for part in str(package.get("version", "")).split("."))
+    except ValueError:
+        fail("invalid package version")
+    if version_tuple < (0, 25, 0):
+        fail("S2-E1 requires package version >= 0.25.0")
 
     migrations = sorted(p.name for p in MIGRATIONS.glob("*.sql") if p.is_file())
     if migrations != EXPECTED_MIGRATIONS:

@@ -355,3 +355,7 @@ STORAGE_MODE
 
 ### S2-B5 Fix 1 — تصحيح updated_at
 كشف اختبار Supabase الحي أن `statement_timestamp()` ثابت طوال SQL statement واحد، لذلك قد لا يتقدم `updated_at` عند تنفيذ أكثر من عملية داخل statement واحد. الإصدار 0.21.1 يضيف Migration تصحيحية جديدة تستبدل الدالة فقط لتستخدم `clock_timestamp()`، مع إبقاء Migration S2-B5 الأصلية والـ22 Trigger دون تعديل.
+
+### S2-E1B — الاختبار التمثيلي الذاتي لنقل Legacy
+
+الإصدار **v0.25.1** يزيل الحاجة إلى Terminal أو قاعدة SQLite خارجية لقبول S2-E1. يبني GitHub Actions Fixture حتمية تغطي جداول Legacy الـ25، ويمررها عبر Migration Compiler، ثم يتحقق من reconciliation ويحافظ على ملف SQL مرجعي قابل للتشغيل يدويًا في Supabase. الاختبار لا يضيف Migration ولا يعتمد أي بيانات دائمة، وينتهي بـ`ROLLBACK;`.

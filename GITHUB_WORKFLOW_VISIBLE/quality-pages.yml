@@ -86,6 +86,9 @@ jobs:
       - name: S2-E1 SQLite migration compiler dry-run tooling
         run: python scripts/check_supabase_s2_e1.py
 
+      - name: S2-E1B representative legacy dry-run pack
+        run: python scripts/check_supabase_s2_e1b.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 

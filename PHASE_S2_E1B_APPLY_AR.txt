@@ -1,0 +1,14 @@
+مرصد الإنجازات — S2-E1B v0.25.1
+Representative Legacy Dry Run
+
+1) ارفع changed_files_only فوق main.
+2) انتظر GitHub Actions GREEN، بما في ذلك S2-E1B representative legacy dry-run pack.
+3) لا تشغّل أي Migration في Supabase.
+4) بعد GREEN افتح Supabase > SQL Editor > New query.
+5) شغّل الملف كاملًا:
+   supabase/tests/s2_e1b_representative_dry_run.sql
+6) النتيجة المطلوبة:
+   PASS: S2-E1 SQLite migration dry run
+7) الملف ينتهي بـ ROLLBACK، لذلك لا تبقى بيانات الاختبار.
+
+هذه المرحلة تختبر خريطة تحويل Legacy ممثلة بالكامل، ولا تحتاج ملف SQLite خارجيًا ولا Terminal.

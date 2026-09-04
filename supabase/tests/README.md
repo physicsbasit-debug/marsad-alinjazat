@@ -26,3 +26,7 @@
 `s2_d_live_acceptance.sql` is acceptance-only and has no paired migration. It reuses one real Auth user, builds a rollback-protected complete fixture across the 26-table target and two schools, validates year isolation, RLS roles, critical constraints and referential behavior, and returns `PASS: S2-D database acceptance and migration readiness`. PASS authorizes only a controlled SQLite data-migration dry run, not runtime cutover.
 
 - S2-D Fix 1 v0.24.1: corrected the SET NULL temporary-document fixture cleanup before role visibility assertions.
+
+### S2-E1B — Representative Legacy Dry Run
+
+`s2_e1b_representative_dry_run.sql` هو Pack قبول ذاتي لا يحتاج ملف SQLite خارجيًا. يبنيه CI منطقيًا من Fixture تمثل جداول Legacy الـ25، ويُراجع مقابل `s2_e1b_reconciliation.json` و`s2_e1b_report.md`. التشغيل اليدوي في Supabase يجب أن يعيد `PASS: S2-E1 SQLite migration dry run` وينتهي بـ`ROLLBACK;`.

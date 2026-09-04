@@ -1,46 +1,47 @@
-# S2-E1 — SQLite Migration Compiler & Controlled Dry Run
+# S2-E1 / S2-E1B — SQLite Migration Compiler & Controlled Dry Run
 
-هذه المرحلة تحول **نسخة SQLite متسقة** إلى حزمة Dry Run قابلة للتشغيل يدويًا في Supabase SQL Editor. لا تضيف Migration للمخطط ولا تنقل بيانات إنتاجية نهائيًا.
+S2-E1 أنشأت Migration Compiler لتحويل بنية Legacy ذات 25 جدولًا إلى نموذج Supabase الحالي. S2-E1B تجعل بوابة القبول **ذاتية التشغيل** ومطابقة لمنهجية المشروع الفعلية: GitHub + GitHub Actions + Supabase Dashboard.
 
-## لماذا نحتاج Compiler قبل النقل الحقيقي؟
+## المسار المعتمد الآن
 
-لأن المصدر يحتوي 25 جدول SQLite، بينما الهدف 26 جدول PostgreSQL مع دمج أربع علاقات Legacy وتغيير بنية السنة الدراسية والمعلم. النسخ المباشر صفًا بصف ليس نقلًا، بل طريقة متقدمة لصناعة أخطاء يصعب تفسيرها.
+لا نطلب من المستخدم Terminal ولا ملف SQLite خارجيًا. بدل ذلك يبني CI Fixture حتمية تمثل كل جداول Legacy الـ25، ثم يمررها عبر نفس Compiler المستخدم لأي مصدر SQLite مستقبلي.
 
-## الإدخال الحقيقي المطلوب
+المخرجات المرجعية المحفوظة:
 
-ملف نسخة احتياطية متسقة من:
+1. `supabase/tests/s2_e1b_representative_dry_run.sql`
+2. `supabase/tests/s2_e1b_reconciliation.json`
+3. `supabase/tests/s2_e1b_report.md`
 
-`marsad_alinjazat.sqlite3`
+## ما تغطيه Fixture
 
-يُفضّل إنشاؤه باستخدام `scripts/marsad_maintenance.py backup` بدل نسخ ملف قاعدة مفتوح مع WAL.
+- جدولان دراسيان: 2025/2026 و2026/2027.
+- معلم + ملف مهني + CV.
+- `teacher_record_years -> teacher_years` مع إبقاء البيانات التاريخية غير المثبتة NULL.
+- `request_record_years -> upload_requests.academic_year_id`.
+- `event_record_years -> events.academic_year_id`.
+- `event_media_meta -> event_media`.
+- وثيقة Legacy محلية تتحول `local -> legacy_local`.
+- أصل `google_drive` metadata.
+- إعداد عادي + إعداد سري مستبعد Audit-only دون تسريب القيمة.
+- الاجتماعات، التخطيط، الإشراف، التحصيل، الإجراءات، المقاييس، الأنشطة.
 
-قاعدة التشغيل الحقيقية لا توجد في GitHub عمدًا لأن `.gitignore` يستبعد `*.sqlite3` و`data/`.
+## حدود المرحلة
 
-## المخرجات
+- لا Schema migration جديدة.
+- لا تعديل RLS.
+- لا Auth user mutation.
+- لا Storage bytes migration.
+- لا Runtime cutover.
+- لا COMMIT.
 
-يشغّل `scripts/marsad_sqlite_migration_compiler.py` ويولد:
+## القبول الحي
 
-1. `marsad_s2_e1_dry_run.sql`
-2. `marsad_s2_e1_reconciliation.json`
-3. `marsad_s2_e1_report.md`
+بعد GitHub Actions GREEN شغّل:
 
-ملف SQL يبدأ بـ`BEGIN` وينتهي إلزاميًا بـ`ROLLBACK;`، لذلك لا يعتمد أي بيانات دائمة.
+`supabase/tests/s2_e1b_representative_dry_run.sql`
 
-## قواعد التحويل الأساسية
-
-- مدرسة Dry Run اصطناعية ومحددة للمعاملة فقط.
-- السنة الحالية يجب أن تُعطى صراحة ولا تُخمن.
-- cutoff التاريخي للسنة الدراسية يبقى أغسطس كما في Legacy.
-- `request_record_years` و`event_record_years` يندمجان في `academic_year_id`.
-- `teacher_record_years` يندمج في `teacher_years`، والحقول التاريخية غير المثبتة تبقى `NULL`.
-- `event_media_meta` يندمج في `event_media`.
-- `local` يتحول إلى `legacy_local`.
-- `storage_file_id` يُحفظ داخل `storage_path` فقط عند غياب مسار صريح.
-- أسرار Legacy مثل refresh tokens لا تُصدر إلى SQL وتظهر كاستبعاد موثق بالعدد فقط.
-- Auth users وschool_memberships وملفات التخزين الفعلية لا تُنقل هنا.
-
-## معنى PASS
+في Supabase SQL Editor. النتيجة المطلوبة:
 
 `PASS: S2-E1 SQLite migration dry run`
 
-تعني أن نسخة SQLite الحقيقية أمكن تحميلها داخل Transaction مؤقتة مع تطابق أعداد الهدف ثم Rollback. لا تعني أن React تحول إلى Supabase، ولا أن FastAPI/SQLite يمكن حذفه بعد.
+ثم ينفذ الملف `ROLLBACK;`، فلا تبقى بيانات الاختبار.

@@ -1,0 +1,47 @@
+{
+  "phase": "S2-E1B",
+  "project_version": "0.25.1",
+  "title": "Representative Legacy Fixture Dry Run",
+  "purpose": "make S2-E1 acceptance self-contained for the GitHub + Supabase Dashboard workflow",
+  "schema_changes_allowed": false,
+  "rls_changes_allowed": false,
+  "runtime_switch_allowed": false,
+  "live_data_commit_allowed": false,
+  "storage_bytes_migration_allowed": false,
+  "auth_user_mutation_allowed": false,
+  "sql_schema_migration_added": false,
+  "source_mode": "deterministic_representative_fixture",
+  "source_table_count": 25,
+  "fixture_source_row_count": 26,
+  "target_table_count": 26,
+  "target_expected_row_count": 26,
+  "fixture_current_academic_year": "2026/2027",
+  "fixture_school_name": "مدرسة مرصد الاختبار التمثيلي",
+  "fixture_requirements": {
+    "all_25_legacy_tables_represented": true,
+    "secret_setting_exclusion_exercised": true,
+    "teacher_history_fold_exercised": true,
+    "request_year_fold_exercised": true,
+    "event_year_fold_exercised": true,
+    "event_media_meta_fold_exercised": true,
+    "legacy_local_storage_normalization_exercised": true,
+    "google_drive_storage_metadata_exercised": true
+  },
+  "committed_outputs": [
+    "supabase/tests/s2_e1b_representative_dry_run.sql",
+    "supabase/tests/s2_e1b_reconciliation.json",
+    "supabase/tests/s2_e1b_report.md"
+  ],
+  "dry_run_safety": {
+    "must_begin_transaction": true,
+    "must_end_with_rollback": true,
+    "commit_forbidden": true,
+    "production_cutover": false
+  },
+  "acceptance": {
+    "github_ci_required": true,
+    "external_sqlite_snapshot_required": false,
+    "supabase_expected_result": "PASS: S2-E1 SQLite migration dry run",
+    "meaning": "representative legacy mapping is accepted against the live Supabase schema; no production data is committed and runtime remains unchanged"
+  }
+}
