@@ -189,9 +189,10 @@ def main() -> None:
         if fragment not in req_ws:
             fail(f"RequestsWorkspace C3B missing: {fragment}")
     doc_ws = DOC_WS.read_text()
-    for fragment in ("createSupabaseDocumentSignedUrl", "onOpenDocument={openDocument}", "S3-C3B • وثائق Supabase", "5 دقائق"):
+    document_boundary_marker = "S3-C3C • وثائق Supabase" if version >= (0, 35, 0) else "S3-C3B • وثائق Supabase"
+    for fragment in ("createSupabaseDocumentSignedUrl", "onOpenDocument={openDocument}", document_boundary_marker, "5 دقائق"):
         if fragment not in doc_ws:
-            fail(f"DocumentsWorkspace C3B missing: {fragment}")
+            fail(f"DocumentsWorkspace C3B signed-open boundary missing: {fragment}")
     if "onOpenDocument?: (document: DocumentRecord) => Promise<void>" not in DOC_PAGE.read_text():
         fail("presentational Documents signed-open seam missing")
     if "إنشاء رابط الرفع متاح الآن من صفحة الطلبات عبر Supabase." not in APP.read_text():
@@ -223,7 +224,7 @@ def main() -> None:
     print("PASS: Marsad S3-C3B public intake and private Storage contract")
     print("INFO: request_create=1 public_upload=1 private_storage=1 signed_url_seconds=300")
     print("INFO: token_raw_persisted=0 token_sha256_only=1 max_upload_mb=25 orphan_cleanup=1")
-    print("INFO: direct_document_upload=0 historical_legacy=1 browser_server_secret=0")
+    print(f"INFO: direct_document_upload={1 if version >= (0, 35, 0) else 0} historical_legacy=1 browser_server_secret=0")
 
 
 if __name__ == "__main__":

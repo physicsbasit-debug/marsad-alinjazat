@@ -168,7 +168,9 @@ def main() -> None:
 
     doc_ws = DOC_WS.read_text()
     doc_fragments = ["REQUESTS_DOCUMENTS_DATA_MODE", "loadSupabaseRequestsDocumentsSnapshot",
-                     "canUpload={false}", "الرجوع المؤقت إلى Legacy"]
+                     "الرجوع المؤقت إلى Legacy"]
+    if version < (0, 35, 0):
+        doc_fragments.append("canUpload={false}")
     if version < (0, 34, 0):
         doc_fragments.append("S3-C3A • وثائق Supabase")
     for fragment in doc_fragments:
@@ -233,7 +235,7 @@ def main() -> None:
 
     print("PASS: Marsad S3-C3A requests/documents review cutover contract")
     print("INFO: current_year_supabase=1 historical_legacy=1 request_review=1 documents_index=1")
-    print("INFO: request_create=0 direct_upload=0 public_upload=0 storage=0 token_hash_select=0")
+    print(f"INFO: request_create={1 if version >= (0, 34, 0) else 0} direct_upload={1 if version >= (0, 35, 0) else 0} public_upload={1 if version >= (0, 34, 0) else 0} storage={1 if version >= (0, 34, 0) else 0} token_hash_select=0")
     print("INFO: roles_read=owner,admin roles_write=owner,admin rpc_security=invoker")
 
 

@@ -4,9 +4,10 @@ import { loadTenantSessionContext, signInWithEmail, subscribeToAuthChanges } fro
 import type { TenantSessionContext } from '../lib/supabaseSession';
 import { createSupabaseDocumentSignedUrl, loadSupabaseRequestsDocumentsSnapshot } from '../lib/supabaseRequestsDocuments';
 import type { SupabaseRequestsDocumentsSnapshot } from '../lib/supabaseRequestsDocuments';
-import type { DocumentRecord, Teacher } from '../types';
+import type { DirectDocumentInput, DocumentRecord, Teacher } from '../types';
 import { Documents } from './Documents';
 import { REQUESTS_DOCUMENTS_DATA_MODE } from './RequestsWorkspace';
+import { uploadSupabaseDirectDocument } from '../lib/supabaseDocuments';
 
 export function DocumentsWorkspace({
   legacyDocuments,
@@ -58,6 +59,12 @@ export function DocumentsWorkspace({
   if (!context) return <Login error={error} onSignedIn={load} onLegacy={() => setForceLegacy(true)}/>;
   if (error || !snapshot) return <State title="تعذر تشغيل سجل الوثائق من Supabase" detail={error || 'لم تكتمل القراءة.'} onRetry={() => void load()} onLegacy={() => setForceLegacy(true)}/>;
 
+
+  async function uploadDocument(input: DirectDocumentInput, file: File): Promise<void> {
+    if (!context) throw new Error('جلسة Supabase غير متاحة.');
+    await uploadSupabaseDirectDocument(context, input, file);
+  }
+
   async function openDocument(document: DocumentRecord): Promise<void> {
     if (!context) return;
     try {
@@ -75,19 +82,21 @@ export function DocumentsWorkspace({
       teachers={snapshot.teachers}
       academicYear={academicYear}
       onRefresh={load}
-      canUpload={false}
+      canUpload
       onOpenDocument={openDocument}
-      sourceNotice="S3-C3B يخزن ملفات الطلبات في Bucket خاصة ويفتحها للإدارة برابط موقّع صالح لمدة 5 دقائق. الرفع المباشر للوثائق ما زال مؤجلًا."
+      onUploadDocument={uploadDocument}
+      uploadAccept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png"
+      sourceNotice="S3-C3C يتيح للإدارة رفع الوثائق مباشرة إلى Bucket الخاصة، مع استمرار فتح الملفات عبر رابط موقّع صالح لمدة 5 دقائق."
     />
   </>;
 }
 
 function SourceBanner({ source, detail, onLegacy, onRestore, onRefresh }: { source: 'supabase'|'legacy'; detail: string; onLegacy?: () => void; onRestore?: () => void; onRefresh?: () => void }) {
-  return <div className={`teacher-source-banner ${source}`}><div><span className="teacher-source-dot"/><div><strong>{source==='supabase'?'S3-C3B • وثائق Supabase':'مصدر Legacy مؤقت'}</strong><span>{detail}</span></div></div><div className="teacher-source-actions">{onRefresh&&<button onClick={onRefresh}><Icon name="arrow" size={15}/> تحديث</button>}{onLegacy&&<button onClick={onLegacy}>الرجوع المؤقت إلى Legacy</button>}{onRestore&&<button onClick={onRestore}>إعادة Supabase</button>}</div></div>;
+  return <div className={`teacher-source-banner ${source}`}><div><span className="teacher-source-dot"/><div><strong>{source==='supabase'?'S3-C3C • وثائق Supabase':'مصدر Legacy مؤقت'}</strong><span>{detail}</span></div></div><div className="teacher-source-actions">{onRefresh&&<button onClick={onRefresh}><Icon name="arrow" size={15}/> تحديث</button>}{onLegacy&&<button onClick={onLegacy}>الرجوع المؤقت إلى Legacy</button>}{onRestore&&<button onClick={onRestore}>إعادة Supabase</button>}</div></div>;
 }
 function State({ title, detail, busy, onRetry, onLegacy }: { title:string; detail:string; busy?:boolean; onRetry?:()=>void; onLegacy?:()=>void }) { return <div className="teacher-cutover-state"><div className="teacher-cutover-card">{busy?<div className="spinner"/>:<Icon name="alert" size={28}/>}<h2>{title}</h2><p>{detail}</p><div className="teacher-source-actions">{onRetry&&<button className="primary-button" onClick={onRetry}>إعادة المحاولة</button>}{onLegacy&&<button className="ghost-button" onClick={onLegacy}>Legacy مؤقتًا</button>}</div></div></div>; }
 function Login({ error, onSignedIn, onLegacy }: { error:string; onSignedIn:()=>Promise<void>; onLegacy:()=>void }) {
   const [busy,setBusy]=useState(false); const [message,setMessage]=useState(error);
   async function submit(event:React.FormEvent<HTMLFormElement>){event.preventDefault();const form=new FormData(event.currentTarget);setBusy(true);setMessage('');try{await signInWithEmail(String(form.get('email')||''),String(form.get('password')||''));await onSignedIn();}catch(caught){setMessage(caught instanceof Error?caught.message:'تعذر تسجيل الدخول.');}finally{setBusy(false);}}
-  return <div className="teacher-cutover-state"><div className="teacher-cutover-card"><span className="eyebrow">S3-C3B • Supabase</span><h2>تسجيل الدخول لسجل الوثائق</h2><form onSubmit={submit} className="teacher-login-form"><label>البريد الإلكتروني<input type="email" name="email" required/></label><label>كلمة المرور<input type="password" name="password" required/></label>{message&&<div className="inline-error"><Icon name="alert" size={16}/>{message}</div>}<button className="primary-button" disabled={busy}>{busy?'جاري التحقق...':'تسجيل الدخول'}</button></form><button className="ghost-button" onClick={onLegacy}>Legacy مؤقتًا</button></div></div>;
+  return <div className="teacher-cutover-state"><div className="teacher-cutover-card"><span className="eyebrow">S3-C3C • Supabase</span><h2>تسجيل الدخول لسجل الوثائق</h2><form onSubmit={submit} className="teacher-login-form"><label>البريد الإلكتروني<input type="email" name="email" required/></label><label>كلمة المرور<input type="password" name="password" required/></label>{message&&<div className="inline-error"><Icon name="alert" size={16}/>{message}</div>}<button className="primary-button" disabled={busy}>{busy?'جاري التحقق...':'تسجيل الدخول'}</button></form><button className="ghost-button" onClick={onLegacy}>Legacy مؤقتًا</button></div></div>;
 }

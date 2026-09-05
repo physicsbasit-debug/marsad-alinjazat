@@ -1,0 +1,23 @@
+مرصد الإنجازات — S3-C3C Direct Document Upload & Management — v0.35.0
+
+النطاق:
+- تفعيل «إضافة وثيقة» في صفحة الوثائق للعام الدراسي الحالي عبر Supabase.
+- الرفع المباشر متاح فقط لحساب owner/admin الموثق في Supabase Auth.
+- المتصفح لا يكتب مباشرة إلى documents أو Storage ولا يحمل أي Secret/Service Role.
+- Edge Function مستقلة marsad-direct-document-upload تتحقق من JWT والعضوية والعام الحالي والمعلم الاختياري.
+- الملفات تذهب إلى Bucket الخاصة marsad-documents بحد 25MB والأنواع التعليمية المعتمدة.
+- الوثيقة المباشرة تُسجل approved لأنها أضيفت من الإدارة، مع approved_at ونشاط مؤسسي.
+- عند فشل metadata أو activity بعد رفع Storage تُنفذ عملية تعويض بحذف السجل/الملف لمنع الأيتام.
+- فتح الوثائق يبقى عبر Signed URL لمدة 300 ثانية.
+- لا توجد Migration جديدة ولا تغيير في RLS أو مخطط الجداول أو Bucket.
+- مسار الرفع العام S3-C3B يبقى كما هو دون تعديل.
+
+قبل الدمج:
+1) ارفع changed-files-only إلى GitHub.
+2) انتظر GitHub Actions: npm check + pytest + S0→S3-C3C + HTTP E2E.
+3) لا تشغّل أي SQL لهذه المرحلة.
+4) أنشئ/حدّث Edge Function باسم marsad-direct-document-upload مع Verify JWT مفعّلًا.
+5) نفّذ اختبار قبول حي: الإدارة → الوثائق → إضافة وثيقة → رفع ملف → ظهوره approved → فتحه عبر Signed URL.
+6) اختبر الرفض من حساب غير owner/admin، واختبر ملفًا غير مسموح أو أكبر من 25MB.
+
+لا تضع SUPABASE_SECRET_KEYS أو SUPABASE_SERVICE_ROLE_KEY أو أي sb_secret_* داخل VITE_* أو src/.

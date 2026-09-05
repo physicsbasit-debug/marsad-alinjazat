@@ -13,6 +13,8 @@ export function Documents({
   canUpload = true,
   sourceNotice,
   onOpenDocument,
+  onUploadDocument,
+  uploadAccept,
 }: {
   documents: DocumentRecord[];
   teachers: Teacher[];
@@ -21,12 +23,14 @@ export function Documents({
   canUpload?: boolean;
   sourceNotice?: string;
   onOpenDocument?: (document: DocumentRecord) => Promise<void>;
+  onUploadDocument?: (input: DirectDocumentInput, file: File) => Promise<void>;
+  uploadAccept?: string;
 }) {
   const [adding, setAdding] = useState(false);
   return <div className="page"><PageHeader eyebrow="المكتبة المؤسسية" title="الوثائق والمراجع" description="الملف في Drive، أما هنا فالمعنى: نوعه، مادته، صفه، صاحبه، سنته وحالته." action={canUpload?'إضافة وثيقة':undefined} onAction={canUpload?()=>setAdding(true):undefined} />{sourceNotice&&<div className="quiet-note">{sourceNotice}</div>}
     {documents.length===0?<div className="library-empty"><div className="empty-illustration"><Icon name="document" size={36}/></div><h2>لا توجد وثائق لهذا العام</h2><p>يمكن رفع وثيقة مباشرة لهذا العام، أو ستظهر الملفات المستلمة عبر طلبات الملفات تلقائيًا.</p></div>:
     <div className="document-grid">{documents.map(doc=><article className="document-card" key={doc.id}><span className="doc-icon"><Icon name="document"/></span><div><strong>{doc.title}</strong><p>{doc.originalName}</p><small>{[doc.subject,doc.grade,doc.academicYear].filter(Boolean).join(' • ')}</small></div>{doc.webViewLink?<a href={doc.webViewLink} target="_blank" rel="noreferrer" className="icon-button"><Icon name="external"/></a>:onOpenDocument&&doc.storageProvider==='supabase'&&doc.storagePath?<button type="button" className="icon-button" onClick={()=>void onOpenDocument(doc)} aria-label="فتح الوثيقة"><Icon name="external"/></button>:<span className="local-badge">محلي</span>}</article>)}</div>}
-    {canUpload&&<DirectDocumentModal open={adding} teachers={teachers} academicYear={academicYear} onClose={()=>setAdding(false)} onCreated={async()=>{setAdding(false);await onRefresh();}}/>}
+    {canUpload&&<DirectDocumentModal open={adding} teachers={teachers} academicYear={academicYear} onClose={()=>setAdding(false)} onCreated={async()=>{setAdding(false);await onRefresh();}} onUploadDocument={onUploadDocument} accept={uploadAccept}/>}
   </div>;
 }
 
@@ -36,12 +40,16 @@ function DirectDocumentModal({
   academicYear,
   onClose,
   onCreated,
+  onUploadDocument,
+  accept,
 }: {
   open: boolean;
   teachers: Teacher[];
   academicYear: string;
   onClose: () => void;
   onCreated: () => Promise<void>;
+  onUploadDocument?: (input: DirectDocumentInput, file: File) => Promise<void>;
+  accept?: string;
 }) {
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState('');
@@ -62,7 +70,7 @@ function DirectDocumentModal({
       grade:String(form.get('grade')||''),
     };
     setBusy(true);setMessage('');
-    try{await uploadDirectDocument(input,file);formElement.reset();await onCreated();}
+    try{if(onUploadDocument){await onUploadDocument(input,file);}else{await uploadDirectDocument(input,file);}formElement.reset();await onCreated();}
     catch(error){setMessage(error instanceof Error?error.message:'تعذر رفع الوثيقة.');}
     finally{setBusy(false);}
   }
@@ -70,7 +78,7 @@ function DirectDocumentModal({
   return <Modal open={open} onClose={onClose}><form className="request-form" onSubmit={submit}>
     <div className="modal-heading"><span className="eyebrow">وثيقة مؤسسية</span><h2>إضافة وثيقة إلى سجل العام</h2><p>استخدم العام الذي تنتمي إليه الوثيقة فعليًا. الرفع اليوم لا يغيّر سنة السجل التاريخية.</p></div>
     <div className="form-grid">
-      <label className="full">الملف<input type="file" name="file" required accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.webp"/></label>
+      <label className="full">الملف<input type="file" name="file" required accept={accept || ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.webp"}/></label>
       <label className="full">عنوان الوثيقة<input name="title" required placeholder="مثال: تحليل نتائج الاختبار النهائي"/></label>
       <label>العام الدراسي للسجل<input name="academicYear" required readOnly value={academicYear} dir="ltr"/><small className="field-hint">يُحدد من تقويم عام العمل أعلى التطبيق.</small></label>
       <label>التصنيف<select name="category" defaultValue="وثيقة"><option>وثيقة</option><option>خطة</option><option>اختبار</option><option>تحليل نتائج</option><option>محضر</option><option>تقرير</option><option>مرجع</option><option>وثيقة أخرى</option></select></label>

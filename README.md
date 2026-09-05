@@ -1,3 +1,7 @@
+## Phase S3-C3C — Direct Document Upload & Management
+
+The current-year Documents workspace can now upload administrative documents directly through an authenticated Supabase Edge Function. Browser code receives no server credential and has no direct `documents`/Storage write grant; the existing private `marsad-documents` bucket is reused. No database migration is added in this phase. See `SUPABASE_DIRECT_DOCUMENT_UPLOAD_AR.md`.
+
 ## Phase S2-E1 — SQLite Migration Compiler & Controlled Dry Run
 
 S2-E1 adds a rollback-only compiler that validates a consistent legacy SQLite snapshot, maps all 25 source tables into the 26-table Supabase target, emits reconciliation artifacts, excludes legacy secret settings, preserves the frozen academic-year rules, and generates a Supabase SQL dry run ending in `ROLLBACK;`. No schema/RLS/runtime/storage-byte change is introduced.
@@ -57,8 +61,8 @@ The repository now contains the browser client boundary, local CLI configuration
 
 **مرصد الإنجازات** منصة عربية RTL لإدارة العمل التربوي وبناء ذاكرة مؤسسية للمعلم الأول ورئيس المجال. تجمع أعمال القسم والمعلمين والطلبات والوثائق والتخطيط والتحصيل والإشراف والاجتماعات والفعاليات في سجلات مترابطة قابلة للمتابعة بدل توزيعها بين ملفات ومجلدات منفصلة.
 
-> الإصدار الجاري: **v0.25.0 — Phase S2-E1 SQLite Migration Dry Run**
-> آخر نقطة استقرار خضراء: **v0.23.0 — Phase S2-C2 Domain RLS + Live Acceptance**
+> الإصدار الجاري: **v0.35.0 — Phase S3-C3C Direct Document Upload & Management**
+> آخر نقطة استقرار خضراء: **v0.34.2 — S3-C3B R2 Public Intake LIVE GREEN**
 > المعاينة الحية: **https://physicsbasit-debug.github.io/marsad-alinjazat/**
 
 ## الفكرة
