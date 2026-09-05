@@ -122,6 +122,9 @@ jobs:
       - name: S3-C3B R1 GitHub Pages public upload routing
         run: python scripts/check_supabase_s3_c3b_r1.py
 
+      - name: S3-C3B R2 browser-to-Edge CORS correction
+        run: python scripts/check_supabase_s3_c3b_r2.py
+
       - name: Real HTTP E2E regression
         run: python scripts/marsad_e2e_regression.py
 

@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.112.4';
+import { corsHeaders as supabaseCorsHeaders } from 'npm:@supabase/supabase-js@2.112.4/cors';
 
 const BUCKET = 'marsad-documents';
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -17,8 +18,7 @@ const EXTENSION_MIME: Record<string, string> = {
 };
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'apikey, content-type, x-client-info',
+  ...supabaseCorsHeaders,
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Cache-Control': 'no-store',
 };

@@ -1,0 +1,18 @@
+مرصد الإنجازات — S3-C3B R2 — v0.34.2
+تصحيح CORS لاستدعاء Edge Function من المتصفح
+
+السبب:
+كان رابط الرفع يصل إلى واجهة React بعد R1، لكن استدعاء supabase.functions.invoke يرسل Authorization مع apikey وx-client-info وcontent-type. قائمة CORS اليدوية في marsad-public-upload لم تسمح بـ Authorization، لذلك كان المتصفح يوقف الاستدعاء عند preflight قبل وصوله إلى الوظيفة.
+
+النطاق:
+- لا SQL جديد.
+- لا تعديل على migration أو Storage schema أو RPCs.
+- لا تعديل على رابط الرفع أو واجهة PublicUpload.
+- تعديل Edge Function فقط لاستخدام CORS headers الرسمية المتزامنة من supabase-js.
+- تحديث حراس CI لتوثيق التصحيح المحدود.
+
+بعد رفع changed files ونجاح GitHub Actions:
+1) استبدل كود Edge Function marsad-public-upload بالكود الجديد.
+2) أعد Deploy للوظيفة فقط.
+3) لا تشغّل migration ولا Live Acceptance SQL من جديد لهذا التصحيح.
+4) أنشئ طلب رفع جديد وافتحه في نافذة خاصة، ثم ارفع PDF صغيرًا.

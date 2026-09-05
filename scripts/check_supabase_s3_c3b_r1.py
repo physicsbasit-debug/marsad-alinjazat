@@ -45,7 +45,13 @@ def main() -> None:
     if version < (0, 34, 1):
         fail("S3-C3B R1 requires package version >= 0.34.1")
 
+    future_mutable = {
+        ROOT / "supabase/functions/marsad-public-upload/index.ts",
+        ROOT / "scripts/check_supabase_s3_c3b.py",
+    } if version >= (0, 34, 2) else set()
     for path, expected in PROTECTED_HASHES.items():
+        if path in future_mutable:
+            continue
         if not path.exists() or sha(path) != expected:
             fail(f"protected S3-C3B artifact changed: {path.relative_to(ROOT)}")
 

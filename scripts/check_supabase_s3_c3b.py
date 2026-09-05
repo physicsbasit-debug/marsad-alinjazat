@@ -64,7 +64,8 @@ def main() -> None:
         fail("S3-C3A migration changed during S3-C3B")
     if sha(MIGRATIONS / MIGRATION) != MIGRATION_SHA:
         fail("S3-C3B migration hash mismatch")
-    if sha(EDGE) != EDGE_SHA:
+    # v0.34.2+ permits the bounded CORS-only Edge correction guarded by S3-C3B R2.
+    if version < (0, 34, 2) and sha(EDGE) != EDGE_SHA:
         fail("S3-C3B Edge Function hash mismatch")
 
     migrations = sorted(p.name for p in MIGRATIONS.glob("*.sql") if p.is_file())
@@ -134,10 +135,15 @@ def main() -> None:
         "const BUCKET = 'marsad-documents'", "const MAX_BYTES = 25 * 1024 * 1024",
         "SUPABASE_SECRET_KEYS", "SUPABASE_SERVICE_ROLE_KEY", "sha256Hex(token)",
         ".storage.from(BUCKET).upload", ".rpc('marsad_register_public_upload_v1'",
-        ".storage.from(BUCKET).remove([storagePath])", "status: 204", "Access-Control-Allow-Origin",
+        ".storage.from(BUCKET).remove([storagePath])", "status: 204",
     ):
         if fragment not in edge:
             fail(f"Edge Function missing: {fragment}")
+    if version < (0, 34, 2) and "Access-Control-Allow-Origin" not in edge:
+        fail("Edge Function missing legacy CORS origin header")
+    if version >= (0, 34, 2) and "corsHeaders as supabaseCorsHeaders" not in edge:
+        fail("S3-C3B R2 synchronized Supabase CORS headers missing")
+
     upload_pos = edge.find(".storage.from(BUCKET).upload")
     rpc_pos = edge.find(".rpc('marsad_register_public_upload_v1'")
     cleanup_pos = edge.find(".storage.from(BUCKET).remove([storagePath])")
